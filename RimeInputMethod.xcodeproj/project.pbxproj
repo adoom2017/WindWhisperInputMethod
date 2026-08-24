@@ -29,6 +29,9 @@
 		A10000000000000000000014 /* zh-Hans.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* zh-Hans.lproj */; };
 		A10000000000000000000015 /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* en.lproj */; };
 		A10000000000000000000016 /* FengYuInputSwitcherIcon-v1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */; };
+		A10000000000000000000017 /* CandidateWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001B /* CandidateWindowController.swift */; };
+		A10000000000000000000018 /* CandidateWindowPositioner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001C /* CandidateWindowPositioner.swift */; };
+		A10000000000000000000019 /* M4SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001D /* M4SmokeTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -72,6 +75,9 @@
 		A20000000000000000000018 /* zh-Hans.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "zh-Hans.lproj"; sourceTree = "<group>"; };
 		A20000000000000000000019 /* en.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = en.lproj; sourceTree = "<group>"; };
 		A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "FengYuInputSwitcherIcon-v1.pdf"; sourceTree = "<group>"; };
+		A2000000000000000000001B /* CandidateWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowController.swift; sourceTree = "<group>"; };
+		A2000000000000000000001C /* CandidateWindowPositioner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowPositioner.swift; sourceTree = "<group>"; };
+		A2000000000000000000001D /* M4SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M4SmokeTest.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				A40000000000000000000004 /* InputController */,
+				A4000000000000000000000D /* CandidateWindow */,
 				A40000000000000000000005 /* Installer */,
 				A40000000000000000000009 /* RimeBridge */,
 			);
@@ -206,6 +213,16 @@
 			path = lib;
 			sourceTree = "<group>";
 		};
+		A4000000000000000000000D /* CandidateWindow */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000001B /* CandidateWindowController.swift */,
+				A2000000000000000000001C /* CandidateWindowPositioner.swift */,
+				A2000000000000000000001D /* M4SmokeTest.swift */,
+			);
+			path = CandidateWindow;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -297,6 +314,9 @@
 				A10000000000000000000011 /* RimeRuntime.swift in Sources */,
 				A10000000000000000000012 /* RimeKeyMapper.swift in Sources */,
 				A10000000000000000000013 /* M3SmokeTest.swift in Sources */,
+				A10000000000000000000017 /* CandidateWindowController.swift in Sources */,
+				A10000000000000000000018 /* CandidateWindowPositioner.swift in Sources */,
+				A10000000000000000000019 /* M4SmokeTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,15 +1,15 @@
 # 风语完整开发计划
 
-> 文档状态：已确认，M3 功能实现与自动化验收完成  
+> 文档状态：已确认，M4 功能实现与自动化验收完成
 > 规划版本：0.1  
 > 日期：2026-08-24  
-> 当前门禁：**M3 真实 TextEdit 人工输入待确认；确认前不进入 M4**
+> 当前门禁：**M4 候选窗已热安装，等待 TextEdit 中键盘、鼠标与焦点行为人工确认；确认后进入 M5**
 
 ## 1. 文档目的
 
 本文是后续 AI Coding Agent 和人工开发者共同遵循的实施规范。它定义产品范围、架构边界、阶段任务、交付物、测试方法、风险与验收门禁。任何实现都应以本文为主线，并用 `docs/DECISIONS.md` 记录后续决策。
 
-用户已于 2026-08-24 明确确认开始编码，并允许本机安装测试。M1、M2 已完成；M3 已完成代码与自动化验收，真实 TextEdit 按键测试因 macOS 拒绝自动发送按键而保留一次人工确认门禁。
+用户已于 2026-08-24 明确确认开始编码，并允许本机安装测试。M1—M4 已完成代码与自动化验收；真实 TextEdit 按键和鼠标测试因 macOS 拒绝自动发送按键而保留人工确认门禁。
 
 ## 2. 产品目标
 
@@ -255,7 +255,7 @@ RimeInputMethod/
 
 验收：干净环境可重复构建；命令行测试闭环通过；无开发机 Homebrew 运行时依赖。
 
-### M3：基本输入闭环（实现与自动化验收完成，TextEdit 人工门禁待确认）
+### M3：基本输入闭环（已完成）
 
 任务：
 
@@ -269,9 +269,9 @@ RimeInputMethod/
 
 已完成：进程级 Rime runtime、每 controller 独立 session、串行化引擎调用、按键映射、快捷键透传、marked text、commit、Backspace、Escape、Space、Return 和停用提交策略。Debug/Release 的 `--m3-smoke` 已验证生产前端更新器向 `IMKTextInput` 发送 marked text 与“你好”提交；本机热安装无需注销。
 
-待确认：macOS 拒绝未授予辅助功能权限的 `osascript` 发送真实按键（错误 1002），因此仍需用户在 TextEdit 中切到“风语”，输入 `nihao` 后按空格，确认上屏“你好”。候选窗属于 M4，M3 只显示行内组合文本。
+人工验证并入 M4：macOS 拒绝未授予辅助功能权限的 `osascript` 发送真实按键（错误 1002），因此由用户在 TextEdit 中完成真实输入门禁。
 
-### M4：候选数据与基线窗口
+### M4：候选数据与基线窗口（实现与自动化验收完成，TextEdit 人工门禁待确认）
 
 任务：
 
@@ -281,6 +281,10 @@ RimeInputMethod/
 - 增加多屏边界与插入点变化测试。
 
 验收：键盘和鼠标选择一致；窗口永不抢焦点；页码和高亮与引擎一致。
+
+已完成：不可变 candidate/context/status 快照接入；非激活 `NSPanel` 基线候选窗；候选序号、注释、页码和高亮；数字键、方向键、PageUp/PageDown 与鼠标语义选词；插入点定位、多显示器选择、下方优先、空间不足向上翻转和可见区域约束；停用、提交与错误路径隐藏窗口。
+
+自动化：`Scripts/test-m4.sh Debug|Release` 覆盖候选展示模型、鼠标命中、非激活窗口配置、屏幕选择、边界定位，以及真实 librime 的候选高亮、翻页和选择提交。最终人工门禁见 `docs/M4_VALIDATION.md`。
 
 ### M5：原生毛玻璃视觉
 
@@ -455,4 +459,4 @@ RimeInputMethod/
 
 ## 19. 当前停点
 
-M1、M2 已完成。M3 已把 InputMethodKit controller、每会话 Rime session、按键映射、marked text、commit 和生命周期清理接成闭环；Debug arm64、Release arm64+x86_64、M2 回归、M3 生产前端更新器、静态分析和免注销热安装均通过。macOS 因未授予辅助功能权限而拒绝自动向 TextEdit 发送按键，因此当前停点是用户手工输入 `nihao` + Space 的 TextEdit 门禁；确认后进入 M4 候选数据与基线窗口。
+M1—M4 已完成实现。InputMethodKit controller、每会话 Rime session、marked text/commit、不可变候选快照、非激活基线面板、键盘/鼠标选词、Rime 高亮/翻页和多屏边界定位已接成闭环；Debug arm64、Release arm64+x86_64、M2/M3/M4 回归、静态分析和免注销热安装均应作为门禁执行。macOS 因未授予辅助功能权限而拒绝自动向 TextEdit 发送按键，因此当前停点是 `docs/M4_VALIDATION.md` 的 TextEdit 人工门禁；确认后进入 M5 原生毛玻璃视觉。

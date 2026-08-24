@@ -113,6 +113,16 @@
 - 后果：当前登录会话可继续热更新，不产生第二个输入源，不重置用户配置或词库；未来正式改 Bundle ID 时另行设计迁移。
 - 验证：工程校验脚本检查显示名、新图标文件和旧图标引用；Debug/Release 构建检查最终 bundle 的 `Info.plist` 与资源清单。
 
+### ADR-021：M4 使用自定义非激活基线候选面板
+
+- 日期：2026-08-24
+- 状态：已接受
+- 选择：M4 使用 `.borderless + .nonactivatingPanel` 的 `NSPanel` 和轻量自绘候选列表；panel 永不成为 key/main window。系统 `IMKCandidates` 仅作为行为对照，不作为最终界面依赖。
+- 状态所有权：页码、候选和高亮只来自不可变 Rime 快照；鼠标点击只回传本页候选索引，由 controller 调用 Rime 后重新读取快照。CandidateWindow 不访问引擎、不提交文本。
+- 定位：优先从 `IMKTextInput.attributes(forCharacterIndex:lineHeightRectangle:)` 获取当前输入行矩形；`firstRect` 仅作为多级兼容回退。随后按该矩形选择对应显示器的 visible frame，默认向下展开，空间不足向上翻转，最终约束在可见区域内。
+- 视觉边界：M4 只建立可用、可测的系统色基线；`NSVisualEffectView`、毛玻璃材质、横排视觉和可访问性主题细化属于 M5。
+- 验证：Debug/Release `--m4-smoke` 覆盖模型、鼠标命中、非激活约束、多屏边界、Rime 高亮、翻页和选择；真实 TextEdit 焦点与鼠标体验保留人工门禁。
+
 ## 待用户确认
 
 - ADR-008：默认输入方案和内置双拼集合。

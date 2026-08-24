@@ -77,6 +77,14 @@ M2 已固定路径：shared data 为应用包的 `Contents/Resources/Rime`；use
 
 定位函数只接受光标矩形、目标屏幕 visible frame、窗口测量尺寸和布局方向，输出最终 frame。优先向下/右展开，空间不足时翻转，并将最终 frame 约束在当前屏幕可见区域。窗口测量必须在完成文本布局后进行。
 
+## M4 候选窗闭环
+
+- `CandidateWindowModel` 只接收不可变 `RimeMenuSnapshot`，生成页码、1—9 本页序号、候选正文、注释与高亮索引；展示层不持有或查询 Rime session。
+- `CandidateWindowCoordinator` 持有 `.nonactivatingPanel`，其 panel 明确拒绝成为 key/main window。面板仅通过 `CandidateWindowAction` 向 controller 回传语义选择。
+- `RimeInputController` 在文本状态写入 client 后读取插入点屏幕矩形，再刷新候选窗；优先使用 `attributes(forCharacterIndex:lineHeightRectangle:)` 返回的输入行矩形，并以当前插入点、selected range 和 marked range 的 `firstRect` 作为兼容回退。鼠标选择由 controller 调用 session，重新读取完整快照并同时更新文本和窗口。
+- 键盘数字、方向键和 PageUp/PageDown 仍经过统一按键映射进入 librime。前端不自行计算页码或高亮，因此键盘和鼠标不会形成第二套候选状态。
+- controller 停用、关闭、提交、client/session 缺失或快照读取失败时立即隐藏面板，避免跨应用残留。
+
 ## 错误降级
 
 - 引擎不可用：输入事件透传，隐藏候选窗，展示不含输入内容的诊断状态。

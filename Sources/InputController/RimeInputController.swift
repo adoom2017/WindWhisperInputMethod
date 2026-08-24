@@ -12,6 +12,9 @@ final class RimeInputController: IMKInputController {
     private var session: RimeSession?
     private var hasMarkedText = false
     private var didLogSessionError = false
+    private lazy var candidateWindow = CandidateWindowCoordinator { [weak self] action in
+        self?.handleCandidateWindowAction(action)
+    }
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         self.inputClient = inputClient as? IMKTextInput
@@ -40,6 +43,7 @@ final class RimeInputController: IMKInputController {
 
     override func inputControllerWillClose() {
         finishComposition()
+        hideCandidateWindow()
         session = nil
         inputClient = nil
         super.inputControllerWillClose()
@@ -83,6 +87,7 @@ final class RimeInputController: IMKInputController {
             logger.error("Unable to update composition: \(error.localizedDescription, privacy: .public)")
             session.clearComposition()
             hasMarkedText = RimeClientUpdater.clearMarkedText(in: client)
+            hideCandidateWindow()
         }
         return true
     }
@@ -103,6 +108,7 @@ final class RimeInputController: IMKInputController {
     }
 
     private func finishComposition() {
+        hideCandidateWindow()
         guard let session, let client = inputClient else {
             hasMarkedText = false
             return
@@ -127,6 +133,123 @@ final class RimeInputController: IMKInputController {
             to: client,
             hadMarkedText: hasMarkedText
         )
+        updateCandidateWindow(snapshot: snapshot, client: client)
+    }
+
+    private func updateCandidateWindow(snapshot: RimeSnapshot, client: IMKTextInput) {
+        guard snapshot.composition != nil, !snapshot.menu.candidates.isEmpty else {
+            hideCandidateWindow()
+            return
+        }
+
+        guard let anchorRect = CandidateAnchorResolver.anchorRect(in: client) else {
+            #if DEBUG
+                logger.notice(
+                    "Candidate panel suppressed: no usable anchor; candidates=\(snapshot.menu.candidates.count)"
+                )
+            #endif
+            hideCandidateWindow()
+            return
+        }
+
+        presentCandidateWindow(
+            menu: snapshot.menu,
+            anchorRect: anchorRect,
+            clientWindowLevel: client.windowLevel()
+        )
+    }
+
+    private func handleCandidateWindowAction(_ action: CandidateWindowAction) {
+        guard let session, let client = inputClient else {
+            hideCandidateWindow()
+            return
+        }
+
+        let accepted: Bool
+        switch action {
+        case .selectCandidate(let index):
+            accepted = session.selectCandidate(at: index)
+        }
+        guard accepted else {
+            return
+        }
+
+        do {
+            apply(try session.readSnapshot(), to: client)
+        } catch {
+            logger.error("Unable to apply candidate selection: \(error.localizedDescription, privacy: .public)")
+            session.clearComposition()
+            hasMarkedText = RimeClientUpdater.clearMarkedText(in: client)
+            hideCandidateWindow()
+        }
+    }
+
+    private func presentCandidateWindow(
+        menu: RimeMenuSnapshot,
+        anchorRect: NSRect,
+        clientWindowLevel: CGWindowLevel
+    ) {
+        let operation: () -> Void = { [weak self] in
+            guard let self else { return }
+            self.candidateWindow.update(
+                menu: menu,
+                anchorRect: anchorRect,
+                clientWindowLevel: clientWindowLevel
+            )
+        }
+        if Thread.isMainThread {
+            operation()
+        } else {
+            DispatchQueue.main.async(execute: operation)
+        }
+    }
+
+    private func hideCandidateWindow() {
+        let operation: () -> Void = { [weak self] in
+            guard let self else { return }
+            self.candidateWindow.hide()
+        }
+        if Thread.isMainThread {
+            operation()
+        } else {
+            DispatchQueue.main.async(execute: operation)
+        }
+    }
+}
+
+enum CandidateAnchorResolver {
+    static func anchorRect(in client: IMKTextInput) -> NSRect? {
+        var lineRect = NSRect.zero
+        _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &lineRect)
+        if isUsable(lineRect) {
+            return lineRect
+        }
+
+        var ranges = [NSRange(location: NSNotFound, length: 0)]
+        let selectedRange = client.selectedRange()
+        if selectedRange.location != NSNotFound {
+            ranges.append(selectedRange)
+        }
+        let markedRange = client.markedRange()
+        if markedRange.location != NSNotFound {
+            ranges.append(NSRange(location: NSMaxRange(markedRange), length: 0))
+        }
+
+        for range in ranges {
+            var actualRange = NSRange(location: NSNotFound, length: 0)
+            let rect = client.firstRect(forCharacterRange: range, actualRange: &actualRange)
+            if isUsable(rect) {
+                return rect
+            }
+        }
+        return nil
+    }
+
+    private static func isUsable(_ rect: NSRect) -> Bool {
+        guard !rect.isNull, !rect.isInfinite, rect.height > 0 else {
+            return false
+        }
+        return [rect.origin.x, rect.origin.y, rect.width, rect.height].allSatisfy(\.isFinite)
     }
 }
 

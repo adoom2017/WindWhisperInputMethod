@@ -174,9 +174,11 @@ enum M3SmokeTest {
     }
 }
 
-private final class M3InputClientDouble: NSObject, IMKTextInput {
+final class M3InputClientDouble: NSObject, IMKTextInput {
     private(set) var committedText = ""
     private(set) var markedText = ""
+    var lineHeightRectangle = NSRect.zero
+    var firstRectResult = NSRect.zero
 
     func insertText(_ string: Any!, replacementRange: NSRange) {
         committedText.append(text(from: string))
@@ -219,7 +221,7 @@ private final class M3InputClientDouble: NSObject, IMKTextInput {
         forCharacterIndex index: Int,
         lineHeightRectangle lineRect: UnsafeMutablePointer<NSRect>!
     ) -> [AnyHashable: Any]! {
-        lineRect?.pointee = .zero
+        lineRect?.pointee = lineHeightRectangle
         return [:]
     }
 
@@ -258,7 +260,7 @@ private final class M3InputClientDouble: NSObject, IMKTextInput {
 
     func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer!) -> NSRect {
         actualRange?.pointee = range
-        return .zero
+        return firstRectResult
     }
 
     private func text(from value: Any?) -> String {

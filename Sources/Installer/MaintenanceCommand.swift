@@ -56,6 +56,8 @@ enum MaintenanceCommand {
             return RimeSmokeTest.run(arguments: arguments)
         case "--m3-smoke":
             return M3SmokeTest.run()
+        case "--m4-smoke":
+            return M4SmokeTest.run()
         case "--help":
             printHelp()
             return EXIT_SUCCESS
@@ -149,6 +151,7 @@ enum MaintenanceCommand {
               --diagnose               Print non-sensitive bundle diagnostics
               --rime-smoke             Run the isolated librime M2 integration test
               --m3-smoke               Run the M3 key mapping and composition test
+              --m4-smoke               Run the M4 candidate window and interaction test
               --help                   Show this help
             """
         )

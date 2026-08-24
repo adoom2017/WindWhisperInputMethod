@@ -33,4 +33,4 @@ M2 回归项也全部通过：librime 版本、schema、候选、提交、UTF-8/
 
 自动 TextEdit 验收尝试被 macOS 拒绝，原因是 `osascript` 未获“辅助功能”发送按键权限（错误 1002）。脚本已关闭临时文稿并恢复原输入法，没有保存测试内容。
 
-请在 TextEdit 中选择“风语”，输入 `nihao` 后按 Space。预期：先显示行内组合文本，随后上屏“你好”，且不残留 marked text。M4 候选窗尚未实现，所以此阶段不会显示候选面板。
+请在 TextEdit 中选择“风语”，输入 `nihao` 后按 Space。预期：先显示行内组合文本和 M4 候选面板，随后上屏“你好”，且不残留 marked text。候选窗专项验证已迁移到 `M4_VALIDATION.md`。
