@@ -1,0 +1,426 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* Main.swift */; };
+		A10000000000000000000002 /* ApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* ApplicationDelegate.swift */; };
+		A10000000000000000000003 /* RimeInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* RimeInputController.swift */; };
+		A10000000000000000000004 /* InputSourceMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* InputSourceMetadata.swift */; };
+		A10000000000000000000005 /* MaintenanceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* MaintenanceCommand.swift */; };
+		A10000000000000000000006 /* InputSourceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* InputSourceManager.swift */; };
+		A10000000000000000000007 /* FengYuInputModeIcon.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* FengYuInputModeIcon.pdf */; };
+		A10000000000000000000008 /* zh_CN.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* zh_CN.lproj */; };
+		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Assets.xcassets */; };
+		A1000000000000000000000A /* RimeBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* RimeBridge.c */; };
+		A1000000000000000000000B /* RimeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* RimeModels.swift */; };
+		A1000000000000000000000C /* RimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* RimeService.swift */; };
+		A1000000000000000000000D /* RimeSmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* RimeSmokeTest.swift */; };
+		A1000000000000000000000E /* librime.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* librime.1.dylib */; };
+		A1000000000000000000000F /* librime.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* librime.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		A10000000000000000000010 /* Rime in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* Rime */; };
+		A10000000000000000000011 /* RimeRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* RimeRuntime.swift */; };
+		A10000000000000000000012 /* RimeKeyMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* RimeKeyMapper.swift */; };
+		A10000000000000000000013 /* M3SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* M3SmokeTest.swift */; };
+		A10000000000000000000014 /* zh-Hans.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* zh-Hans.lproj */; };
+		A10000000000000000000015 /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* en.lproj */; };
+		A10000000000000000000016 /* FengYuInputSwitcherIcon-v1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A71000000000000000000001 /* Embed Libraries */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				A1000000000000000000000F /* librime.1.dylib in Embed Libraries */,
+			);
+			name = "Embed Libraries";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		A20000000000000000000001 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Main.swift; sourceTree = "<group>"; };
+		A20000000000000000000002 /* ApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationDelegate.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* RimeInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeInputController.swift; sourceTree = "<group>"; };
+		A20000000000000000000004 /* InputSourceMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceMetadata.swift; sourceTree = "<group>"; };
+		A20000000000000000000005 /* MaintenanceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceCommand.swift; sourceTree = "<group>"; };
+		A20000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000000000000000000007 /* RimeInputMethod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RimeInputMethod.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000008 /* InputSourceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceManager.swift; sourceTree = "<group>"; };
+		A20000000000000000000009 /* FengYuInputModeIcon.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = FengYuInputModeIcon.pdf; sourceTree = "<group>"; };
+		A2000000000000000000000A /* zh_CN.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = zh_CN.lproj; sourceTree = "<group>"; };
+		A2000000000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A2000000000000000000000C /* RimeBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RimeBridge.c; sourceTree = "<group>"; };
+		A2000000000000000000000D /* RimeBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RimeBridge.h; sourceTree = "<group>"; };
+		A2000000000000000000000E /* RimeBridge-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RimeBridge-Bridging-Header.h"; sourceTree = "<group>"; };
+		A2000000000000000000000F /* RimeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* RimeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeService.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* RimeSmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeSmokeTest.swift; sourceTree = "<group>"; };
+		A20000000000000000000012 /* librime.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = librime.1.dylib; sourceTree = "<group>"; };
+		A20000000000000000000013 /* Rime */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Rime; sourceTree = "<group>"; };
+		A20000000000000000000014 /* rime_api.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rime_api.h; sourceTree = "<group>"; };
+		A20000000000000000000015 /* RimeRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeRuntime.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* RimeKeyMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeKeyMapper.swift; sourceTree = "<group>"; };
+		A20000000000000000000017 /* M3SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M3SmokeTest.swift; sourceTree = "<group>"; };
+		A20000000000000000000018 /* zh-Hans.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "zh-Hans.lproj"; sourceTree = "<group>"; };
+		A20000000000000000000019 /* en.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = en.lproj; sourceTree = "<group>"; };
+		A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "FengYuInputSwitcherIcon-v1.pdf"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A30000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1000000000000000000000E /* librime.1.dylib in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A40000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000002 /* App */,
+				A40000000000000000000003 /* Sources */,
+				A40000000000000000000006 /* Resources */,
+				A40000000000000000000008 /* Vendor */,
+				A40000000000000000000007 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A40000000000000000000002 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000001 /* Main.swift */,
+				A20000000000000000000002 /* ApplicationDelegate.swift */,
+				A20000000000000000000015 /* RimeRuntime.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000003 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				A40000000000000000000004 /* InputController */,
+				A40000000000000000000005 /* Installer */,
+				A40000000000000000000009 /* RimeBridge */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000004 /* InputController */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000003 /* RimeInputController.swift */,
+				A20000000000000000000016 /* RimeKeyMapper.swift */,
+				A20000000000000000000017 /* M3SmokeTest.swift */,
+			);
+			path = InputController;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000005 /* Installer */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000004 /* InputSourceMetadata.swift */,
+				A20000000000000000000005 /* MaintenanceCommand.swift */,
+				A20000000000000000000008 /* InputSourceManager.swift */,
+			);
+			path = Installer;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000006 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000006 /* Info.plist */,
+				A20000000000000000000009 /* FengYuInputModeIcon.pdf */,
+				A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */,
+				A2000000000000000000000B /* Assets.xcassets */,
+				A20000000000000000000013 /* Rime */,
+				A2000000000000000000000A /* zh_CN.lproj */,
+				A20000000000000000000018 /* zh-Hans.lproj */,
+				A20000000000000000000019 /* en.lproj */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000007 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000007 /* RimeInputMethod.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000008 /* Vendor */ = {
+			isa = PBXGroup;
+			children = (
+				A4000000000000000000000A /* librime */,
+			);
+			path = Vendor;
+			sourceTree = "<group>";
+		};
+		A40000000000000000000009 /* RimeBridge */ = {
+			isa = PBXGroup;
+			children = (
+				A2000000000000000000000C /* RimeBridge.c */,
+				A2000000000000000000000D /* RimeBridge.h */,
+				A2000000000000000000000E /* RimeBridge-Bridging-Header.h */,
+				A2000000000000000000000F /* RimeModels.swift */,
+				A20000000000000000000010 /* RimeService.swift */,
+				A20000000000000000000011 /* RimeSmokeTest.swift */,
+			);
+			path = RimeBridge;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000A /* librime */ = {
+			isa = PBXGroup;
+			children = (
+				A4000000000000000000000B /* include */,
+				A4000000000000000000000C /* lib */,
+			);
+			path = librime;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000B /* include */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000014 /* rime_api.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+		A4000000000000000000000C /* lib */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000012 /* librime.1.dylib */,
+			);
+			path = lib;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A50000000000000000000001 /* RimeInputMethod */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "RimeInputMethod" */;
+			buildPhases = (
+				A60000000000000000000001 /* Sources */,
+				A30000000000000000000001 /* Frameworks */,
+				A70000000000000000000001 /* Resources */,
+				A71000000000000000000001 /* Embed Libraries */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RimeInputMethod;
+			productName = RimeInputMethod;
+			productReference = A20000000000000000000007 /* RimeInputMethod.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A80000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2640;
+				LastUpgradeCheck = 2640;
+				TargetAttributes = {
+					A50000000000000000000001 = {
+						CreatedOnToolsVersion = 26.4;
+					};
+				};
+			};
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "RimeInputMethod" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = zh_CN;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+				zh_CN,
+				"zh-Hans",
+			);
+			mainGroup = A40000000000000000000001;
+			productRefGroup = A40000000000000000000007 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A50000000000000000000001 /* RimeInputMethod */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A70000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000007 /* FengYuInputModeIcon.pdf in Resources */,
+				A10000000000000000000008 /* zh_CN.lproj in Resources */,
+				A10000000000000000000009 /* Assets.xcassets in Resources */,
+				A10000000000000000000010 /* Rime in Resources */,
+				A10000000000000000000014 /* zh-Hans.lproj in Resources */,
+				A10000000000000000000015 /* en.lproj in Resources */,
+				A10000000000000000000016 /* FengYuInputSwitcherIcon-v1.pdf in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A60000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* Main.swift in Sources */,
+				A10000000000000000000002 /* ApplicationDelegate.swift in Sources */,
+				A10000000000000000000003 /* RimeInputController.swift in Sources */,
+				A10000000000000000000004 /* InputSourceMetadata.swift in Sources */,
+				A10000000000000000000005 /* MaintenanceCommand.swift in Sources */,
+				A10000000000000000000006 /* InputSourceManager.swift in Sources */,
+				A1000000000000000000000A /* RimeBridge.c in Sources */,
+				A1000000000000000000000B /* RimeModels.swift in Sources */,
+				A1000000000000000000000C /* RimeService.swift in Sources */,
+				A1000000000000000000000D /* RimeSmokeTest.swift in Sources */,
+				A10000000000000000000011 /* RimeRuntime.swift in Sources */,
+				A10000000000000000000012 /* RimeKeyMapper.swift in Sources */,
+				A10000000000000000000013 /* M3SmokeTest.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AA0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "arm64 x86_64";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		AA0000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_PKGINFO_FILE = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/include";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/lib";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.rime.dev;
+				PRODUCT_MODULE_NAME = RimeInputMethod;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RimeBridge/RimeBridge-Bridging-Header.h";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_PKGINFO_FILE = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/include";
+				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/lib";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.rime.dev;
+				PRODUCT_MODULE_NAME = RimeInputMethod;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RimeBridge/RimeBridge-Bridging-Header.h";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A90000000000000000000001 /* Build configuration list for PBXProject "RimeInputMethod" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000001 /* Debug */,
+				AA0000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "RimeInputMethod" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000003 /* Debug */,
+				AA0000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A80000000000000000000001 /* Project object */;
+}

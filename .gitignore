@@ -1,0 +1,23 @@
+# Xcode / Swift build products
+.build/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+
+# Local dependencies and generated Rime data
+Vendor/Build/
+Resources/Rime/build/
+*.userdb/
+
+# Logs and local configuration
+*.log
+.DS_Store
+.env
+.env.*
+
+# Packaging artifacts
+dist/
+*.dmg
+*.pkg
+*.zip
