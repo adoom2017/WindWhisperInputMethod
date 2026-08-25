@@ -58,6 +58,12 @@ enum MaintenanceCommand {
             return M3SmokeTest.run()
         case "--m4-smoke":
             return M4SmokeTest.run()
+        case "--m5-smoke":
+            return M5SmokeTest.run()
+        case "--m5-preview":
+            return MainActor.assumeIsolated {
+                M5SmokeTest.preview()
+            }
         case "--help":
             printHelp()
             return EXIT_SUCCESS
@@ -152,6 +158,8 @@ enum MaintenanceCommand {
               --rime-smoke             Run the isolated librime M2 integration test
               --m3-smoke               Run the M3 key mapping and composition test
               --m4-smoke               Run the M4 candidate window and interaction test
+              --m5-smoke               Run the M5 native material and layout test
+              --m5-preview             Show the M5 candidate window visual preview
               --help                   Show this help
             """
         )

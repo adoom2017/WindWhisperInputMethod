@@ -32,6 +32,9 @@
 		A10000000000000000000017 /* CandidateWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001B /* CandidateWindowController.swift */; };
 		A10000000000000000000018 /* CandidateWindowPositioner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001C /* CandidateWindowPositioner.swift */; };
 		A10000000000000000000019 /* M4SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001D /* M4SmokeTest.swift */; };
+		A1000000000000000000001A /* CandidateWindowTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001E /* CandidateWindowTheme.swift */; };
+		A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001F /* CandidateWindowLayout.swift */; };
+		A1000000000000000000001C /* M5SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* M5SmokeTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -78,6 +81,9 @@
 		A2000000000000000000001B /* CandidateWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowController.swift; sourceTree = "<group>"; };
 		A2000000000000000000001C /* CandidateWindowPositioner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowPositioner.swift; sourceTree = "<group>"; };
 		A2000000000000000000001D /* M4SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M4SmokeTest.swift; sourceTree = "<group>"; };
+		A2000000000000000000001E /* CandidateWindowTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowTheme.swift; sourceTree = "<group>"; };
+		A2000000000000000000001F /* CandidateWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowLayout.swift; sourceTree = "<group>"; };
+		A20000000000000000000020 /* M5SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M5SmokeTest.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -218,7 +224,10 @@
 			children = (
 				A2000000000000000000001B /* CandidateWindowController.swift */,
 				A2000000000000000000001C /* CandidateWindowPositioner.swift */,
+				A2000000000000000000001E /* CandidateWindowTheme.swift */,
+				A2000000000000000000001F /* CandidateWindowLayout.swift */,
 				A2000000000000000000001D /* M4SmokeTest.swift */,
+				A20000000000000000000020 /* M5SmokeTest.swift */,
 			);
 			path = CandidateWindow;
 			sourceTree = "<group>";
@@ -317,6 +326,9 @@
 				A10000000000000000000017 /* CandidateWindowController.swift in Sources */,
 				A10000000000000000000018 /* CandidateWindowPositioner.swift in Sources */,
 				A10000000000000000000019 /* M4SmokeTest.swift in Sources */,
+				A1000000000000000000001A /* CandidateWindowTheme.swift in Sources */,
+				A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */,
+				A1000000000000000000001C /* M5SmokeTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

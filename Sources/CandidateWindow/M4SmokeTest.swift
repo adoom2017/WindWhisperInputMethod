@@ -43,7 +43,7 @@ enum M4SmokeTest {
             )
         )
         guard
-            model.pageLabel == "第 3 页",
+            model.pageLabel == "3",
             model.highlightedIndex == 1,
             model.entries.map(\.shortcut) == ["1", "2"],
             model.entries.map(\.text) == ["风", "语"]
@@ -53,25 +53,23 @@ enum M4SmokeTest {
     }
 
     private static func verifyHitTesting() throws {
-        let topInset: CGFloat = 30
+        let frames = [
+            NSRect(x: 10, y: 8, width: 60, height: 38),
+            NSRect(x: 74, y: 8, width: 80, height: 38),
+            NSRect(x: 158, y: 8, width: 70, height: 38),
+        ]
         guard
             CandidateWindowHitTester.candidateIndex(
-                at: NSPoint(x: 20, y: 31),
-                topInset: topInset,
-                rowHeight: 32,
-                candidateCount: 3
+                at: NSPoint(x: 20, y: 20),
+                candidateFrames: frames
             ) == 0,
             CandidateWindowHitTester.candidateIndex(
-                at: NSPoint(x: 20, y: 94),
-                topInset: topInset,
-                rowHeight: 32,
-                candidateCount: 3
-            ) == 2,
+                at: NSPoint(x: 100, y: 20),
+                candidateFrames: frames
+            ) == 1,
             CandidateWindowHitTester.candidateIndex(
-                at: NSPoint(x: 20, y: 126),
-                topInset: topInset,
-                rowHeight: 32,
-                candidateCount: 3
+                at: NSPoint(x: 240, y: 20),
+                candidateFrames: frames
             ) == nil
         else {
             throw RimeBridgeError.smokeAssertion("candidate mouse hit testing is incorrect.")

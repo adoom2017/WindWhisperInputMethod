@@ -38,13 +38,15 @@
 - 方案：每个双拼固定编码样例；辅码命中、不命中、歧义和回退。
 - 异常：资源缺失、配置损坏、部署失败、磁盘只读、session 失效。
 
-## M3/M4 自动化与人工门禁
+## M3—M5 自动化与人工门禁
 
 - `Scripts/test-m3.sh Debug|Release` 覆盖按键映射、Command/Control/Option 透传、Backspace、Escape、`nihao + Space` 提交“你好”，以及生产 `RimeClientUpdater` 对 `IMKTextInput` 的 marked/commit 调用。
 - `xcodebuild analyze` 必须无诊断失败；Release 主程序和 librime 必须同时包含 arm64、x86_64。
 - `Scripts/test-textedit-m3.sh` 只创建并关闭一个不保存的 TextEdit 临时文稿；它需要运行终端/宿主获得 macOS“辅助功能”发送按键权限。
 - `Scripts/test-m4.sh Debug|Release` 覆盖候选展示模型、本页序号、鼠标行命中、非激活面板配置、下方/上方翻转、可见区域约束、多显示器选择，以及真实 librime 的方向键高亮、PageDown 翻页和语义选词提交。
-- 当前机器未授予自动按键所需权限，macOS 以错误 1002 拒绝脚本化 TextEdit 输入；因此真实事件入口、鼠标点击和焦点保持由用户按 `docs/M4_VALIDATION.md` 手工确认。确认后进入 M5。
+- M4 候选窗显示已由用户在实际输入中确认；完整键盘、鼠标和多屏检查项保留在 `docs/M4_VALIDATION.md` 作为后续回归清单。
+- `Scripts/test-m5.sh Debug|Release` 覆盖正常/无障碍主题 fallback、横向布局边界、候选间不重叠、短正文优先与长文本公平压缩、macOS 26 `NSGlassEffectView` 和旧系统 `NSVisualEffectView` 回退配置，以及 Aqua/Dark Aqua × 普通/降低透明度与增强对比度的离屏 PNG 渲染。
+- M5 本机视觉门禁按 `docs/M5_VALIDATION.md` 执行，重点确认实际桌面内容下的毛玻璃、候选截断、快速输入稳定性和系统无障碍显示设置。
 
 ## 性能记录
 

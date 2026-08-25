@@ -77,13 +77,16 @@ M2 已固定路径：shared data 为应用包的 `Contents/Resources/Rime`；use
 
 定位函数只接受光标矩形、目标屏幕 visible frame、窗口测量尺寸和布局方向，输出最终 frame。优先向下/右展开，空间不足时翻转，并将最终 frame 约束在当前屏幕可见区域。窗口测量必须在完成文本布局后进行。
 
-## M4 候选窗闭环
+## M4/M5 候选窗闭环
 
 - `CandidateWindowModel` 只接收不可变 `RimeMenuSnapshot`，生成页码、1—9 本页序号、候选正文、注释与高亮索引；展示层不持有或查询 Rime session。
-- `CandidateWindowCoordinator` 持有 `.nonactivatingPanel`，其 panel 明确拒绝成为 key/main window。面板仅通过 `CandidateWindowAction` 向 controller 回传语义选择。
+- `CandidateWindowCoordinator` 持有 `.nonactivatingPanel`，用非激活窗口样式保持宿主文本焦点；面板仅通过 `CandidateWindowAction` 向 controller 回传语义选择或翻页。
 - `RimeInputController` 在文本状态写入 client 后读取插入点屏幕矩形，再刷新候选窗；优先使用 `attributes(forCharacterIndex:lineHeightRectangle:)` 返回的输入行矩形，并以当前插入点、selected range 和 marked range 的 `firstRect` 作为兼容回退。鼠标选择由 controller 调用 session，重新读取完整快照并同时更新文本和窗口。
 - 键盘数字、方向键和 PageUp/PageDown 仍经过统一按键映射进入 librime。前端不自行计算页码或高亮，因此键盘和鼠标不会形成第二套候选状态。
 - controller 停用、关闭、提交、client/session 缺失或快照读取失败时立即隐藏面板，避免跨应用残留。
+- macOS 26 以 `NSGlassEffectView` clear 样式作为内容根视图，由系统玻璃直接控制圆角且关闭矩形 panel 阴影；macOS 13—15 回退到 popover / behind-window / active 的 `NSVisualEffectView`。`CandidateWindowTheme` 集中提供圆角、间距、字体、颜色、宽度上限和动画时长，并根据降低透明度、增强对比度和减少动态效果生成安全降级。
+- `CandidateHorizontalLayout` 是不依赖 window/session 的纯布局边界：先测量候选正文和注释，再在 760pt 上限内按比例压缩，输出候选、页码和前后翻页命中区域。竖排不进入首版，但布局边界已独立，后续可新增策略而不改 Rime 或 controller。
+- 候选窗首次出现只做 80ms 可中断淡入；后续按键更新直接替换快照并重排，隐藏立即执行，因此动画不在输入热路径上形成等待。
 
 ## 错误降级
 

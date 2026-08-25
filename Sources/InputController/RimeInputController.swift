@@ -169,6 +169,8 @@ final class RimeInputController: IMKInputController {
         switch action {
         case .selectCandidate(let index):
             accepted = session.selectCandidate(at: index)
+        case .page(let up):
+            accepted = session.process(keyCode: up ? 0xFF55 : 0xFF56)
         }
         guard accepted else {
             return

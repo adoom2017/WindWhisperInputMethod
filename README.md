@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-**M1—M4 已完成实现和自动化验收；当前等待 M4 候选窗的 TextEdit 人工体验确认。**
+**M1—M5 已完成实现和自动化验收；当前等待 M5 毛玻璃候选窗的本机视觉确认。**
 
-应用现已自带官方 librime 1.16.0、最小 Rime 全拼测试数据和窄 C/Swift 桥接。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。Command、Control、Option 组合保持透传。M4 已加入不抢焦点的原生候选面板，显示页码、候选序号、注释和 Rime 高亮；鼠标点击与键盘选词共用同一 Rime session，面板会跟随插入点、跨屏选择可见区域并在空间不足时翻转。
+应用现已自带官方 librime 1.16.0、最小 Rime 全拼测试数据和窄 C/Swift 桥接。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。Command、Control、Option 组合保持透传。候选面板不抢焦点并跟随插入点；macOS 26 使用系统 `NSGlassEffectView` clear 玻璃，旧系统回退到 `NSVisualEffectView`，两者共用横向自适应布局。窗口显示页码、候选序号、注释/辅码与 Rime 高亮；鼠标点击、滚轮翻页和键盘选词共用同一 Rime session。深浅色、降低透明度、增强对比度和减少动态效果均使用系统设置自动适配。
 
 本机为 Apple Silicon，Debug 只构建 arm64；Release 应用和内置 librime 都包含 arm64 + x86_64。安装脚本使用本地签名、父输入法/子模式分阶段启用和当前会话热刷新；M3 最终 Debug 构建已成功热安装，没有上传构建包、注销或重启，并恢复了安装前使用的鼠须管输入源。
 
@@ -42,9 +42,11 @@
 ./Scripts/test-m3.sh Release
 ./Scripts/test-m4.sh Debug
 ./Scripts/test-m4.sh Release
+./Scripts/test-m5.sh Debug
+./Scripts/test-m5.sh Release
 ```
 
-`test-rime-bridge.sh` 会在 `/private/tmp` 创建隔离数据目录，验证应用内嵌运行库、签名、动态依赖、部署、候选和提交闭环，然后清理该测试目录。`test-m3.sh` 进一步验证按键映射、快捷键透传、组合编辑以及生产 `IMKTextInput` 更新路径。`test-m4.sh` 覆盖候选模型、鼠标命中、非激活面板约束、多显示器定位、边界翻转，以及真实 librime 高亮、翻页和语义选择。需要从官方发布重新恢复锁定依赖时执行：
+`test-rime-bridge.sh` 会在 `/private/tmp` 创建隔离数据目录，验证应用内嵌运行库、签名、动态依赖、部署、候选和提交闭环，然后清理该测试目录。`test-m3.sh` 进一步验证按键映射、快捷键透传、组合编辑以及生产 `IMKTextInput` 更新路径。`test-m4.sh` 覆盖候选模型、鼠标命中、非激活面板约束、多显示器定位、边界翻转，以及真实 librime 高亮、翻页和语义选择。`test-m5.sh` 覆盖主题降级、横向布局、长文本压缩、macOS 26 原生玻璃与旧系统材质回退配置，以及浅色/深色和普通/无障碍组合的离屏视觉快照。需要从官方发布重新恢复锁定依赖时执行：
 
 ```bash
 ./Scripts/fetch-librime.sh
@@ -83,9 +85,9 @@ build/DerivedData/Build/Products/<Configuration>/RimeInputMethod.app
 RimeInputMethod/
 ├── App/                    # InputMethodKit 进程入口与生命周期（M1 已实现）
 ├── Sources/
-│   ├── InputController/    # M3/M4 按键映射、IMK 会话、文本与候选协调
+│   ├── InputController/    # M3—M5 按键映射、IMK 会话、文本与候选协调
 │   ├── RimeBridge/         # M2 已实现的 C shim、Swift RAII 与快照模型
-│   ├── CandidateWindow/    # M4 基线非激活候选窗；M5 加入毛玻璃视觉
+│   ├── CandidateWindow/    # M4/M5 非激活候选窗、布局、主题与毛玻璃视觉
 │   ├── Configuration/      # 配置解析与设置模型
 │   ├── Installer/          # 注册命令和输入源元数据
 │   └── Shared/             # 通用模型、日志、工具

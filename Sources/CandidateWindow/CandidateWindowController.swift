@@ -2,6 +2,7 @@ import AppKit
 
 enum CandidateWindowAction: Equatable, Sendable {
     case selectCandidate(index: Int)
+    case page(up: Bool)
 }
 
 struct CandidateWindowEntry: Equatable, Sendable {
@@ -34,57 +35,82 @@ struct CandidateWindowModel: Equatable, Sendable {
     }
 
     var pageLabel: String {
-        "第 \(pageNumber + 1) 页"
+        "\(pageNumber + 1)"
     }
 }
 
 enum CandidateWindowHitTester {
-    static func candidateIndex(
-        at point: NSPoint,
-        topInset: CGFloat,
-        rowHeight: CGFloat,
-        candidateCount: Int
-    ) -> Int? {
-        let contentY = point.y - topInset
-        guard contentY >= 0, rowHeight > 0 else {
-            return nil
-        }
-        let row = Int(contentY / rowHeight)
-        return (0..<candidateCount).contains(row) ? row : nil
+    static func candidateIndex(at point: NSPoint, candidateFrames: [NSRect]) -> Int? {
+        candidateFrames.firstIndex { $0.contains(point) }
     }
 }
 
 enum CandidatePanelConfiguration {
+    enum RenderingMode: Equatable {
+        case nativeGlass
+        case visualEffectFallback
+    }
+
     static let styleMask: NSWindow.StyleMask = .nonactivatingPanel
+    static let material: NSVisualEffectView.Material = .popover
+    static let blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
+
+    static var renderingMode: RenderingMode {
+        if #available(macOS 26.0, *) {
+            return .nativeGlass
+        }
+        return .visualEffectFallback
+    }
 }
 
 final class CandidatePanel: NSPanel {}
 
 final class CandidateWindowCoordinator {
     private let panel: CandidatePanel
+    private let materialView: NSView
     private let candidateView: CandidateListView
     private let onAction: (CandidateWindowAction) -> Void
 
     init(onAction: @escaping (CandidateWindowAction) -> Void) {
         self.onAction = onAction
         panel = CandidatePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 240, height: 80),
+            contentRect: NSRect(x: 0, y: 0, width: 240, height: 54),
             styleMask: CandidatePanelConfiguration.styleMask,
             backing: .buffered,
             defer: false
         )
-        candidateView = CandidateListView(frame: panel.contentView?.bounds ?? .zero)
+        let contentBounds = panel.contentView?.bounds ?? .zero
+        candidateView = CandidateListView(frame: contentBounds)
+        if #available(macOS 26.0, *) {
+            let glassView = NSGlassEffectView(frame: contentBounds)
+            glassView.style = .clear
+            glassView.cornerRadius = 13
+            glassView.contentView = candidateView
+            materialView = glassView
+        } else {
+            let effectView = NSVisualEffectView(frame: contentBounds)
+            effectView.material = CandidatePanelConfiguration.material
+            effectView.blendingMode = CandidatePanelConfiguration.blendingMode
+            effectView.state = .active
+            effectView.wantsLayer = true
+            effectView.addSubview(candidateView)
+            materialView = effectView
+        }
 
-        panel.contentView = candidateView
+        materialView.autoresizingMask = [.width, .height]
+        candidateView.autoresizingMask = [.width, .height]
+        candidateView.onAction = { [weak self] action in
+            self?.onAction(action)
+        }
+
+        panel.contentView = materialView
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = true
+        panel.hasShadow = CandidatePanelConfiguration.renderingMode == .visualEffectFallback
         panel.hidesOnDeactivate = false
         panel.animationBehavior = .none
+        panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        candidateView.onSelection = { [weak self] index in
-            self?.onAction(.selectCandidate(index: index))
-        }
     }
 
     func update(menu: RimeMenuSnapshot, anchorRect: NSRect, clientWindowLevel: CGWindowLevel) {
@@ -94,7 +120,9 @@ final class CandidateWindowCoordinator {
             return
         }
 
-        candidateView.model = model
+        let theme = CandidateWindowTheme.system(environment: .current)
+        apply(theme: theme)
+        candidateView.update(model: model, theme: theme)
         let size = candidateView.preferredSize
         let screenFrames = NSScreen.screens.map(\.visibleFrame)
         guard
@@ -107,6 +135,7 @@ final class CandidateWindowCoordinator {
             return
         }
 
+        let wasVisible = panel.isVisible
         panel.level = NSWindow.Level(
             rawValue: max(Int(clientWindowLevel) + 1, NSWindow.Level.popUpMenu.rawValue)
         )
@@ -118,33 +147,54 @@ final class CandidateWindowCoordinator {
             ),
             display: true
         )
+        candidateView.frame = materialView.bounds
+
         if NSApp.isHidden {
             NSApp.unhideWithoutActivation()
         }
+        if !wasVisible, theme.animationDuration > 0 {
+            panel.alphaValue = 0
+        }
         panel.orderFront(nil)
         if !panel.isVisible {
-            // Input methods run behind the client application. If AppKit declines
-            // the ordinary ordering request, publish this nonactivating panel
-            // without activating the input-method process or stealing focus.
             panel.orderFrontRegardless()
         }
         panel.displayIfNeeded()
+
+        if !wasVisible, theme.animationDuration > 0 {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = theme.animationDuration
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().alphaValue = 1
+            }
+        } else {
+            panel.alphaValue = 1
+        }
     }
 
     func hide() {
+        panel.alphaValue = 1
         panel.orderOut(nil)
+    }
+
+    private func apply(theme: CandidateWindowTheme) {
+        if #available(macOS 26.0, *), let glassView = materialView as? NSGlassEffectView {
+            glassView.style = .clear
+            glassView.cornerRadius = theme.cornerRadius
+            glassView.tintColor = nil
+        } else if let effectView = materialView as? NSVisualEffectView {
+            effectView.material = CandidatePanelConfiguration.material
+            effectView.blendingMode = CandidatePanelConfiguration.blendingMode
+            effectView.state = .active
+            effectView.layer?.cornerRadius = theme.cornerRadius
+            effectView.layer?.cornerCurve = .continuous
+            effectView.layer?.masksToBounds = true
+        }
     }
 }
 
-private final class CandidateListView: NSView {
-    static let rowHeight: CGFloat = 32
-    static let horizontalPadding: CGFloat = 10
-    static let verticalPadding: CGFloat = 8
-    static let headerHeight: CGFloat = 22
-    static let maximumWidth: CGFloat = 520
-    static let minimumWidth: CGFloat = 176
-
-    var model = CandidateWindowModel(
+final class CandidateListView: NSView {
+    private(set) var model = CandidateWindowModel(
         menu: RimeMenuSnapshot(
             pageSize: 0,
             pageNumber: 0,
@@ -152,55 +202,83 @@ private final class CandidateListView: NSView {
             highlightedIndex: 0,
             candidates: []
         )
-    ) {
-        didSet { needsDisplay = true }
-    }
-    var onSelection: ((Int) -> Void)?
+    )
+    private(set) var theme = CandidateWindowTheme.system(
+        environment: CandidateAccessibilityEnvironment(
+            reduceTransparency: false,
+            increaseContrast: false,
+            reduceMotion: false
+        )
+    )
+    var onAction: ((CandidateWindowAction) -> Void)?
+
+    private var scrollAccumulator: CGFloat = 0
+    private var lastScrollAction = Date.distantPast
 
     override var isFlipped: Bool { true }
+    override var isOpaque: Bool { theme.reduceTransparency }
+
+    var layout: CandidateWindowLayout {
+        CandidateHorizontalLayout.make(model: model, theme: theme)
+    }
 
     var preferredSize: NSSize {
-        let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 16),
-        ]
-        let commentAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 12),
-        ]
-        var contentWidth: CGFloat = 0
-        for entry in model.entries {
-            let textWidth = (entry.text as NSString).size(withAttributes: textAttributes).width
-            let commentWidth = ((entry.comment ?? "") as NSString)
-                .size(withAttributes: commentAttributes).width
-            contentWidth = max(contentWidth, 30 + textWidth + (commentWidth > 0 ? 12 + commentWidth : 0))
-        }
-        let width = min(
-            max(contentWidth + Self.horizontalPadding * 2, Self.minimumWidth),
-            Self.maximumWidth
+        layout.size
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.list)
+        setAccessibilityLabel("风语候选")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(model: CandidateWindowModel, theme: CandidateWindowTheme) {
+        self.model = model
+        self.theme = theme
+        setAccessibilityValue(
+            model.entries.map { "\($0.shortcut) \($0.text)" }.joined(separator: "，")
         )
-        let height = Self.verticalPadding * 2 + Self.headerHeight
-            + CGFloat(model.entries.count) * Self.rowHeight
-        return NSSize(width: ceil(width), height: ceil(height))
+        needsDisplay = true
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        let currentLayout = layout
 
-        let backgroundPath = NSBezierPath(roundedRect: bounds, xRadius: 9, yRadius: 9)
-        NSColor.windowBackgroundColor.withAlphaComponent(0.98).setFill()
-        backgroundPath.fill()
+        theme.panelBackgroundColor.setFill()
+        NSBezierPath(
+            roundedRect: bounds,
+            xRadius: theme.cornerRadius,
+            yRadius: theme.cornerRadius
+        ).fill()
 
-        let headerAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 11, weight: .medium),
-            .foregroundColor: NSColor.secondaryLabelColor,
-        ]
-        (model.pageLabel as NSString).draw(
-            at: NSPoint(x: Self.horizontalPadding, y: Self.verticalPadding + 3),
-            withAttributes: headerAttributes
+        theme.panelBorderColor.setStroke()
+        let borderInset: CGFloat = theme.increaseContrast ? 0.75 : 0.5
+        let border = NSBezierPath(
+            roundedRect: bounds.insetBy(dx: borderInset, dy: borderInset),
+            xRadius: max(theme.cornerRadius - borderInset, 0),
+            yRadius: max(theme.cornerRadius - borderInset, 0)
         )
+        border.lineWidth = theme.increaseContrast ? 1.5 : 1
+        border.stroke()
 
-        for (row, entry) in model.entries.enumerated() {
-            draw(entry: entry, row: row)
+        for (index, entry) in model.entries.enumerated()
+            where currentLayout.candidateFrames.indices.contains(index)
+        {
+            draw(entry: entry, index: index, in: currentLayout.candidateFrames[index])
         }
+        drawPageIndicator(layout: currentLayout)
     }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -209,71 +287,193 @@ private final class CandidateListView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        guard
-            let row = CandidateWindowHitTester.candidateIndex(
-                at: point,
-                topInset: Self.verticalPadding + Self.headerHeight,
-                rowHeight: Self.rowHeight,
-                candidateCount: model.entries.count
-            )
-        else {
+        let currentLayout = layout
+        if let index = CandidateWindowHitTester.candidateIndex(
+            at: point,
+            candidateFrames: currentLayout.candidateFrames
+        ) {
+            onAction?(.selectCandidate(index: model.entries[index].index))
             return
         }
-        onSelection?(model.entries[row].index)
+        if currentLayout.previousPageFrame.contains(point), model.pageNumber > 0 {
+            onAction?(.page(up: true))
+        } else if currentLayout.nextPageFrame.contains(point), !model.isLastPage {
+            onAction?(.page(up: false))
+        }
     }
 
-    private func draw(entry: CandidateWindowEntry, row: Int) {
-        let rowRect = NSRect(
-            x: 5,
-            y: Self.verticalPadding + Self.headerHeight + CGFloat(row) * Self.rowHeight,
-            width: bounds.width - 10,
-            height: Self.rowHeight
-        )
-        if row == model.highlightedIndex {
-            NSColor.selectedContentBackgroundColor.setFill()
-            NSBezierPath(roundedRect: rowRect, xRadius: 6, yRadius: 6).fill()
-        }
-
-        let isHighlighted = row == model.highlightedIndex
-        let primaryColor: NSColor = isHighlighted ? .selectedMenuItemTextColor : .labelColor
-        let secondaryColor: NSColor = isHighlighted
-            ? .selectedMenuItemTextColor.withAlphaComponent(0.72)
-            : .secondaryLabelColor
-        let numberAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular),
-            .foregroundColor: secondaryColor,
-        ]
-        let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 16),
-            .foregroundColor: primaryColor,
-        ]
-        let commentAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 12),
-            .foregroundColor: secondaryColor,
-        ]
-
-        let baselineY = rowRect.minY + 6
-        (entry.shortcut as NSString).draw(
-            at: NSPoint(x: Self.horizontalPadding, y: baselineY + 2),
-            withAttributes: numberAttributes
-        )
-        let textOrigin = NSPoint(x: Self.horizontalPadding + 30, y: baselineY)
-        (entry.text as NSString).draw(at: textOrigin, withAttributes: textAttributes)
-
-        guard let comment = entry.comment, !comment.isEmpty else {
+    override func scrollWheel(with event: NSEvent) {
+        let delta = event.scrollingDeltaY
+        guard delta != 0 else {
             return
         }
-        let textWidth = (entry.text as NSString).size(withAttributes: textAttributes).width
-        let commentRect = NSRect(
-            x: textOrigin.x + textWidth + 12,
-            y: baselineY + 3,
-            width: max(bounds.width - textOrigin.x - textWidth - 22, 0),
-            height: Self.rowHeight - 8
+        if scrollAccumulator.sign != delta.sign {
+            scrollAccumulator = 0
+        }
+        scrollAccumulator += delta
+
+        let now = Date()
+        guard abs(scrollAccumulator) >= 10, now.timeIntervalSince(lastScrollAction) >= 0.18 else {
+            return
+        }
+        let pageUp = scrollAccumulator > 0
+        scrollAccumulator = 0
+        lastScrollAction = now
+        if (pageUp && model.pageNumber > 0) || (!pageUp && !model.isLastPage) {
+            onAction?(.page(up: pageUp))
+        }
+    }
+
+    private func draw(entry: CandidateWindowEntry, index: Int, in frame: NSRect) {
+        let isHighlighted = index == model.highlightedIndex
+        if isHighlighted {
+            theme.highlightColor.setFill()
+            NSBezierPath(
+                roundedRect: frame,
+                xRadius: theme.cornerRadius - 4,
+                yRadius: theme.cornerRadius - 4
+            ).fill()
+        }
+
+        let primaryColor: NSColor = isHighlighted ? .selectedMenuItemTextColor : .labelColor
+        let secondaryColor: NSColor = isHighlighted
+            ? .selectedMenuItemTextColor.withAlphaComponent(0.78)
+            : .secondaryLabelColor
+        let shortcutBackground = isHighlighted
+            ? NSColor.selectedMenuItemTextColor.withAlphaComponent(0.18)
+            : NSColor.quaternaryLabelColor.withAlphaComponent(theme.increaseContrast ? 0.38 : 0.22)
+
+        let shortcutRect = NSRect(
+            x: frame.minX + theme.candidateHorizontalPadding,
+            y: frame.midY - 9,
+            width: 18,
+            height: 18
         )
-        (comment as NSString).draw(
-            with: commentRect,
+        shortcutBackground.setFill()
+        NSBezierPath(roundedRect: shortcutRect, xRadius: 5, yRadius: 5).fill()
+        let shortcutAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedDigitSystemFont(
+                ofSize: theme.shortcutFontSize,
+                weight: .medium
+            ),
+            .foregroundColor: secondaryColor,
+        ]
+        let shortcutSize = (entry.shortcut as NSString).size(withAttributes: shortcutAttributes)
+        (entry.shortcut as NSString).draw(
+            at: NSPoint(
+                x: shortcutRect.midX - shortcutSize.width / 2,
+                y: shortcutRect.midY - shortcutSize.height / 2
+            ),
+            withAttributes: shortcutAttributes
+        )
+
+        let contentX = shortcutRect.maxX + 6
+        let contentWidth = max(frame.maxX - theme.candidateHorizontalPadding - contentX, 0)
+        guard contentWidth > 0 else {
+            return
+        }
+
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let textAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(
+                ofSize: theme.primaryFontSize,
+                weight: isHighlighted ? .semibold : .regular
+            ),
+            .foregroundColor: primaryColor,
+            .paragraphStyle: paragraph,
+        ]
+        let commentAttributes: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: theme.commentFontSize),
+            .foregroundColor: secondaryColor,
+            .paragraphStyle: paragraph,
+        ]
+        let textNaturalWidth = (entry.text as NSString).size(withAttributes: textAttributes).width
+        let comment = entry.comment ?? ""
+        let commentNaturalWidth = (comment as NSString).size(withAttributes: commentAttributes).width
+        let commentGap: CGFloat = comment.isEmpty ? 0 : 7
+
+        let commentWidth: CGFloat
+        if comment.isEmpty {
+            commentWidth = 0
+        } else if textNaturalWidth + commentGap + commentNaturalWidth <= contentWidth {
+            commentWidth = commentNaturalWidth
+        } else {
+            commentWidth = min(commentNaturalWidth, max(contentWidth * 0.36, 24))
+        }
+        let textWidth = max(contentWidth - commentGap - commentWidth, 0)
+        let textRect = NSRect(
+            x: contentX,
+            y: frame.midY - 11,
+            width: textWidth,
+            height: 24
+        )
+        (entry.text as NSString).draw(
+            with: textRect,
             options: [.truncatesLastVisibleLine, .usesLineFragmentOrigin],
-            attributes: commentAttributes
+            attributes: textAttributes
+        )
+
+        if commentWidth > 0 {
+            let commentRect = NSRect(
+                x: textRect.maxX + commentGap,
+                y: frame.midY - 8,
+                width: commentWidth,
+                height: 20
+            )
+            (comment as NSString).draw(
+                with: commentRect,
+                options: [.truncatesLastVisibleLine, .usesLineFragmentOrigin],
+                attributes: commentAttributes
+            )
+        }
+    }
+
+    private func drawPageIndicator(layout: CandidateWindowLayout) {
+        NSColor.separatorColor.withAlphaComponent(theme.increaseContrast ? 0.8 : 0.45).setStroke()
+        let divider = NSBezierPath()
+        divider.move(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.minY + 7))
+        divider.line(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.maxY - 7))
+        divider.lineWidth = 1
+        divider.stroke()
+
+        let enabledColor = NSColor.secondaryLabelColor
+        let disabledColor = NSColor.tertiaryLabelColor.withAlphaComponent(0.45)
+        let controlAttributes: (NSColor) -> [NSAttributedString.Key: Any] = { color in
+            [
+                .font: NSFont.systemFont(ofSize: 14, weight: .medium),
+                .foregroundColor: color,
+            ]
+        }
+        drawCentered(
+            "‹",
+            in: layout.previousPageFrame,
+            attributes: controlAttributes(model.pageNumber > 0 ? enabledColor : disabledColor)
+        )
+        drawCentered(
+            model.pageLabel,
+            in: layout.pageFrame,
+            attributes: [
+                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]
+        )
+        drawCentered(
+            "›",
+            in: layout.nextPageFrame,
+            attributes: controlAttributes(!model.isLastPage ? enabledColor : disabledColor)
+        )
+    }
+
+    private func drawCentered(
+        _ string: String,
+        in rect: NSRect,
+        attributes: [NSAttributedString.Key: Any]
+    ) {
+        let size = (string as NSString).size(withAttributes: attributes)
+        (string as NSString).draw(
+            at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2),
+            withAttributes: attributes
         )
     }
 }

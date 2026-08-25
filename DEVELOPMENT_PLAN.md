@@ -1,15 +1,15 @@
 # 风语完整开发计划
 
-> 文档状态：已确认，M4 功能实现与自动化验收完成
+> 文档状态：已确认，M5 功能实现与自动化验收完成
 > 规划版本：0.1  
 > 日期：2026-08-24  
-> 当前门禁：**M4 候选窗已热安装，等待 TextEdit 中键盘、鼠标与焦点行为人工确认；确认后进入 M5**
+> 当前门禁：**M5 原生毛玻璃候选窗等待本机视觉确认；确认后进入 M6 词库、双拼与辅码**
 
 ## 1. 文档目的
 
 本文是后续 AI Coding Agent 和人工开发者共同遵循的实施规范。它定义产品范围、架构边界、阶段任务、交付物、测试方法、风险与验收门禁。任何实现都应以本文为主线，并用 `docs/DECISIONS.md` 记录后续决策。
 
-用户已于 2026-08-24 明确确认开始编码，并允许本机安装测试。M1—M4 已完成代码与自动化验收；真实 TextEdit 按键和鼠标测试因 macOS 拒绝自动发送按键而保留人工确认门禁。
+用户已于 2026-08-24 明确确认开始编码，并允许本机安装测试。M1—M5 已完成代码与自动化验收；M4 候选窗已由用户确认可见，M5 保留最终本机视觉确认门禁。
 
 ## 2. 产品目标
 
@@ -18,7 +18,7 @@
 1. 通过 InputMethodKit 成为标准 macOS 输入源，在常见 Cocoa 文本控件与主流应用中稳定工作。
 2. 使用 librime 提供组合、候选、选词、翻页、用户词频、方案切换和部署能力。
 3. 兼容 Rime schema 与词典生态，首版支持全拼、多种双拼，以及可配置的辅码输入。
-4. 候选窗采用 AppKit 原生非激活面板与 `NSVisualEffectView`，呈现贴合系统的毛玻璃视觉。
+4. 候选窗采用 AppKit 原生非激活面板；macOS 26 使用 `NSGlassEffectView`，较旧系统以 `NSVisualEffectView` 回退，呈现贴合系统的毛玻璃视觉。
 5. 对用户输入保持本地优先：首版不上传按键、组合串、候选或用户词典。
 6. 形成可复现的构建、安装、调试、测试和发布流程。
 
@@ -71,7 +71,7 @@ InputMethodKit Server
         ▼
 Input Controller ────────► Candidate Window Coordinator
         │                         │
-        │ 规范化按键/上下文        └─► NSPanel + NSVisualEffectView
+        │ 规范化按键/上下文        └─► NSPanel + NSGlassEffectView / NSVisualEffectView
         ▼
 Rime Service / Session Adapter
         │ librime C API
@@ -136,7 +136,7 @@ librime Engine
 ### 7.1 窗口行为
 
 - 使用不可抢夺输入焦点的 `NSPanel`，不激活应用、不打断宿主编辑状态。
-- 内容根视图使用 `NSVisualEffectView`，材质、混合模式和 active state 选择通过视觉样机验证。
+- macOS 26 内容根视图使用 `NSGlassEffectView` clear 样式；旧系统使用 `NSVisualEffectView`，材质、混合模式和 active state 通过视觉样机验证。
 - 窗口随插入点定位；优先读取 InputMethodKit 客户端提供的光标矩形。
 - 超出当前屏幕可见区域时自动翻转或收缩；必须按候选窗所在屏幕而非主屏幕计算。
 - 对 Retina、不同缩放比例、横排/竖排文本和全屏空间进行验证。
@@ -271,7 +271,7 @@ RimeInputMethod/
 
 人工验证并入 M4：macOS 拒绝未授予辅助功能权限的 `osascript` 发送真实按键（错误 1002），因此由用户在 TextEdit 中完成真实输入门禁。
 
-### M4：候选数据与基线窗口（实现与自动化验收完成，TextEdit 人工门禁待确认）
+### M4：候选数据与基线窗口（已完成）
 
 任务：
 
@@ -284,19 +284,23 @@ RimeInputMethod/
 
 已完成：不可变 candidate/context/status 快照接入；非激活 `NSPanel` 基线候选窗；候选序号、注释、页码和高亮；数字键、方向键、PageUp/PageDown 与鼠标语义选词；插入点定位、多显示器选择、下方优先、空间不足向上翻转和可见区域约束；停用、提交与错误路径隐藏窗口。
 
-自动化：`Scripts/test-m4.sh Debug|Release` 覆盖候选展示模型、鼠标命中、非激活窗口配置、屏幕选择、边界定位，以及真实 librime 的候选高亮、翻页和选择提交。最终人工门禁见 `docs/M4_VALIDATION.md`。
+自动化：`Scripts/test-m4.sh Debug|Release` 覆盖候选展示模型、鼠标命中、非激活窗口配置、屏幕选择、边界定位，以及真实 librime 的候选高亮、翻页和选择提交。候选窗显示已由用户在实际输入中确认；详细记录见 `docs/M4_VALIDATION.md`。
 
-### M5：原生毛玻璃视觉
+### M5：原生毛玻璃视觉（实现与自动化验收完成，本机视觉门禁待确认）
 
 任务：
 
-- 引入 `NSVisualEffectView`、动态系统色、圆角、阴影和主题 token。
+- 引入 `NSGlassEffectView` / `NSVisualEffectView` 回退、动态系统色、圆角、阴影和主题 token。
 - 完成横排布局，评估竖排布局是否纳入首版。
 - 支持候选注释/辅码显示、自适应宽度与长文本截断。
 - 覆盖深浅色、减少透明度、增强对比度、Retina、多屏和缩放。
 - 动画必须短、可中断、不会延迟按键反馈。
 
 验收：视觉截图基线通过；可访问性模式下信息清晰；快速输入无明显布局抖动。
+
+已完成：macOS 26 以 `.clear` 的 `NSGlassEffectView` 呈现真正系统玻璃，并由该视图直接控制连续圆角，避免矩形窗口阴影产生尖角；macOS 13—15 使用 `.popover` / `.behindWindow` 的 `NSVisualEffectView` 回退。使用动态系统色和集中主题 token；首版确定为横排候选布局，短候选正文优先完整显示，注释/辅码与长文本按剩余宽度截断；页码、点击翻页和滚轮/触控板翻页接入统一 Rime 动作；降低透明度、增强对比度和减少动态效果提供明确降级。出现动画仅为可中断的 80ms 淡入，隐藏与输入状态更新不等待动画。
+
+自动化：`Scripts/test-m5.sh Debug|Release` 覆盖主题 fallback、横排边界、长文本宽度分配、原生材质配置，以及 Aqua/Dark Aqua × 普通/无障碍模式的离屏视觉快照。竖排布局经评估不纳入首版，保留为后续可选布局；人工门禁见 `docs/M5_VALIDATION.md`。
 
 ### M6：Rime 词库、双拼与辅码
 
@@ -459,4 +463,4 @@ RimeInputMethod/
 
 ## 19. 当前停点
 
-M1—M4 已完成实现。InputMethodKit controller、每会话 Rime session、marked text/commit、不可变候选快照、非激活基线面板、键盘/鼠标选词、Rime 高亮/翻页和多屏边界定位已接成闭环；Debug arm64、Release arm64+x86_64、M2/M3/M4 回归、静态分析和免注销热安装均应作为门禁执行。macOS 因未授予辅助功能权限而拒绝自动向 TextEdit 发送按键，因此当前停点是 `docs/M4_VALIDATION.md` 的 TextEdit 人工门禁；确认后进入 M5 原生毛玻璃视觉。
+M1—M5 已完成实现。InputMethodKit controller、每会话 Rime session、marked text/commit、不可变候选快照、非激活原生毛玻璃面板、横向自适应布局、键盘/鼠标/滚轮选词翻页、Rime 高亮以及多屏边界定位已接成闭环；Debug arm64、Release arm64+x86_64、M2—M5 回归、静态分析和免注销热安装均作为门禁执行。当前停点是 `docs/M5_VALIDATION.md` 的本机视觉确认；确认后进入 M6，并先确认默认方案、内置双拼集合、辅码规则和词库来源。

@@ -117,11 +117,21 @@
 
 - 日期：2026-08-24
 - 状态：已接受
-- 选择：M4 使用 `.borderless + .nonactivatingPanel` 的 `NSPanel` 和轻量自绘候选列表；panel 永不成为 key/main window。系统 `IMKCandidates` 仅作为行为对照，不作为最终界面依赖。
+- 选择：M4 使用 `.nonactivatingPanel` 的 `NSPanel` 和轻量自绘候选列表，以非激活窗口样式保持宿主焦点。系统 `IMKCandidates` 仅作为行为对照，不作为最终界面依赖。
 - 状态所有权：页码、候选和高亮只来自不可变 Rime 快照；鼠标点击只回传本页候选索引，由 controller 调用 Rime 后重新读取快照。CandidateWindow 不访问引擎、不提交文本。
 - 定位：优先从 `IMKTextInput.attributes(forCharacterIndex:lineHeightRectangle:)` 获取当前输入行矩形；`firstRect` 仅作为多级兼容回退。随后按该矩形选择对应显示器的 visible frame，默认向下展开，空间不足向上翻转，最终约束在可见区域内。
 - 视觉边界：M4 只建立可用、可测的系统色基线；`NSVisualEffectView`、毛玻璃材质、横排视觉和可访问性主题细化属于 M5。
 - 验证：Debug/Release `--m4-smoke` 覆盖模型、鼠标命中、非激活约束、多屏边界、Rime 高亮、翻页和选择；真实 TextEdit 焦点与鼠标体验保留人工门禁。
+
+### ADR-022：M5 首版采用原生横排毛玻璃布局
+
+- 日期：2026-08-24
+- 状态：已接受
+- 选择：macOS 26 候选窗根视图使用 `NSGlassEffectView` 的 `.clear` 样式，连续圆角由系统玻璃自身生成，并关闭会产生矩形尖角的 panel 阴影；macOS 13—15 回退到 `NSVisualEffectView` 的 `.popover` 材质、`.behindWindow` 混合和 `.active` 状态。首版只交付横排布局，竖排作为后续可选策略，不阻塞 M6。
+- 主题：动态系统色与系统强调色为唯一颜色来源；降低透明度切换到不透明系统背景，增强对比度加强边框和实色高亮，减少动态效果完全关闭淡入。
+- 布局：面板宽度限制在 220—760pt，候选按内容测量后公平压缩；短正文获得优先保留宽度，注释/辅码和超长正文再分别尾部截断。候选命中区域、页码和翻页按钮由同一纯布局模型生成，避免绘制与点击坐标漂移。
+- 交互：点击候选、点击翻页、滚轮/触控板翻页均只产生 `CandidateWindowAction`，controller 再调用 Rime 并读取新快照；首次显示允许 80ms 可中断淡入，输入更新与隐藏不等待动画。
+- 验证：`--m5-smoke` 覆盖主题降级、布局边界、长文本、材质配置，以及浅/深色和普通/无障碍模式的离屏渲染。
 
 ## 待用户确认
 
