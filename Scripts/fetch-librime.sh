@@ -54,12 +54,59 @@ download_data_file() {
     install -m 0644 "$downloaded_path" "$rime_data/$name"
 }
 
+verify_reference_file() {
+    local name="$1"
+    local source_url="$2"
+    local expected_sha256="$3"
+    local downloaded_path="$temporary_root/reference-$name"
+
+    curl --fail --location --output "$downloaded_path" "$source_url"
+    local actual_sha256
+    actual_sha256="$(shasum -a 256 "$downloaded_path" | awk '{print $1}')"
+    if [[ "$actual_sha256" != "$expected_sha256" ]]; then
+        echo "Rime reference checksum mismatch: $name" >&2
+        exit 65
+    fi
+}
+
 download_data_file "cangjie5.dict.yaml" "2dbc120d838ea1e30286f565060d6f84c11623ff1798fd52c97d50e370b833dd"
 download_data_file "cangjie5.schema.yaml" "e112cc9624923befde28be408222d3bc3ca95df7c270c508d735570403e8b272"
-download_data_file "default.yaml" "f199599315b4b6502072ac6e2afe8569fec917847b558d5a40a1859a4286eb1c"
 download_data_file "essay.txt" "3d11a425aa14a47f536812bc60021138bf6aacbe7da69fc0c4fb04f85811173e"
 download_data_file "luna_pinyin.dict.yaml" "971baa1f38a42d3d82f858b5bbdcad6482371f8d93a2f5d5c4ab341046419e3b"
-download_data_file "luna_pinyin.schema.yaml" "33ae5531d6e220089edd14a9e8a52e38b6dee13eb51795aa93ba5ff97140ab38"
 download_data_file "symbols.yaml" "e4cda5663039e284ce62d7febe207bf6b788df6a9705ca174fabd7f8c140ed30"
 
-echo "Fetched librime $version ($commit) and verified all checksums."
+# M6 adapts these two files in place. Verify the pinned upstream bytes without
+# overwriting the product schema list, display names, or auxiliary translator.
+verify_reference_file \
+    "default.yaml" \
+    "https://raw.githubusercontent.com/rime/librime/$version/data/minimal/default.yaml" \
+    "f199599315b4b6502072ac6e2afe8569fec917847b558d5a40a1859a4286eb1c"
+verify_reference_file \
+    "luna_pinyin.schema.yaml" \
+    "https://raw.githubusercontent.com/rime/librime/$version/data/minimal/luna_pinyin.schema.yaml" \
+    "33ae5531d6e220089edd14a9e8a52e38b6dee13eb51795aa93ba5ff97140ab38"
+
+double_pinyin_commit="01a13287cbd27819be1c34fa1ddc1b3643d5001b"
+verify_reference_file \
+    "double_pinyin.schema.yaml" \
+    "https://raw.githubusercontent.com/rime/rime-double-pinyin/$double_pinyin_commit/double_pinyin.schema.yaml" \
+    "763430a99d0cd693805766b49d60b9092bc2af0ca26eb107f1d044566ce765d3"
+verify_reference_file \
+    "double_pinyin_flypy.schema.yaml" \
+    "https://raw.githubusercontent.com/rime/rime-double-pinyin/$double_pinyin_commit/double_pinyin_flypy.schema.yaml" \
+    "6b522a7e9cb743474287a14678597460bd124369f32573dd63e8f04e7c41d4b9"
+verify_reference_file \
+    "double_pinyin_mspy.schema.yaml" \
+    "https://raw.githubusercontent.com/rime/rime-double-pinyin/$double_pinyin_commit/double_pinyin_mspy.schema.yaml" \
+    "c72dc607000b39795ab267f80ec8727c6551015579b735a839f198422a75d7a2"
+verify_reference_file \
+    "double_pinyin_abc.schema.yaml" \
+    "https://raw.githubusercontent.com/rime/rime-double-pinyin/$double_pinyin_commit/double_pinyin_abc.schema.yaml" \
+    "bb57bc3f3436aa1e9c98e7ad1a7f2b84810dbedc971f659d9bdfe2b5c81eac4f"
+
+"$project_root/Scripts/generate-aux-dictionary.swift" \
+    "$rime_data/luna_pinyin.dict.yaml" \
+    "$rime_data/cangjie5.dict.yaml" \
+    "$rime_data/fengyu_aux.dict.yaml"
+
+echo "Fetched librime $version ($commit), verified M6 Rime sources, and regenerated the auxiliary dictionary."

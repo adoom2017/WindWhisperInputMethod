@@ -3,8 +3,8 @@
 
 schema:
   schema_id: luna_pinyin
-  name: 朙月拼音
-  version: "0.15.test"
+  name: 风语全拼
+  version: "0.16.fengyu-m6"
   author:
     - 佛振 <chen.sst@gmail.com>
   description: |
@@ -14,6 +14,8 @@ schema:
       * Android open source project
       * Chewing - 新酷音
       * opencc - 開放中文轉換
+  dependencies:
+    - fengyu_aux
 
 switches:
   - name: ascii_mode
@@ -49,6 +51,7 @@ engine:
   segmentors:
     - ascii_segmentor
     - matcher
+    - affix_segmentor@auxiliary
     - abc_segmentor
     - affix_segmentor@alphabet
     - affix_segmentor@cangjie
@@ -58,6 +61,7 @@ engine:
   translators:
     - punct_translator
     - reverse_lookup_translator
+    - table_translator@auxiliary
     - script_translator
     - table_translator@cangjie
     - script_translator@pinyin
@@ -89,6 +93,19 @@ translator:
   dictionary: luna_pinyin
   preedit_format:
     - xform/([nljqxy])v/$1ü/
+
+auxiliary:
+  tag: auxiliary
+  dictionary: fengyu_aux
+  enable_user_dict: false
+  enable_completion: true
+  prefix: ";"
+  tips: 〔辅码：拼音＋仓颉首码〕
+  preedit_format:
+    - xform/^;/〔辅码〕/
+  comment_format:
+    - xform/^/〔/
+    - xform/$/〕/
 
 alphabet:
   tag: alphabet
@@ -153,6 +170,7 @@ key_binder:
 recognizer:
   import_preset: default
   patterns:
+    auxiliary: "^;[a-z]*$"
     alphabet: '(?<![A-Z]):[^;]*;?$'
     cangjie: "C:[a-z']*;?$"
     pinyin: "P:[a-z']*;?$"

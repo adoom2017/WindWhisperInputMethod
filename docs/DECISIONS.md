@@ -66,7 +66,7 @@
 - 状态：已接受
 - 选择：固定 librime tag `1.16.0`、commit `a251145d3aafa33871824a40bbec04c966bd8b56` 和官方 `rime-a251145-macOS-universal.tar.bz2`；归档 SHA-256 为 `e4c9a8767a456f2550f1242921b7656c6e6be088c89a921274bd5d4404f58b99`。
 - 集成：应用只嵌入核心 `librime.1.dylib`，不加载 Lua、octagram、predict 插件；构建不依赖 Homebrew，`Scripts/fetch-librime.sh` 可从官方来源按校验值恢复依赖。
-- 数据：M2 仅随包放入同一 tag 的 `data/minimal` 固定数据，用于桥接测试；产品词库、双拼和辅码仍等待 M6 决策。
+- 数据：M2 从同一 tag 的 `data/minimal` 引入固定基础数据；M6 已在 ADR-023 中确定产品词库、双拼和辅码发布范围。
 - 验证：库和 Release 应用均含 arm64/x86_64；`otool` 只显示系统库；Debug、Release、已安装 bundle 的输入/候选/提交测试通过。
 
 ### ADR-016：Rime 数据目录隔离
@@ -133,11 +133,18 @@
 - 交互：点击候选、点击翻页、滚轮/触控板翻页均只产生 `CandidateWindowAction`，controller 再调用 Rime 并读取新快照；首次显示允许 80ms 可中断淡入，输入更新与隐藏不等待动画。
 - 验证：`--m5-smoke` 覆盖主题降级、布局边界、长文本、材质配置，以及浅/深色和普通/无障碍模式的离屏渲染。
 
+### ADR-023：M6 内置方案、词库与独立辅码模式
+
+- 日期：2026-08-25
+- 状态：已接受
+- 方案：默认使用“风语全拼”，内置自然码、小鹤、微软和智能 ABC 四套官方双拼；仓颉保留为兼容方案。双拼配置固定到 `rime/rime-double-pinyin` commit `01a13287cbd27819be1c34fa1ddc1b3643d5001b`。
+- 辅码：使用 `;` 进入独立模式，编码为“完整拼音＋仓颉首码”。索引由锁定的 `luna_pinyin.dict.yaml` 和 `cangjie5.dict.yaml` 生成，不在 Swift 前端转换；正常全拼和纯双拼不受影响。
+- 数据保护：bundle 内 shared data 与 Application Support 下的 user data 保持隔离；桥接层只允许切换到部署清单中的方案。全量重新部署不得覆盖 `.custom.yaml` 和 `luna_pinyin.userdb`。
+- 许可：官方双拼配置及其风语适配按 GPL-3.0 随附；基础 Rime 数据及派生索引的来源、许可和修改记录见 `Resources/Rime/DATA_LOCK.json`、`docs/RIME_DATA.md` 与 `LICENSES/`。
+- 验证：`Scripts/test-m6.sh` 覆盖五套方案语料、辅码候选从 7 个缩到 1 个、候选注释、缺失方案拒绝、纯双拼无回退、用户数据升级保护与生成结果复现。
+
 ## 待用户确认
 
-- ADR-008：默认输入方案和内置双拼集合。
-- ADR-009：首版辅码体系、触发方式与显示方式。
-- ADR-010：词库来源、版本、许可证和是否随包发布。
 - ADR-012：设置入口与是否保留菜单栏状态项。
 - ADR-013：正式发布签名、notarization 与分发渠道。
 

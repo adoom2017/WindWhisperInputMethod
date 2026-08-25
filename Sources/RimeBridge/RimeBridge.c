@@ -1,6 +1,7 @@
 #include "RimeBridge.h"
 
 #include <stdlib.h>
+#include <stdatomic.h>
 #include <string.h>
 
 #include "rime_api.h"
@@ -8,6 +9,7 @@
 struct RBService {
   RimeApi *api;
   int initialized;
+  atomic_int deployment_state;
 };
 
 static RBServiceRef active_service = NULL;
@@ -37,6 +39,23 @@ static RBResult rb_fail(RBResult result,
 static int rb_service_is_valid(RBServiceRef service) {
   return service != NULL && service == active_service &&
          service->initialized && service->api != NULL;
+}
+
+static void rb_notification_handler(void *context_object,
+                                    RimeSessionId session_id,
+                                    const char *message_type,
+                                    const char *message_value) {
+  (void)session_id;
+  RBServiceRef service = (RBServiceRef)context_object;
+  if (service == NULL || message_type == NULL || message_value == NULL ||
+      strcmp(message_type, "deploy") != 0) {
+    return;
+  }
+  if (strcmp(message_value, "failure") == 0) {
+    atomic_store(&service->deployment_state, -1);
+  } else if (strcmp(message_value, "success") == 0) {
+    atomic_store(&service->deployment_state, 1);
+  }
 }
 
 RBResult rb_service_create(const RBServiceConfiguration *configuration,
@@ -89,10 +108,14 @@ RBResult rb_service_create(const RBServiceConfiguration *configuration,
   traits.app_name = configuration->app_name;
   traits.min_log_level = configuration->min_log_level;
 
+  instance->api = api;
+  atomic_init(&instance->deployment_state, 0);
   api->setup(&traits);
+  if (RIME_API_AVAILABLE(api, set_notification_handler)) {
+    api->set_notification_handler(rb_notification_handler, instance);
+  }
   api->initialize(&traits);
 
-  instance->api = api;
   instance->initialized = 1;
   active_service = instance;
   *service = instance;
@@ -105,6 +128,9 @@ void rb_service_destroy(RBServiceRef service) {
   }
   if (RIME_API_AVAILABLE(service->api, cleanup_all_sessions)) {
     service->api->cleanup_all_sessions();
+  }
+  if (RIME_API_AVAILABLE(service->api, set_notification_handler)) {
+    service->api->set_notification_handler(NULL, NULL);
   }
   service->api->finalize();
   service->initialized = 0;
@@ -138,8 +164,14 @@ RBResult rb_service_deploy(RBServiceRef service,
                    error_message);
   }
 
+  atomic_store(&service->deployment_state, 0);
   service->api->start_maintenance(full_check ? True : False);
   service->api->join_maintenance_thread();
+  if (atomic_load(&service->deployment_state) < 0) {
+    return rb_fail(RB_RESULT_DEPLOYMENT_FAILED,
+                   "librime reported a deployment failure.",
+                   error_message);
+  }
   if (RIME_API_AVAILABLE(service->api, is_maintenance_mode) &&
       service->api->is_maintenance_mode()) {
     return rb_fail(RB_RESULT_DEPLOYMENT_FAILED,
@@ -223,6 +255,34 @@ int rb_session_select_candidate(RBServiceRef service,
   }
   return service->api->select_candidate_on_current_page(
              (RimeSessionId)session, index) != False;
+}
+
+int rb_session_select_schema(RBServiceRef service,
+                             RBSessionRef session,
+                             const char *schema_id) {
+  if (!rb_service_is_valid(service) || session == 0 || schema_id == NULL ||
+      !RIME_API_AVAILABLE(service->api, get_schema_list) ||
+      !RIME_API_AVAILABLE(service->api, free_schema_list) ||
+      !RIME_API_AVAILABLE(service->api, select_schema)) {
+    return 0;
+  }
+  RimeSchemaList schemas = {0};
+  if (service->api->get_schema_list(&schemas) == False) {
+    return 0;
+  }
+  int found = 0;
+  for (size_t index = 0; index < schemas.size; ++index) {
+    if (schemas.list[index].schema_id != NULL &&
+        strcmp(schemas.list[index].schema_id, schema_id) == 0) {
+      found = 1;
+      break;
+    }
+  }
+  service->api->free_schema_list(&schemas);
+  if (!found) {
+    return 0;
+  }
+  return service->api->select_schema((RimeSessionId)session, schema_id) != False;
 }
 
 void rb_snapshot_init(RBSnapshot *snapshot) {

@@ -88,6 +88,9 @@ void rb_session_clear_composition(RBServiceRef service, RBSessionRef session);
 int rb_session_select_candidate(RBServiceRef service,
                                 RBSessionRef session,
                                 size_t index);
+int rb_session_select_schema(RBServiceRef service,
+                             RBSessionRef session,
+                             const char *schema_id);
 
 void rb_snapshot_init(RBSnapshot *snapshot);
 void rb_snapshot_clear(RBSnapshot *snapshot);

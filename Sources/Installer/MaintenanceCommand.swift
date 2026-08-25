@@ -60,6 +60,8 @@ enum MaintenanceCommand {
             return M4SmokeTest.run()
         case "--m5-smoke":
             return M5SmokeTest.run()
+        case "--m6-smoke":
+            return M6SmokeTest.run(arguments: arguments)
         case "--m5-preview":
             return MainActor.assumeIsolated {
                 M5SmokeTest.preview()
@@ -160,6 +162,7 @@ enum MaintenanceCommand {
               --m4-smoke               Run the M4 candidate window and interaction test
               --m5-smoke               Run the M5 native material and layout test
               --m5-preview             Show the M5 candidate window visual preview
+              --m6-smoke               Run the M6 schemas, auxiliary code, and upgrade test
               --help                   Show this help
             """
         )

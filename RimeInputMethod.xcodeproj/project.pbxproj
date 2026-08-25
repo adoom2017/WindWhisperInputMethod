@@ -35,6 +35,7 @@
 		A1000000000000000000001A /* CandidateWindowTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001E /* CandidateWindowTheme.swift */; };
 		A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001F /* CandidateWindowLayout.swift */; };
 		A1000000000000000000001C /* M5SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* M5SmokeTest.swift */; };
+		A1000000000000000000001D /* M6SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* M6SmokeTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -84,6 +85,7 @@
 		A2000000000000000000001E /* CandidateWindowTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowTheme.swift; sourceTree = "<group>"; };
 		A2000000000000000000001F /* CandidateWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowLayout.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* M5SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M5SmokeTest.swift; sourceTree = "<group>"; };
+		A20000000000000000000021 /* M6SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M6SmokeTest.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -190,6 +192,7 @@
 				A2000000000000000000000F /* RimeModels.swift */,
 				A20000000000000000000010 /* RimeService.swift */,
 				A20000000000000000000011 /* RimeSmokeTest.swift */,
+				A20000000000000000000021 /* M6SmokeTest.swift */,
 			);
 			path = RimeBridge;
 			sourceTree = "<group>";
@@ -329,6 +332,7 @@
 				A1000000000000000000001A /* CandidateWindowTheme.swift in Sources */,
 				A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */,
 				A1000000000000000000001C /* M5SmokeTest.swift in Sources */,
+				A1000000000000000000001D /* M6SmokeTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -4,9 +4,9 @@
 
 ## 当前状态
 
-**M1—M5 已完成实现和自动化验收；当前等待 M5 毛玻璃候选窗的本机视觉确认。**
+**M1—M6 已完成实现和自动化验收；当前版本已进入 M6 本机使用确认。**
 
-应用现已自带官方 librime 1.16.0、最小 Rime 全拼测试数据和窄 C/Swift 桥接。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。Command、Control、Option 组合保持透传。候选面板不抢焦点并跟随插入点；macOS 26 使用系统 `NSGlassEffectView` clear 玻璃，旧系统回退到 `NSVisualEffectView`，两者共用横向自适应布局。窗口显示页码、候选序号、注释/辅码与 Rime 高亮；鼠标点击、滚轮翻页和键盘选词共用同一 Rime session。深浅色、降低透明度、增强对比度和减少动态效果均使用系统设置自动适配。
+应用现已自带官方 librime 1.16.0、Rime 基础词库、风语全拼、自然码双拼、小鹤双拼、微软双拼、智能 ABC 双拼和可复现生成的辅码索引。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。Command、Control、Option 组合保持透传。候选面板不抢焦点并跟随插入点；macOS 26 使用系统 `NSGlassEffectView` clear 玻璃，旧系统回退到 `NSVisualEffectView`，两者共用横向自适应布局。窗口显示页码、候选序号、注释/辅码与 Rime 高亮；鼠标点击、滚轮翻页和键盘选词共用同一 Rime session。深浅色、降低透明度、增强对比度和减少动态效果均使用系统设置自动适配。
 
 本机为 Apple Silicon，Debug 只构建 arm64；Release 应用和内置 librime 都包含 arm64 + x86_64。安装脚本使用本地签名、父输入法/子模式分阶段启用和当前会话热刷新；M3 最终 Debug 构建已成功热安装，没有上传构建包、注销或重启，并恢复了安装前使用的鼠须管输入源。
 
@@ -44,9 +44,11 @@
 ./Scripts/test-m4.sh Release
 ./Scripts/test-m5.sh Debug
 ./Scripts/test-m5.sh Release
+./Scripts/test-m6.sh Debug
+./Scripts/test-m6.sh Release
 ```
 
-`test-rime-bridge.sh` 会在 `/private/tmp` 创建隔离数据目录，验证应用内嵌运行库、签名、动态依赖、部署、候选和提交闭环，然后清理该测试目录。`test-m3.sh` 进一步验证按键映射、快捷键透传、组合编辑以及生产 `IMKTextInput` 更新路径。`test-m4.sh` 覆盖候选模型、鼠标命中、非激活面板约束、多显示器定位、边界翻转，以及真实 librime 高亮、翻页和语义选择。`test-m5.sh` 覆盖主题降级、横向布局、长文本压缩、macOS 26 原生玻璃与旧系统材质回退配置，以及浅色/深色和普通/无障碍组合的离屏视觉快照。需要从官方发布重新恢复锁定依赖时执行：
+`test-rime-bridge.sh` 会在 `/private/tmp` 创建隔离数据目录，验证应用内嵌运行库、签名、动态依赖、部署、候选和提交闭环，然后清理该测试目录。`test-m3.sh` 进一步验证按键映射、快捷键透传、组合编辑以及生产 `IMKTextInput` 更新路径。`test-m4.sh` 覆盖候选模型、鼠标命中、非激活面板约束、多显示器定位、边界翻转，以及真实 librime 高亮、翻页和语义选择。`test-m5.sh` 覆盖主题降级、横向布局、长文本压缩、macOS 26 原生玻璃与旧系统材质回退配置，以及浅色/深色和普通/无障碍组合的离屏视觉快照。`test-m6.sh` 验证 5 套输入方案固定语料、辅码缩小候选与注释、缺失方案保护、用户词典/覆盖文件升级保护，以及辅码词典的可复现生成。需要从官方发布重新恢复锁定依赖时执行：
 
 ```bash
 ./Scripts/fetch-librime.sh
@@ -112,7 +114,15 @@ RimeInputMethod/
 - 最低版本：macOS 13
 - Release 架构：arm64 + x86_64
 
-默认双拼方案、首版辅码规则、词库来源与正式分发签名仍需在对应里程碑前确认。
+默认方案为“风语全拼”；内置自然码、小鹤、微软和智能 ABC 双拼。辅码用 `;` 独立触发：输入全拼后，再补一个仓颉首码缩小候选，例如 `;zuo` → `;zuok` 可定位“左”。正式分发签名仍留到 M9 决策。
+
+## 输入方案与辅码
+
+- 默认：风语全拼，正常输入如 `nihao`。
+- 双拼：按 `Control+grave` 或 `F4` 打开 Rime 方案菜单，选择自然码、小鹤、微软或智能 ABC。
+- 辅码：在任一拼音方案中先输入 `;`，再输入完整拼音和可选的仓颉首码。候选注释会显示尚可补充的辅码；该模式与正常全拼、纯双拼完全隔离。
+- 用户词典和 `.custom.yaml` 保存在 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`，更新应用和重新部署不会覆盖这些文件。
+- 数据来源、固定提交、许可证和修改见 `Resources/Rime/DATA_LOCK.json`、`docs/RIME_DATA.md` 与 `LICENSES/`。
 
 ## 品牌资源
 

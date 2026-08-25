@@ -258,6 +258,15 @@ final class RimeSession: @unchecked Sendable {
     }
 
     @discardableResult
+    func selectSchema(identifier: String) -> Bool {
+        service.withEngineLock {
+            identifier.withCString {
+                rb_session_select_schema(serviceHandle, sessionHandle, $0) != 0
+            }
+        }
+    }
+
+    @discardableResult
     func selectCandidate(at index: Int) -> Bool {
         guard index >= 0 else {
             return false
