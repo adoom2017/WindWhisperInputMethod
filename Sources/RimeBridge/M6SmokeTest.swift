@@ -23,6 +23,8 @@ enum M6SmokeTest {
             print("schemaCorpusPassed=\(result.schemeCount)")
             print("defaultSchema=flypy")
             print("flypyAuxiliaryCode=passed")
+            print("flypyShortCodes=passed")
+            print("flypyFourCharacterPhrases=passed")
             print("auxiliaryBroadCandidates=\(result.broadCandidateCount)")
             print("auxiliaryNarrowCandidates=\(result.narrowCandidateCount)")
             print("auxiliaryExpectedCandidate=passed")
@@ -137,6 +139,11 @@ enum M6SmokeTest {
                 throw RimeBridgeError.smokeAssertion("the full small crane code nirx did not commit 你")
             }
 
+            try verifyFlypyCandidate(service: service, sequence: "k", expected: "可以")
+            try verifyFlypyCandidate(service: service, sequence: "aj", expected: "按键")
+            try verifyFlypyCandidate(service: service, sequence: "hvy", expected: "呼之欲出")
+            try verifyFlypyAutoCommit(service: service, sequence: "ahqi", expected: "爱恨情仇")
+
             let auxiliarySession = try service.makeSession()
             guard auxiliarySession.selectSchema(identifier: "luna_pinyin") else {
                 throw RimeBridgeError.smokeAssertion("could not select full pinyin for auxiliary test")
@@ -205,6 +212,39 @@ enum M6SmokeTest {
             broadCandidateCount: broadCandidateCount,
             narrowCandidateCount: narrowCandidateCount
         )
+    }
+
+    private static func verifyFlypyCandidate(
+        service: RimeService,
+        sequence: String,
+        expected: String
+    ) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: "flypy"), session.simulate(sequence: sequence) else {
+            throw RimeBridgeError.smokeAssertion("Flypy did not consume short code \(sequence)")
+        }
+        let snapshot = try session.readSnapshot()
+        guard snapshot.menu.candidates.contains(where: { $0.text == expected }) else {
+            throw RimeBridgeError.smokeAssertion(
+                "Flypy short code \(sequence) is missing candidate \(expected)"
+            )
+        }
+    }
+
+    private static func verifyFlypyAutoCommit(
+        service: RimeService,
+        sequence: String,
+        expected: String
+    ) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: "flypy"), session.simulate(sequence: sequence) else {
+            throw RimeBridgeError.smokeAssertion("Flypy did not consume phrase code \(sequence)")
+        }
+        guard try session.readSnapshot().commitText == expected else {
+            throw RimeBridgeError.smokeAssertion(
+                "Flypy phrase code \(sequence) did not commit \(expected)"
+            )
+        }
     }
 
     private static func validateBundledData(at sharedData: URL) throws {

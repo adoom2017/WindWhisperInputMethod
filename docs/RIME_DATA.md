@@ -65,6 +65,8 @@
      Resources/Rime/flypy_full.txt
    ```
 
+   生成器会保留原码表的单键/双键简码、三键短语简码和四键四字词，并在补充码表中缺少简码或四字词时停止生成。文本码表可以从用户的 `rime-origin` 目录复用；不要复制其中 `build/*.bin` 或用户数据库，必须由当前捆绑的 librime 重新部署。
+
 5. OpenCC 数据从锁定 SHA-256 的官方 `Squirrel-1.1.2.pkg` 提取；更新时同时核对 OpenCC tag、Squirrel 包摘要和三个输出文件摘要。
 6. 执行 `Scripts/test-m6.sh Debug|Release` 和 `Scripts/test-m7.sh Debug|Release`。前者再次生成两类辅码词典并逐字节比较，后者验证“漢字”与“汉字”的真实候选转换。
 7. 更新 `LICENSES/THIRD_PARTY_NOTICES.md` 与对应里程碑验收文档，单独提交数据升级。

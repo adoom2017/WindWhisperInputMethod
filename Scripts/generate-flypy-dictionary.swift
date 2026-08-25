@@ -5,6 +5,8 @@ import Foundation
 enum GeneratorError: Error, CustomStringConvertible {
     case usage
     case missingDataMarker(String)
+    case missingShortCodes
+    case missingFourCharacterPhrases
 
     var description: String {
         switch self {
@@ -12,6 +14,10 @@ enum GeneratorError: Error, CustomStringConvertible {
             "usage: generate-flypy-dictionary.swift <flypydz.dict.yaml> <output> [supplement.txt ...]"
         case .missingDataMarker(let path):
             "dictionary has no data section: \(path)"
+        case .missingShortCodes:
+            "supplement tables contain no one- or two-key short codes"
+        case .missingFourCharacterPhrases:
+            "supplement tables contain no four-character phrases"
         }
     }
 }
@@ -62,19 +68,44 @@ do {
 
     var entries = [Entry]()
     var seen = Set<Entry>()
-    func append(_ entry: Entry) {
+    @discardableResult
+    func append(_ entry: Entry) -> Bool {
         if seen.insert(entry).inserted {
             entries.append(entry)
+            return true
         }
+        return false
     }
 
-    // Preserve the user's curated short codes and phrase ordering first.
+    var supplementalShortCodeCount = 0
+    var supplementalFourCharacterPhraseCount = 0
+
+    // Preserve the user's curated one-/two-key short codes, three-key phrase
+    // abbreviations, and four-key phrases before generated single-character
+    // entries so the original Flypy candidate order remains effective.
     for path in supplementPaths {
         for line in try dataLines(at: path, requiresMarker: false) {
             guard let (text, code) = fields(from: line), code.count <= 4 else {
                 continue
             }
-            append(Entry(text: text, code: code))
+            guard append(Entry(text: text, code: code)) else {
+                continue
+            }
+            if code.count <= 2 {
+                supplementalShortCodeCount += 1
+            }
+            if text.count == 4 {
+                supplementalFourCharacterPhraseCount += 1
+            }
+        }
+    }
+
+    if !supplementPaths.isEmpty {
+        guard supplementalShortCodeCount > 0 else {
+            throw GeneratorError.missingShortCodes
+        }
+        guard supplementalFourCharacterPhraseCount > 0 else {
+            throw GeneratorError.missingFourCharacterPhrases
         }
     }
 
@@ -111,6 +142,8 @@ do {
     let body = entries.map { "\($0.text)\t\($0.code)" }.joined(separator: "\n")
     try (header + body + "\n").write(toFile: outputPath, atomically: true, encoding: .utf8)
     print("generatedRows=\(entries.count)")
+    print("shortCodeRows=\(supplementalShortCodeCount)")
+    print("fourCharacterPhraseRows=\(supplementalFourCharacterPhraseCount)")
 } catch {
     fputs("generate-flypy-dictionary: \(error)\n", stderr)
     exit(EXIT_FAILURE)
