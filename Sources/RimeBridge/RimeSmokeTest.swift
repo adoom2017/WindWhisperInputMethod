@@ -65,6 +65,9 @@ enum RimeSmokeTest {
         try service.deploy(fullCheck: true)
 
         let session = try service.makeSession()
+        guard session.selectSchema(identifier: "luna_pinyin") else {
+            throw RimeBridgeError.smokeAssertion("full pinyin schema could not be selected")
+        }
         guard session.simulate(sequence: "nihao") else {
             throw RimeBridgeError.smokeAssertion("key sequence was not consumed")
         }

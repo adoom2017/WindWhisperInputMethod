@@ -137,7 +137,7 @@
 
 - 日期：2026-08-25
 - 状态：已接受
-- 方案：默认使用“风语全拼”，内置自然码、小鹤、微软和智能 ABC 四套官方双拼；仓颉保留为兼容方案。双拼配置固定到 `rime/rime-double-pinyin` commit `01a13287cbd27819be1c34fa1ddc1b3643d5001b`。
+- 方案：默认使用“小鹤双拼”，同时内置风语全拼、自然码、微软和智能 ABC；仓颉保留为兼容方案。双拼配置固定到 `rime/rime-double-pinyin` commit `01a13287cbd27819be1c34fa1ddc1b3643d5001b`。默认值由用户于 2026-08-25 明确指定。
 - 辅码：使用 `;` 进入独立模式，编码为“完整拼音＋仓颉首码”。索引由锁定的 `luna_pinyin.dict.yaml` 和 `cangjie5.dict.yaml` 生成，不在 Swift 前端转换；正常全拼和纯双拼不受影响。
 - 数据保护：bundle 内 shared data 与 Application Support 下的 user data 保持隔离；桥接层只允许切换到部署清单中的方案。全量重新部署不得覆盖 `.custom.yaml` 和 `luna_pinyin.userdb`。
 - 许可：官方双拼配置及其风语适配按 GPL-3.0 随附；基础 Rime 数据及派生索引的来源、许可和修改记录见 `Resources/Rime/DATA_LOCK.json`、`docs/RIME_DATA.md` 与 `LICENSES/`。

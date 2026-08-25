@@ -1,12 +1,12 @@
 # Rime default settings
 # encoding: utf-8
 
-config_version: "0.17.fengyu-m6"
+config_version: "0.18.fengyu-flypy-default"
 
 schema_list:
+  - schema: double_pinyin_flypy
   - schema: luna_pinyin
   - schema: double_pinyin
-  - schema: double_pinyin_flypy
   - schema: double_pinyin_mspy
   - schema: double_pinyin_abc
   - schema: cangjie5

@@ -20,6 +20,7 @@ enum M6SmokeTest {
         do {
             let result = try execute(arguments: arguments)
             print("schemaCorpusPassed=\(result.schemeCount)")
+            print("defaultSchema=double_pinyin_flypy")
             print("auxiliaryBroadCandidates=\(result.broadCandidateCount)")
             print("auxiliaryNarrowCandidates=\(result.narrowCandidateCount)")
             print("auxiliaryExpectedCandidate=passed")
@@ -72,6 +73,14 @@ enum M6SmokeTest {
         do {
             let service = try RimeService(paths: paths, minLogLevel: 2)
             try service.deploy(fullCheck: true)
+
+            let defaultSession = try service.makeSession()
+            let defaultSnapshot = try defaultSession.readSnapshot()
+            guard defaultSnapshot.status.schemaIdentifier == "double_pinyin_flypy",
+                defaultSnapshot.status.schemaName == "小鹤双拼"
+            else {
+                throw RimeBridgeError.smokeAssertion("small crane double pinyin is not the default")
+            }
 
             for scheme in schemes {
                 let session = try service.makeSession()

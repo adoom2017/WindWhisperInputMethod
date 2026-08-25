@@ -136,7 +136,11 @@ enum M3SmokeTest {
         let paths = try RimeServicePaths.applicationDefaults()
         let service = try RimeService(paths: .temporary(root: root, sharedData: paths.sharedData))
         try service.deploy(fullCheck: true)
-        return try service.makeSession()
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: "luna_pinyin") else {
+            throw RimeBridgeError.smokeAssertion("M3 could not select its full pinyin fixture")
+        }
+        return session
     }
 
     private static func process(character: String, keyCode: UInt16, in session: RimeSession) throws {
