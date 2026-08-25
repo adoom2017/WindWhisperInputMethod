@@ -36,6 +36,9 @@
 		A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001F /* CandidateWindowLayout.swift */; };
 		A1000000000000000000001C /* M5SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* M5SmokeTest.swift */; };
 		A1000000000000000000001D /* M6SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* M6SmokeTest.swift */; };
+		A1000000000000000000001E /* FengYuSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* FengYuSettings.swift */; };
+		A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* FengYuSettingsMenu.swift */; };
+		A10000000000000000000020 /* M7SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* M7SmokeTest.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -86,6 +89,9 @@
 		A2000000000000000000001F /* CandidateWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowLayout.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* M5SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M5SmokeTest.swift; sourceTree = "<group>"; };
 		A20000000000000000000021 /* M6SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M6SmokeTest.swift; sourceTree = "<group>"; };
+		A20000000000000000000022 /* FengYuSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSettings.swift; sourceTree = "<group>"; };
+		A20000000000000000000023 /* FengYuSettingsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSettingsMenu.swift; sourceTree = "<group>"; };
+		A20000000000000000000024 /* M7SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M7SmokeTest.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -126,6 +132,7 @@
 			children = (
 				A40000000000000000000004 /* InputController */,
 				A4000000000000000000000D /* CandidateWindow */,
+				A4000000000000000000000E /* Configuration */,
 				A40000000000000000000005 /* Installer */,
 				A40000000000000000000009 /* RimeBridge */,
 			);
@@ -235,6 +242,16 @@
 			path = CandidateWindow;
 			sourceTree = "<group>";
 		};
+		A4000000000000000000000E /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				A20000000000000000000022 /* FengYuSettings.swift */,
+				A20000000000000000000023 /* FengYuSettingsMenu.swift */,
+				A20000000000000000000024 /* M7SmokeTest.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -333,6 +350,9 @@
 				A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */,
 				A1000000000000000000001C /* M5SmokeTest.swift in Sources */,
 				A1000000000000000000001D /* M6SmokeTest.swift in Sources */,
+				A1000000000000000000001E /* FengYuSettings.swift in Sources */,
+				A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */,
+				A10000000000000000000020 /* M7SmokeTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

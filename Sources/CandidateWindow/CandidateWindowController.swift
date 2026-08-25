@@ -120,9 +120,15 @@ final class CandidateWindowCoordinator {
             return
         }
 
+        let settings = FengYuSettingsStore.shared.snapshot
         let theme = CandidateWindowTheme.system(environment: .current)
+        apply(colorScheme: settings.colorScheme)
         apply(theme: theme)
-        candidateView.update(model: model, theme: theme)
+        candidateView.update(
+            model: model,
+            theme: theme,
+            orientation: settings.candidateOrientation
+        )
         let size = candidateView.preferredSize
         let screenFrames = NSScreen.screens.map(\.visibleFrame)
         guard
@@ -191,6 +197,21 @@ final class CandidateWindowCoordinator {
             effectView.layer?.masksToBounds = true
         }
     }
+
+    private func apply(colorScheme: CandidateColorScheme) {
+        let appearance: NSAppearance?
+        switch colorScheme {
+        case .system:
+            appearance = nil
+        case .light:
+            appearance = NSAppearance(named: .aqua)
+        case .dark:
+            appearance = NSAppearance(named: .darkAqua)
+        }
+        panel.appearance = appearance
+        materialView.appearance = appearance
+        candidateView.appearance = appearance
+    }
 }
 
 final class CandidateListView: NSView {
@@ -211,6 +232,7 @@ final class CandidateListView: NSView {
         )
     )
     var onAction: ((CandidateWindowAction) -> Void)?
+    private(set) var orientation: CandidateOrientation = .horizontal
 
     private var scrollAccumulator: CGFloat = 0
     private var lastScrollAction = Date.distantPast
@@ -219,7 +241,12 @@ final class CandidateListView: NSView {
     override var isOpaque: Bool { theme.reduceTransparency }
 
     var layout: CandidateWindowLayout {
-        CandidateHorizontalLayout.make(model: model, theme: theme)
+        switch orientation {
+        case .horizontal:
+            CandidateHorizontalLayout.make(model: model, theme: theme)
+        case .vertical:
+            CandidateVerticalLayout.make(model: model, theme: theme)
+        }
     }
 
     var preferredSize: NSSize {
@@ -238,9 +265,14 @@ final class CandidateListView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func update(model: CandidateWindowModel, theme: CandidateWindowTheme) {
+    func update(
+        model: CandidateWindowModel,
+        theme: CandidateWindowTheme,
+        orientation: CandidateOrientation = .horizontal
+    ) {
         self.model = model
         self.theme = theme
+        self.orientation = orientation
         setAccessibilityValue(
             model.entries.map { "\($0.shortcut) \($0.text)" }.joined(separator: "，")
         )
@@ -432,8 +464,13 @@ final class CandidateListView: NSView {
     private func drawPageIndicator(layout: CandidateWindowLayout) {
         NSColor.separatorColor.withAlphaComponent(theme.increaseContrast ? 0.8 : 0.45).setStroke()
         let divider = NSBezierPath()
-        divider.move(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.minY + 7))
-        divider.line(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.maxY - 7))
+        if layout.orientation == .horizontal {
+            divider.move(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.minY + 7))
+            divider.line(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.maxY - 7))
+        } else {
+            divider.move(to: NSPoint(x: layout.pageFrame.minX + 7, y: layout.pageFrame.minY - 2))
+            divider.line(to: NSPoint(x: layout.pageFrame.maxX - 7, y: layout.pageFrame.minY - 2))
+        }
         divider.lineWidth = 1
         divider.stroke()
 

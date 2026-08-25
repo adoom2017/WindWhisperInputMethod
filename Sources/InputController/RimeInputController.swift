@@ -2,7 +2,7 @@ import AppKit
 import InputMethodKit
 import OSLog
 
-final class RimeInputController: IMKInputController {
+final class RimeInputController: IMKInputController, @unchecked Sendable {
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? InputSourceMetadata.bundleIdentifier,
         category: "InputController"
@@ -12,6 +12,7 @@ final class RimeInputController: IMKInputController {
     private var session: RimeSession?
     private var hasMarkedText = false
     private var didLogSessionError = false
+    private var settingsObservers = [NSObjectProtocol]()
     private lazy var candidateWindow = CandidateWindowCoordinator { [weak self] action in
         self?.handleCandidateWindowAction(action)
     }
@@ -19,11 +20,20 @@ final class RimeInputController: IMKInputController {
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         self.inputClient = inputClient as? IMKTextInput
         super.init(server: server, delegate: delegate, client: inputClient)
+        observeSettings()
         ensureSession()
+    }
+
+    deinit {
+        removeSettingsObservers()
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
         Int(NSEvent.EventTypeMask.keyDown.rawValue)
+    }
+
+    override func menu() -> NSMenu! {
+        FengYuSettingsMenuController.shared.menu
     }
 
     override func activateServer(_ sender: Any!) {
@@ -44,6 +54,7 @@ final class RimeInputController: IMKInputController {
     override func inputControllerWillClose() {
         finishComposition()
         hideCandidateWindow()
+        removeSettingsObservers()
         session = nil
         inputClient = nil
         super.inputControllerWillClose()
@@ -105,6 +116,60 @@ final class RimeInputController: IMKInputController {
                 didLogSessionError = true
             }
         }
+    }
+
+    private func observeSettings() {
+        let center = NotificationCenter.default
+        settingsObservers = [
+            center.addObserver(
+                forName: .fengYuSettingsDidChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.applyChangedSettings()
+            },
+            center.addObserver(
+                forName: .fengYuWillRedeploy,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.prepareForRedeploy()
+            },
+            center.addObserver(
+                forName: .fengYuDidRedeploy,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                self?.ensureSession()
+            },
+        ]
+    }
+
+    private func removeSettingsObservers() {
+        let center = NotificationCenter.default
+        settingsObservers.forEach(center.removeObserver)
+        settingsObservers.removeAll()
+    }
+
+    private func applyChangedSettings() {
+        finishComposition()
+        guard let session else {
+            ensureSession()
+            return
+        }
+        do {
+            try FengYuSettingsStore.shared.snapshot.apply(to: session)
+            didLogSessionError = false
+        } catch {
+            logger.error("Unable to apply settings: \(error.localizedDescription, privacy: .public)")
+            self.session = nil
+        }
+    }
+
+    private func prepareForRedeploy() {
+        finishComposition()
+        hideCandidateWindow()
+        session = nil
     }
 
     private func finishComposition() {

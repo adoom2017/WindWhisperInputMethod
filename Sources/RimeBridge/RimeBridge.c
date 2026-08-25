@@ -285,6 +285,31 @@ int rb_session_select_schema(RBServiceRef service,
   return service->api->select_schema((RimeSessionId)session, schema_id) != False;
 }
 
+int rb_session_set_option(RBServiceRef service,
+                          RBSessionRef session,
+                          const char *option,
+                          int value) {
+  if (!rb_service_is_valid(service) || session == 0 || option == NULL ||
+      !RIME_API_AVAILABLE(service->api, set_option)) {
+    return 0;
+  }
+  service->api->set_option((RimeSessionId)session, option,
+                           value ? True : False);
+  return 1;
+}
+
+int rb_session_get_option(RBServiceRef service,
+                          RBSessionRef session,
+                          const char *option,
+                          int *value) {
+  if (!rb_service_is_valid(service) || session == 0 || option == NULL ||
+      value == NULL || !RIME_API_AVAILABLE(service->api, get_option)) {
+    return 0;
+  }
+  *value = service->api->get_option((RimeSessionId)session, option) != False;
+  return 1;
+}
+
 void rb_snapshot_init(RBSnapshot *snapshot) {
   if (snapshot != NULL) {
     memset(snapshot, 0, sizeof(*snapshot));

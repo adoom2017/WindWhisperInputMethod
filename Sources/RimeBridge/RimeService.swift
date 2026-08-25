@@ -267,6 +267,25 @@ final class RimeSession: @unchecked Sendable {
     }
 
     @discardableResult
+    func setOption(_ name: String, enabled: Bool) -> Bool {
+        service.withEngineLock {
+            name.withCString {
+                rb_session_set_option(serviceHandle, sessionHandle, $0, enabled ? 1 : 0) != 0
+            }
+        }
+    }
+
+    func option(_ name: String) -> Bool? {
+        service.withEngineLock {
+            var value: Int32 = 0
+            let available = name.withCString {
+                rb_session_get_option(serviceHandle, sessionHandle, $0, &value) != 0
+            }
+            return available ? value != 0 : nil
+        }
+    }
+
+    @discardableResult
     func selectCandidate(at index: Int) -> Bool {
         guard index >= 0 else {
             return false

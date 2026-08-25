@@ -199,7 +199,7 @@ enum M6SmokeTest {
         guard let lock = object as? [String: Any],
             lock["formatVersion"] as? Int == 1,
             let sources = lock["sources"] as? [[String: Any]],
-            sources.count == 3
+            sources.count == 4
         else {
             throw RimeBridgeError.smokeAssertion("invalid Rime data lock")
         }

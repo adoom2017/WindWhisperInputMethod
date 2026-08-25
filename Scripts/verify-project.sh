@@ -104,4 +104,32 @@ for required_file in \
     fi
 done
 
+verify_sha256() {
+    local file="$1"
+    local expected="$2"
+    if [[ ! -f "$file" ]]; then
+        echo "Required locked data file is missing: $file" >&2
+        exit 66
+    fi
+    local actual
+    actual="$(shasum -a 256 "$file" | awk '{print $1}')"
+    if [[ "$actual" != "$expected" ]]; then
+        echo "Locked data checksum mismatch: $file" >&2
+        exit 65
+    fi
+}
+
+verify_sha256 \
+    "$project_root/Resources/Rime/opencc/t2s.json" \
+    "b818534194f27c2d95f01001edb0a5ec49b9050119892cb30a0504bb202cc07c"
+verify_sha256 \
+    "$project_root/Resources/Rime/opencc/TSCharacters.ocd2" \
+    "85291e0173e972bbca58c848fb90b3bb41c79674cb61a75645e01bd884ad5927"
+verify_sha256 \
+    "$project_root/Resources/Rime/opencc/TSPhrases.ocd2" \
+    "edafc46f5c3eca61a754c78e47117e7c73995cacd6c99aadcb8a219d7ae3e53d"
+verify_sha256 \
+    "$project_root/LICENSES/OpenCC-Apache-2.0.txt" \
+    "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+
 echo "Project metadata verified."

@@ -38,6 +38,38 @@ install -m 0644 "$distribution_path/dist/include/rime_api_deprecated.h" "$vendor
 install -m 0644 "$distribution_path/dist/include/rime_api_stdbool.h" "$vendor_include/rime_api_stdbool.h"
 install -m 0644 "$distribution_path/dist/lib/librime.1.16.0.dylib" "$vendor_lib/librime.1.dylib"
 
+rime_data="$project_root/Resources/Rime"
+squirrel_version="1.1.2"
+squirrel_package_name="Squirrel-$squirrel_version.pkg"
+squirrel_package_sha256="614746013212937623d5bbab9901e9c43d1ec937aa32307d6b6092a05e308287"
+squirrel_package_url="https://github.com/rime/squirrel/releases/download/$squirrel_version/$squirrel_package_name"
+squirrel_package_path="$temporary_root/$squirrel_package_name"
+squirrel_expanded_path="$temporary_root/squirrel-expanded"
+curl --fail --location --output "$squirrel_package_path" "$squirrel_package_url"
+actual_squirrel_sha256="$(shasum -a 256 "$squirrel_package_path" | awk '{print $1}')"
+if [[ "$actual_squirrel_sha256" != "$squirrel_package_sha256" ]]; then
+    echo "Squirrel package checksum mismatch." >&2
+    exit 65
+fi
+pkgutil --expand-full "$squirrel_package_path" "$squirrel_expanded_path"
+opencc_source="$squirrel_expanded_path/Payload/Squirrel.app/Contents/SharedSupport/opencc"
+opencc_destination="$rime_data/opencc"
+mkdir -p "$opencc_destination"
+install -m 0644 "$opencc_source/t2s.json" "$opencc_destination/t2s.json"
+install -m 0644 "$opencc_source/TSCharacters.ocd2" "$opencc_destination/TSCharacters.ocd2"
+install -m 0644 "$opencc_source/TSPhrases.ocd2" "$opencc_destination/TSPhrases.ocd2"
+
+opencc_license_url="https://raw.githubusercontent.com/BYVoid/OpenCC/556ed22496d650bd0b13b6c163be9814637970ae/LICENSE"
+opencc_license_path="$temporary_root/OpenCC-LICENSE"
+opencc_license_sha256="b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+curl --fail --location --output "$opencc_license_path" "$opencc_license_url"
+actual_opencc_license_sha256="$(shasum -a 256 "$opencc_license_path" | awk '{print $1}')"
+if [[ "$actual_opencc_license_sha256" != "$opencc_license_sha256" ]]; then
+    echo "OpenCC license checksum mismatch." >&2
+    exit 65
+fi
+install -m 0644 "$opencc_license_path" "$project_root/LICENSES/OpenCC-Apache-2.0.txt"
+
 download_data_file() {
     local name="$1"
     local expected_sha256="$2"

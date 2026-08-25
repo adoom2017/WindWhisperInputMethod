@@ -1,6 +1,7 @@
 import AppKit
 
 struct CandidateWindowLayout: Equatable {
+    let orientation: CandidateOrientation
     let size: NSSize
     let candidateFrames: [NSRect]
     let pageFrame: NSRect
@@ -138,6 +139,72 @@ enum CandidateHorizontalLayout {
         )
 
         return CandidateWindowLayout(
+            orientation: .horizontal,
+            size: NSSize(width: ceil(panelWidth), height: ceil(panelHeight)),
+            candidateFrames: candidateFrames,
+            pageFrame: pageFrame,
+            previousPageFrame: previousPageFrame,
+            nextPageFrame: nextPageFrame
+        )
+    }
+}
+
+enum CandidateVerticalLayout {
+    static func make(
+        model: CandidateWindowModel,
+        theme: CandidateWindowTheme
+    ) -> CandidateWindowLayout {
+        let primaryFont = NSFont.systemFont(ofSize: theme.primaryFontSize)
+        let commentFont = NSFont.systemFont(ofSize: theme.commentFontSize)
+        let contentChromeWidth = theme.candidateHorizontalPadding * 2 + 20 + 6
+        let desiredContentWidth = model.entries.map { entry in
+            let textWidth = (entry.text as NSString).size(withAttributes: [.font: primaryFont]).width
+            let commentWidth = ((entry.comment ?? "") as NSString)
+                .size(withAttributes: [.font: commentFont]).width
+            return contentChromeWidth + textWidth + (commentWidth > 0 ? 7 : 0) + commentWidth
+        }.max() ?? 0
+        let panelWidth = min(
+            max(desiredContentWidth + theme.horizontalPadding * 2, theme.minimumPanelWidth),
+            420
+        )
+        let rowCount = CGFloat(model.entries.count)
+        let rowGaps = theme.candidateSpacing * CGFloat(max(model.entries.count - 1, 0))
+        let rowsHeight = rowCount * theme.candidateHeight + rowGaps
+        let pageTop = theme.verticalPadding + rowsHeight + theme.candidateSpacing
+        let panelHeight = pageTop + theme.candidateHeight + theme.verticalPadding
+        let rowWidth = panelWidth - theme.horizontalPadding * 2
+
+        let candidateFrames = model.entries.indices.map { index in
+            NSRect(
+                x: theme.horizontalPadding,
+                y: theme.verticalPadding
+                    + CGFloat(index) * (theme.candidateHeight + theme.candidateSpacing),
+                width: rowWidth,
+                height: theme.candidateHeight
+            )
+        }
+        let pageFrame = NSRect(
+            x: theme.horizontalPadding,
+            y: pageTop,
+            width: rowWidth,
+            height: theme.candidateHeight
+        )
+        let controlWidth = floor(pageFrame.width / 3)
+        let previousPageFrame = NSRect(
+            x: pageFrame.minX,
+            y: pageFrame.minY,
+            width: controlWidth,
+            height: pageFrame.height
+        )
+        let nextPageFrame = NSRect(
+            x: pageFrame.maxX - controlWidth,
+            y: pageFrame.minY,
+            width: controlWidth,
+            height: pageFrame.height
+        )
+
+        return CandidateWindowLayout(
+            orientation: .vertical,
             size: NSSize(width: ceil(panelWidth), height: ceil(panelHeight)),
             candidateFrames: candidateFrames,
             pageFrame: pageFrame,

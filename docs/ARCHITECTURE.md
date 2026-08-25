@@ -88,6 +88,15 @@ M2 已固定路径：shared data 为应用包的 `Contents/Resources/Rime`；use
 - `CandidateHorizontalLayout` 是不依赖 window/session 的纯布局边界：先测量候选正文和注释，再在 760pt 上限内按比例压缩，输出候选、页码和前后翻页命中区域。竖排不进入首版，但布局边界已独立，后续可新增策略而不改 Rime 或 controller。
 - 候选窗首次出现只做 80ms 可中断淡入；后续按键更新直接替换快照并重排，隐藏立即执行，因此动画不在输入热路径上形成等待。
 
+## M7 设置、状态与维护
+
+- `FengYuSettingsStore` 是设置唯一来源，使用版本化 `UserDefaults` key 保存方案、全角、简繁、候选方向和颜色主题；未知枚举值自动回退产品默认，不让损坏偏好阻止输入。
+- `IMKInputController.menu()` 返回风语设置菜单，设置只出现在系统输入法菜单中，不创建额外常驻状态栏图标。菜单 target 不访问 marked text 或候选内容。
+- 新 Rime session 由 `RimeRuntime.makeSession()` 统一应用设置；现有 controller 监听进程内通知，在设置变化前先提交组合，再更新自身 session。重新部署同样先提交并释放所有 session，后台部署结束后重新创建。
+- Rime C 窄桥接只新增 `set_option/get_option` 语义接口；Swift 同时设置 `simplification` 与 `zh_simp/zh_trad`，兼容双拼 schema 的二态开关和全拼 schema 的多态简繁开关。
+- 横排与竖排是两个纯布局策略，共享同一候选模型、绘制、点击和翻页动作；主题只固定系统/浅色/深色 appearance，不绕过系统降低透明度、增强对比度和减少动态效果。
+- 脱敏诊断只输出版本、架构、设置值、引擎就绪状态及目录是否存在；不接收输入快照，也不输出完整 Home 路径或 librime 原始错误正文。
+
 ## 错误降级
 
 - 引擎不可用：输入事件透传，隐藏候选窗，展示不含输入内容的诊断状态。

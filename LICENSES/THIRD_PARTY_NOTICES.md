@@ -32,6 +32,16 @@
 - 规则：完整拼音后附加仓颉首码；由 `Scripts/generate-aux-dictionary.swift` 可复现生成。
 - 许可证：按兼容的 GPL-3.0 随包提供。
 
+## OpenCC 1.1.9 转换数据
+
+- 项目：https://github.com/BYVoid/OpenCC
+- 固定 tag：`ver.1.1.9`
+- 固定 commit：`556ed22496d650bd0b13b6c163be9814637970ae`
+- 使用内容：传统到简体转换所需的 `t2s.json`、`TSCharacters.ocd2` 和 `TSPhrases.ocd2`。
+- 分发来源：官方 `rime/squirrel` 1.1.2 发布包；包及输出文件 SHA-256 见 `Resources/Rime/DATA_LOCK.json`。
+- 许可证：Apache-2.0，完整文本见 `OpenCC-Apache-2.0.txt`。
+- 修改：未修改转换配置或词典，只从配套发布包中选择首版实际使用的 `t2s` 文件。
+
 ## 风语原创图标
 
 当前应用图标、输入法菜单图标和切换器图标均为风语原创资源，不使用 Rime/鼠须管图标或其视觉元素。

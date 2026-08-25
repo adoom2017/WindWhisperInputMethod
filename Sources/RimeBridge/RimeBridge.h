@@ -91,6 +91,14 @@ int rb_session_select_candidate(RBServiceRef service,
 int rb_session_select_schema(RBServiceRef service,
                              RBSessionRef session,
                              const char *schema_id);
+int rb_session_set_option(RBServiceRef service,
+                          RBSessionRef session,
+                          const char *option,
+                          int value);
+int rb_session_get_option(RBServiceRef service,
+                          RBSessionRef session,
+                          const char *option,
+                          int *value);
 
 void rb_snapshot_init(RBSnapshot *snapshot);
 void rb_snapshot_clear(RBSnapshot *snapshot);
