@@ -354,6 +354,63 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     }
 }
 
+extension RimeInputController {
+    @objc func fengYuSelectSchemaCommand(_ command: Any) {
+        guard let menuItem = fengYuMenuItem(from: command) else {
+            return
+        }
+        FengYuSettingsMenuController.shared.selectSchema(menuItem: menuItem)
+    }
+
+    @objc func fengYuToggleFullWidthCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.toggleFullWidth()
+    }
+
+    @objc func fengYuToggleSimplifiedChineseCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.toggleSimplifiedChinese()
+    }
+
+    @objc func fengYuSelectOrientationCommand(_ command: Any) {
+        guard let menuItem = fengYuMenuItem(from: command) else {
+            return
+        }
+        FengYuSettingsMenuController.shared.selectOrientation(menuItem: menuItem)
+    }
+
+    @objc func fengYuSelectColorSchemeCommand(_ command: Any) {
+        guard let menuItem = fengYuMenuItem(from: command) else {
+            return
+        }
+        FengYuSettingsMenuController.shared.selectColorScheme(menuItem: menuItem)
+    }
+
+    @objc func fengYuRedeployCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.redeploy()
+    }
+
+    @objc func fengYuOpenUserDirectoryCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.openUserDirectory()
+    }
+
+    @objc func fengYuShowDiagnosticsCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.showDiagnostics()
+    }
+
+    @objc func fengYuResetSettingsCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.resetSettings()
+    }
+
+    private func fengYuMenuItem(from command: Any) -> NSMenuItem? {
+        if let menuItem = command as? NSMenuItem {
+            return menuItem
+        }
+        guard let dictionary = command as? NSDictionary else {
+            return nil
+        }
+        return dictionary.object(forKey: kIMKCommandMenuItemName) as? NSMenuItem
+    }
+}
+
 enum CandidateAnchorResolver {
     static func anchorRect(in client: IMKTextInput) -> NSRect? {
         var lineRect = NSRect.zero

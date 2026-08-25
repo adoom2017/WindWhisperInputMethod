@@ -73,19 +73,19 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
             selected: settings.schema,
             title: \.displayName,
             rawValue: \.rawValue,
-            action: #selector(selectSchema(_:))
+            action: #selector(RimeInputController.fengYuSelectSchemaCommand(_:))
         ))
 
         let fullWidth = actionItem(
             title: "全角字符",
-            action: #selector(toggleFullWidth(_:)),
+            action: #selector(RimeInputController.fengYuToggleFullWidthCommand(_:)),
             state: settings.usesFullWidth
         )
         menu.addItem(fullWidth)
 
         let simplified = actionItem(
             title: "简体中文",
-            action: #selector(toggleSimplifiedChinese(_:)),
+            action: #selector(RimeInputController.fengYuToggleSimplifiedChineseCommand(_:)),
             state: settings.usesSimplifiedChinese
         )
         menu.addItem(simplified)
@@ -96,7 +96,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
             selected: settings.candidateOrientation,
             title: \.displayName,
             rawValue: \.rawValue,
-            action: #selector(selectOrientation(_:))
+            action: #selector(RimeInputController.fengYuSelectOrientationCommand(_:))
         ))
 
         menu.addItem(submenuItem(
@@ -105,20 +105,29 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
             selected: settings.colorScheme,
             title: \.displayName,
             rawValue: \.rawValue,
-            action: #selector(selectColorScheme(_:))
+            action: #selector(RimeInputController.fengYuSelectColorSchemeCommand(_:))
         ))
 
         menu.addItem(.separator())
         let redeploy = actionItem(
             title: isRedeploying ? "正在重新部署…" : "重新部署 Rime",
-            action: #selector(redeploy(_:))
+            action: #selector(RimeInputController.fengYuRedeployCommand(_:))
         )
         redeploy.isEnabled = !isRedeploying
         menu.addItem(redeploy)
-        menu.addItem(actionItem(title: "打开用户目录", action: #selector(openUserDirectory(_:))))
-        menu.addItem(actionItem(title: "查看脱敏诊断…", action: #selector(showDiagnostics(_:))))
+        menu.addItem(actionItem(
+            title: "打开用户目录",
+            action: #selector(RimeInputController.fengYuOpenUserDirectoryCommand(_:))
+        ))
+        menu.addItem(actionItem(
+            title: "查看脱敏诊断…",
+            action: #selector(RimeInputController.fengYuShowDiagnosticsCommand(_:))
+        ))
         menu.addItem(.separator())
-        menu.addItem(actionItem(title: "恢复默认设置…", action: #selector(resetSettings(_:))))
+        menu.addItem(actionItem(
+            title: "恢复默认设置…",
+            action: #selector(RimeInputController.fengYuResetSettingsCommand(_:))
+        ))
     }
 
     private func actionItem(
@@ -127,7 +136,9 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         state: Bool = false
     ) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
-        item.target = self
+        // InputMethodKit routes command menu selectors through the active
+        // IMKInputController and passes a command dictionary as the sender.
+        item.target = nil
         item.state = state ? .on : .off
         return item
     }
@@ -142,6 +153,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
     ) -> NSMenuItem where Value.RawValue == String {
         let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         let submenu = NSMenu(title: title)
+        submenu.autoenablesItems = false
         for value in values {
             let item = actionItem(title: value[keyPath: titleKeyPath], action: action)
             item.representedObject = value[keyPath: rawValueKeyPath]
@@ -152,8 +164,8 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         return parent
     }
 
-    @objc private func selectSchema(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
+    func selectSchema(menuItem: NSMenuItem) {
+        guard let rawValue = menuItem.representedObject as? String,
             let schema = FengYuSchema(rawValue: rawValue)
         else {
             return
@@ -162,18 +174,18 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         rebuildMenu()
     }
 
-    @objc private func toggleFullWidth(_ sender: NSMenuItem) {
+    func toggleFullWidth() {
         store.update { $0.usesFullWidth.toggle() }
         rebuildMenu()
     }
 
-    @objc private func toggleSimplifiedChinese(_ sender: NSMenuItem) {
+    func toggleSimplifiedChinese() {
         store.update { $0.usesSimplifiedChinese.toggle() }
         rebuildMenu()
     }
 
-    @objc private func selectOrientation(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
+    func selectOrientation(menuItem: NSMenuItem) {
+        guard let rawValue = menuItem.representedObject as? String,
             let orientation = CandidateOrientation(rawValue: rawValue)
         else {
             return
@@ -182,8 +194,8 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         rebuildMenu()
     }
 
-    @objc private func selectColorScheme(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
+    func selectColorScheme(menuItem: NSMenuItem) {
+        guard let rawValue = menuItem.representedObject as? String,
             let colorScheme = CandidateColorScheme(rawValue: rawValue)
         else {
             return
@@ -192,7 +204,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         rebuildMenu()
     }
 
-    @objc private func redeploy(_ sender: NSMenuItem) {
+    func redeploy() {
         guard !isRedeploying else {
             return
         }
@@ -229,11 +241,18 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         }
     }
 
-    @objc private func openUserDirectory(_ sender: NSMenuItem) {
+    func openUserDirectory() {
         do {
             let url = try RimeServicePaths.applicationDefaults().userData
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-            NSWorkspace.shared.activateFileViewerSelecting([url])
+            guard NSWorkspace.shared.open(url) else {
+                showMessage(
+                    title: "无法打开用户目录",
+                    message: "Finder 没有接受打开目录的请求。请稍后重试。",
+                    style: .warning
+                )
+                return
+            }
         } catch {
             showMessage(
                 title: "无法打开用户目录",
@@ -243,7 +262,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         }
     }
 
-    @objc private func showDiagnostics(_ sender: NSMenuItem) {
+    func showDiagnostics() {
         let text = FengYuDiagnostics.render(
             settings: store.snapshot,
             runtime: RimeRuntime.shared.diagnosticStatus()
@@ -273,7 +292,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         }
     }
 
-    @objc private func resetSettings(_ sender: NSMenuItem) {
+    func resetSettings() {
         let alert = NSAlert()
         alert.messageText = "恢复风语默认设置？"
         alert.informativeText = "将恢复小鹤双拼、半角、简体、横排和跟随系统主题。用户词典与 .custom.yaml 文件不会被删除。"

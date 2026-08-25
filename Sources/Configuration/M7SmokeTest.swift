@@ -30,6 +30,7 @@ enum M7SmokeTest {
             print("simplifiedTraditionalConversion=passed")
             print("horizontalVerticalLayout=passed")
             print("settingsMenu=passed")
+            print("settingsMenuCommandRouting=passed")
             print("sanitizedDiagnostics=passed")
             print("restoreDefaults=passed")
             return EXIT_SUCCESS
@@ -244,6 +245,13 @@ enum M7SmokeTest {
         let controller = FengYuSettingsMenuController(store: store)
         controller.menuNeedsUpdate(controller.menu)
         let titles = controller.menu.items.map(\.title)
+        let commandItems = actionableItems(in: controller.menu)
+        let unroutableCommands = commandItems.filter { item in
+            guard let action = item.action else {
+                return true
+            }
+            return item.target != nil || !RimeInputController.instancesRespond(to: action)
+        }
         guard
             titles.contains("输入方案"),
             titles.contains("全角字符"),
@@ -253,9 +261,31 @@ enum M7SmokeTest {
             titles.contains("重新部署 Rime"),
             titles.contains("打开用户目录"),
             titles.contains("查看脱敏诊断…"),
-            titles.contains("恢复默认设置…")
+            titles.contains("恢复默认设置…"),
+            !commandItems.isEmpty,
+            commandItems.allSatisfy(\.isEnabled),
+            unroutableCommands.isEmpty
         else {
-            throw RimeBridgeError.smokeAssertion("M7 settings menu is incomplete")
+            let details = unroutableCommands.map { item in
+                let action = item.action.map(NSStringFromSelector) ?? "nil"
+                return "\(item.title):action=\(action),target=\(item.target.map(String.init(describing:)) ?? "nil")"
+            }.joined(separator: "; ")
+            throw RimeBridgeError.smokeAssertion(
+                "M7 settings menu is incomplete or has an unroutable InputMethodKit command: \(details)"
+            )
+        }
+    }
+
+    @MainActor
+    private static func actionableItems(in menu: NSMenu) -> [NSMenuItem] {
+        menu.items.flatMap { item -> [NSMenuItem] in
+            // AppKit assigns its own submenuAction: target to submenu parents;
+            // only leaf items are InputMethodKit commands owned by 风语.
+            var result = item.submenu == nil && item.action != nil ? [item] : []
+            if let submenu = item.submenu {
+                result.append(contentsOf: actionableItems(in: submenu))
+            }
+            return result
         }
     }
 
