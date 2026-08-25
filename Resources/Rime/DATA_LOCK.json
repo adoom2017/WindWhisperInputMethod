@@ -67,6 +67,26 @@
           "sha256": "edafc46f5c3eca61a754c78e47117e7c73995cacd6c99aadcb8a219d7ae3e53d"
         }
       ]
+    },
+    {
+      "name": "User-provided 小鹤音形 local configuration",
+      "version": "10.26.x",
+      "origin": "Imported from the user's existing Rime configuration",
+      "author": "方案设计：何海峰 (flypy.cc)",
+      "license": "No redistribution license was supplied with the local files",
+      "distributionScope": "local-use-only",
+      "notes": "flypy.dict.yaml is generated locally by Scripts/generate-flypy-dictionary.swift. Keep these files out of public release artifacts unless redistribution rights are confirmed.",
+      "files": [
+        { "path": "flypy.schema.yaml", "sha256": "8197e9f66605770693a9e44c53b3fc95e991938e4352f6f8b679ce3866861aca" },
+        { "path": "flypy.dict.yaml", "sha256": "943d5ddd61f273a300ea072d70ac939823e1c8118d974c0cd73470185d1f3c54" },
+        { "path": "flypydz.schema.yaml", "sha256": "e1c0eb96af7580c8529108d86706a53c0cc1e7eff0909b8400442d5aea462ad2" },
+        { "path": "flypydz.dict.yaml", "sha256": "f4a3f6ebf6f836f24d1339c7a661447909bcd05d6fe3209922724ea09dac9862" },
+        { "path": "flypy_full.txt", "sha256": "49a4c0e76eb332b34246e4440e082849218a3d801f2e1ae1d75ec8bbcf7f5b30" },
+        { "path": "flypy_ok.txt", "sha256": "8d7c64ed6ddd813e65b85ce431aa3b493c619221f5a6d18f2332e099ce74f99d" },
+        { "path": "flypy_sys.txt", "sha256": "9206ecdd4e8b73740154ed6e9c4136d0dab85e08935eb382e5d0061134129009" },
+        { "path": "flypy_top.txt", "sha256": "13a209c44245a32c7daf65462e3daf16fd974056f949fd2de05ed2447d4d2e69" },
+        { "path": "flypy_user.txt", "sha256": "17c92de3b515dcb99d2b0d510dc02543274502c1b65b83c8a04be840613767f9" }
+      ]
     }
   ]
 }

@@ -13,8 +13,12 @@ enum M3SmokeTest {
             print("keyMapping=passed")
             try verifyShortcutPassthrough()
             print("shortcutPassthrough=passed")
+            try verifyShiftTapRecognition()
+            print("shiftTapRecognition=passed")
             try verifyCompositionEditing(root: temporaryRoot)
             print("compositionEditing=passed")
+            try verifyShiftModeSwitch(root: temporaryRoot)
+            print("shiftModeSwitch=passed")
             try verifyFrontendCommit(root: temporaryRoot)
             print("frontendCommit=passed")
             try verifyInputClientFlow(root: temporaryRoot.appendingPathComponent("client", isDirectory: true))
@@ -47,6 +51,39 @@ enum M3SmokeTest {
         }
     }
 
+    private static func verifyShiftTapRecognition() throws {
+        var tracker = ShiftTapTracker()
+        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .shift),
+            tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: [])
+        else {
+            throw RimeBridgeError.smokeAssertion("A left Shift tap was not recognized exactly once.")
+        }
+
+        guard !tracker.update(keyCode: UInt16(kVK_RightShift), modifierFlags: .shift),
+            tracker.update(keyCode: UInt16(kVK_RightShift), modifierFlags: [])
+        else {
+            throw RimeBridgeError.smokeAssertion("A right Shift tap was not recognized exactly once.")
+        }
+
+        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .shift) else {
+            throw RimeBridgeError.smokeAssertion("Shift toggled on key-down.")
+        }
+        tracker.noteKeyDown()
+        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: []) else {
+            throw RimeBridgeError.smokeAssertion("Shift-modified typing triggered a mode switch.")
+        }
+
+        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .shift),
+            !tracker.update(
+                keyCode: UInt16(kVK_Command),
+                modifierFlags: [.shift, .command]
+            ),
+            !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .command)
+        else {
+            throw RimeBridgeError.smokeAssertion("A system shortcut triggered a mode switch.")
+        }
+    }
+
     private static func verifyCompositionEditing(root: URL) throws {
         let session = try makeSession(root: root.appendingPathComponent("editing", isDirectory: true))
         try process(character: "n", keyCode: UInt16(kVK_ANSI_N), in: session)
@@ -63,6 +100,33 @@ enum M3SmokeTest {
         try process(character: "\u{1B}", keyCode: UInt16(kVK_Escape), in: session)
         guard try session.readSnapshot().composition == nil else {
             throw RimeBridgeError.smokeAssertion("Escape did not clear the composition.")
+        }
+    }
+
+    private static func verifyShiftModeSwitch(root: URL) throws {
+        let session = try makeSession(root: root.appendingPathComponent("shift", isDirectory: true))
+        guard session.option("ascii_mode") == false else {
+            throw RimeBridgeError.smokeAssertion("The session did not start in Chinese mode.")
+        }
+        guard session.simulate(sequence: "ni") else {
+            throw RimeBridgeError.smokeAssertion("Could not prepare a composition for Shift.")
+        }
+        let switched = try RimeInputModeSwitcher.toggle(in: session)
+        guard switched.snapshot.status.isASCIIMode, switched.codeToCommit == "ni",
+            switched.snapshot.composition == nil
+        else {
+            throw RimeBridgeError.smokeAssertion("Shift did not commit the code and enter English mode.")
+        }
+        guard !session.process(keyCode: 0x61) else {
+            throw RimeBridgeError.smokeAssertion("English mode did not pass a letter through to macOS.")
+        }
+        let english = try session.readSnapshot()
+        guard english.commitText == nil, english.composition == nil else {
+            throw RimeBridgeError.smokeAssertion("English mode unexpectedly composed ASCII text.")
+        }
+        let restored = try RimeInputModeSwitcher.toggle(in: session)
+        guard !restored.snapshot.status.isASCIIMode, restored.codeToCommit == nil else {
+            throw RimeBridgeError.smokeAssertion("A second Shift tap did not restore Chinese mode.")
         }
     }
 

@@ -55,6 +55,10 @@ enum M7SmokeTest {
         guard store.snapshot == .defaults else {
             throw RimeBridgeError.smokeAssertion("new settings did not use product defaults")
         }
+        defaults.set("double_pinyin_flypy", forKey: "settings.schema.v1")
+        guard store.snapshot.schema == .flypy else {
+            throw RimeBridgeError.smokeAssertion("legacy pure-phonetic default was not migrated")
+        }
 
         let changeCount = LockedCounter()
         let observer = NotificationCenter.default.addObserver(
@@ -86,7 +90,7 @@ enum M7SmokeTest {
             throw RimeBridgeError.smokeAssertion("settings were not persisted or notified")
         }
 
-        defaults.set("removed_schema", forKey: "settings.schema.v1")
+        defaults.set("removed_schema", forKey: "settings.schema.v2")
         defaults.set("diagonal", forKey: "settings.candidateOrientation.v1")
         defaults.set("neon", forKey: "settings.colorScheme.v1")
         let repaired = FengYuSettingsStore(defaults: defaults).snapshot

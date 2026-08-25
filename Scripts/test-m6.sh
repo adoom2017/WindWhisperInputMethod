@@ -20,6 +20,15 @@ trap cleanup EXIT
     "$test_root/fengyu_aux.dict.yaml"
 cmp "$test_root/fengyu_aux.dict.yaml" "$project_root/Resources/Rime/fengyu_aux.dict.yaml"
 echo "auxiliaryDictionaryReproducible=passed"
+"$project_root/Scripts/generate-flypy-dictionary.swift" \
+    "$project_root/Resources/Rime/flypydz.dict.yaml" \
+    "$test_root/flypy.dict.yaml" \
+    "$project_root/Resources/Rime/flypy_top.txt" \
+    "$project_root/Resources/Rime/flypy_sys.txt" \
+    "$project_root/Resources/Rime/flypy_user.txt" \
+    "$project_root/Resources/Rime/flypy_full.txt"
+cmp "$test_root/flypy.dict.yaml" "$project_root/Resources/Rime/flypy.dict.yaml"
+echo "flypyDictionaryReproducible=passed"
 "$application_path/Contents/MacOS/RimeInputMethod" \
     --m6-smoke \
     --user-data-root "$test_root"

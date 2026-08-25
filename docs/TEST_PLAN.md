@@ -35,19 +35,20 @@
 - Unicode：Emoji、扩展汉字、组合字符、中英混排。
 - 候选：数字选词、鼠标选词、高亮、首尾页、空页保护。
 - 会话：切应用、切窗口、切输入源、休眠唤醒、进程重启。
-- 方案：每个双拼固定编码样例；辅码命中、不命中、歧义和回退。
+- 方案：每个双拼固定编码样例；小鹤音形逐键收窄；通用辅码命中、不命中、歧义和回退。
+- 中英文：左右 Shift 单击切换；Shift 大写输入和 Command/Control/Option 快捷键不误触；英文按键透传。
 - 异常：资源缺失、配置损坏、部署失败、磁盘只读、session 失效。
 
 ## M3—M7 自动化与人工门禁
 
-- `Scripts/test-m3.sh Debug|Release` 覆盖按键映射、Command/Control/Option 透传、Backspace、Escape、`nihao + Space` 提交“你好”，以及生产 `RimeClientUpdater` 对 `IMKTextInput` 的 marked/commit 调用。
+- `Scripts/test-m3.sh Debug|Release` 覆盖按键映射、Command/Control/Option 透传、左右 Shift 单击与组合防误触、中英文往返、Backspace、Escape、`nihao + Space` 提交“你好”，以及生产 `RimeClientUpdater` 对 `IMKTextInput` 的 marked/commit 调用。
 - `xcodebuild analyze` 必须无诊断失败；Release 主程序和 librime 必须同时包含 arm64、x86_64。
 - `Scripts/test-textedit-m3.sh` 只创建并关闭一个不保存的 TextEdit 临时文稿；它需要运行终端/宿主获得 macOS“辅助功能”发送按键权限。
 - `Scripts/test-m4.sh Debug|Release` 覆盖候选展示模型、本页序号、鼠标行命中、非激活面板配置、下方/上方翻转、可见区域约束、多显示器选择，以及真实 librime 的方向键高亮、PageDown 翻页和语义选词提交。
 - M4 候选窗显示已由用户在实际输入中确认；完整键盘、鼠标和多屏检查项保留在 `docs/M4_VALIDATION.md` 作为后续回归清单。
 - `Scripts/test-m5.sh Debug|Release` 覆盖正常/无障碍主题 fallback、横向布局边界、候选间不重叠、短正文优先与长文本公平压缩、macOS 26 `NSGlassEffectView` 和旧系统 `NSVisualEffectView` 回退配置，以及 Aqua/Dark Aqua × 普通/降低透明度与增强对比度的离屏 PNG 渲染。
 - M5 本机视觉门禁按 `docs/M5_VALIDATION.md` 执行，重点确认实际桌面内容下的毛玻璃、候选截断、快速输入稳定性和系统无障碍显示设置。
-- `Scripts/test-m6.sh Debug|Release` 覆盖五套拼音方案、辅码缩小候选、用户覆盖/词典保护、部署失败和数据锁。
+- `Scripts/test-m6.sh Debug|Release` 覆盖六套拼音方案、小鹤 `ni → nir → nirx → 你`、通用辅码缩小候选、用户覆盖/词典保护、部署失败、数据锁和两类词典复现。
 - `Scripts/test-m7.sh Debug|Release` 覆盖设置持久化、非法值回退、多 session 同步、设置前组合提交、OpenCC 繁简转换、横竖排布局、输入法菜单完整性、诊断脱敏和恢复默认值。
 - M7 人工门禁按 `docs/M7_VALIDATION.md` 执行，重点确认系统输入法菜单可见、修改后当前应用与新应用一致、后台重新部署可恢复输入，以及菜单操作不显示或记录输入内容。
 

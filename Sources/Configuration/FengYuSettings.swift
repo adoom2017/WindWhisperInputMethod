@@ -1,7 +1,8 @@
 import Foundation
 
 enum FengYuSchema: String, CaseIterable, Sendable {
-    case flypy = "double_pinyin_flypy"
+    case flypy = "flypy"
+    case flypyPhonetic = "double_pinyin_flypy"
     case fullPinyin = "luna_pinyin"
     case natural = "double_pinyin"
     case microsoft = "double_pinyin_mspy"
@@ -10,7 +11,8 @@ enum FengYuSchema: String, CaseIterable, Sendable {
 
     var displayName: String {
         switch self {
-        case .flypy: "小鹤双拼"
+        case .flypy: "小鹤双拼（音形辅码）"
+        case .flypyPhonetic: "小鹤双拼（纯音码）"
         case .fullPinyin: "风语全拼"
         case .natural: "自然码双拼"
         case .microsoft: "微软双拼"
@@ -93,7 +95,10 @@ final class FengYuSettingsStore: @unchecked Sendable {
     static let shared = FengYuSettingsStore()
 
     private enum Key {
-        static let schema = "settings.schema.v1"
+        // v2 intentionally resets the former pure-phonetic Flypy default to
+        // the user-requested 小鹤音形 schema while keeping both menu choices.
+        static let schema = "settings.schema.v2"
+        static let legacySchema = "settings.schema.v1"
         static let fullWidth = "settings.fullWidth.v1"
         static let simplified = "settings.simplified.v1"
         static let orientation = "settings.candidateOrientation.v1"
@@ -143,7 +148,14 @@ final class FengYuSettingsStore: @unchecked Sendable {
     func reset() {
         let changed = lock.fengYuWithLock {
             let wasDefault = unlockedSnapshot() == .defaults
-            [Key.schema, Key.fullWidth, Key.simplified, Key.orientation, Key.colorScheme]
+            [
+                Key.schema,
+                Key.legacySchema,
+                Key.fullWidth,
+                Key.simplified,
+                Key.orientation,
+                Key.colorScheme,
+            ]
                 .forEach(defaults.removeObject(forKey:))
             return !wasDefault
         }

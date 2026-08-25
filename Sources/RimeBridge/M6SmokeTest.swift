@@ -9,6 +9,7 @@ enum M6SmokeTest {
     }
 
     private static let schemes = [
+        SchemeCase(identifier: "flypy", name: "小鹤音形", sequence: "nir", expected: "你"),
         SchemeCase(identifier: "luna_pinyin", name: "风语全拼", sequence: "nihao", expected: "你好"),
         SchemeCase(identifier: "double_pinyin", name: "自然码双拼", sequence: "nihk", expected: "你好"),
         SchemeCase(identifier: "double_pinyin_flypy", name: "小鹤双拼", sequence: "nihc", expected: "你好"),
@@ -20,7 +21,8 @@ enum M6SmokeTest {
         do {
             let result = try execute(arguments: arguments)
             print("schemaCorpusPassed=\(result.schemeCount)")
-            print("defaultSchema=double_pinyin_flypy")
+            print("defaultSchema=flypy")
+            print("flypyAuxiliaryCode=passed")
             print("auxiliaryBroadCandidates=\(result.broadCandidateCount)")
             print("auxiliaryNarrowCandidates=\(result.narrowCandidateCount)")
             print("auxiliaryExpectedCandidate=passed")
@@ -76,10 +78,10 @@ enum M6SmokeTest {
 
             let defaultSession = try service.makeSession()
             let defaultSnapshot = try defaultSession.readSnapshot()
-            guard defaultSnapshot.status.schemaIdentifier == "double_pinyin_flypy",
-                defaultSnapshot.status.schemaName == "小鹤双拼"
+            guard defaultSnapshot.status.schemaIdentifier == "flypy",
+                defaultSnapshot.status.schemaName == "小鹤音形"
             else {
-                throw RimeBridgeError.smokeAssertion("small crane double pinyin is not the default")
+                throw RimeBridgeError.smokeAssertion("small crane auxiliary-code schema is not the default")
             }
 
             for scheme in schemes {
@@ -110,6 +112,29 @@ enum M6SmokeTest {
             let missingSnapshot = try missingSession.readSnapshot()
             guard missingSnapshot.status.schemaIdentifier != missingIdentifier else {
                 throw RimeBridgeError.smokeAssertion("a missing schema became active")
+            }
+
+            let flypyAuxiliarySession = try service.makeSession()
+            guard flypyAuxiliarySession.selectSchema(identifier: "flypy"),
+                flypyAuxiliarySession.simulate(sequence: "ni")
+            else {
+                throw RimeBridgeError.smokeAssertion("could not start small crane auxiliary input")
+            }
+            let flypyBroad = try flypyAuxiliarySession.readSnapshot()
+            flypyAuxiliarySession.clearComposition()
+            guard flypyAuxiliarySession.simulate(sequence: "nir") else {
+                throw RimeBridgeError.smokeAssertion("small crane auxiliary code was not consumed")
+            }
+            let flypyNarrow = try flypyAuxiliarySession.readSnapshot()
+            guard flypyNarrow.menu.candidates.contains(where: { $0.text == "你" }),
+                flypyBroad.menu.candidates.count > flypyNarrow.menu.candidates.count
+            else {
+                throw RimeBridgeError.smokeAssertion("small crane shape code did not narrow to 你")
+            }
+            guard flypyAuxiliarySession.simulate(sequence: "x"),
+                try flypyAuxiliarySession.readSnapshot().commitText == "你"
+            else {
+                throw RimeBridgeError.smokeAssertion("the full small crane code nirx did not commit 你")
             }
 
             let auxiliarySession = try service.makeSession()
@@ -184,6 +209,9 @@ enum M6SmokeTest {
 
     private static func validateBundledData(at sharedData: URL) throws {
         let required = schemes.map { "\($0.identifier).schema.yaml" } + [
+            "flypy.dict.yaml",
+            "flypydz.schema.yaml",
+            "flypydz.dict.yaml",
             "fengyu_aux.schema.yaml",
             "fengyu_aux.dict.yaml",
             "DATA_LOCK.json",
@@ -199,7 +227,7 @@ enum M6SmokeTest {
         guard let lock = object as? [String: Any],
             lock["formatVersion"] as? Int == 1,
             let sources = lock["sources"] as? [[String: Any]],
-            sources.count == 4
+            sources.count == 5
         else {
             throw RimeBridgeError.smokeAssertion("invalid Rime data lock")
         }

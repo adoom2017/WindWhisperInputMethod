@@ -103,6 +103,7 @@ final class RimeService: @unchecked Sendable {
         try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.staging, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
+        try Self.seedBundledFlypyUserTables(at: paths, using: fileManager)
 
         let strings = try CStringStorage([
             paths.sharedData.path,
@@ -153,6 +154,23 @@ final class RimeService: @unchecked Sendable {
             try Self.withBridgeError { error in
                 rb_service_deploy(handle, fullCheck ? 1 : 0, error)
             }
+        }
+    }
+
+    private static func seedBundledFlypyUserTables(
+        at paths: RimeServicePaths,
+        using fileManager: FileManager
+    ) throws {
+        for name in ["flypy_top", "flypy_sys", "flypy_user", "flypy_full", "flypy_ok"] {
+            let fileName = "\(name).txt"
+            let source = paths.sharedData.appendingPathComponent(fileName)
+            let destination = paths.userData.appendingPathComponent(fileName)
+            guard fileManager.fileExists(atPath: source.path),
+                !fileManager.fileExists(atPath: destination.path)
+            else {
+                continue
+            }
+            try fileManager.copyItem(at: source, to: destination)
         }
     }
 

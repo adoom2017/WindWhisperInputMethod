@@ -1,9 +1,10 @@
 # Rime default settings
 # encoding: utf-8
 
-config_version: "0.18.fengyu-flypy-default"
+config_version: "0.19.fengyu-flypy-auxiliary"
 
 schema_list:
+  - schema: flypy
   - schema: double_pinyin_flypy
   - schema: luna_pinyin
   - schema: double_pinyin
@@ -140,7 +141,7 @@ recognizer:
 
 ascii_composer:
   switch_key:
-    Shift_L: inline_ascii
-    Shift_R: commit_text
+    Shift_L: commit_code
+    Shift_R: commit_code
     Control_L: noop
     Control_R: noop

@@ -1,6 +1,56 @@
 import AppKit
 import Carbon
 
+struct ShiftTapTracker {
+    private static let shiftKeyCodes: Set<UInt16> = [
+        UInt16(kVK_Shift),
+        UInt16(kVK_RightShift),
+    ]
+
+    private var pressedShiftKeys = Set<UInt16>()
+    private var eligibleKeyCode: UInt16?
+
+    mutating func update(
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags
+    ) -> Bool {
+        guard Self.shiftKeyCodes.contains(keyCode) else {
+            if !modifierFlags.intersection([.command, .control, .option, .function]).isEmpty {
+                eligibleKeyCode = nil
+            }
+            return false
+        }
+
+        if pressedShiftKeys.contains(keyCode) {
+            pressedShiftKeys.remove(keyCode)
+            let shouldToggle = eligibleKeyCode == keyCode && pressedShiftKeys.isEmpty
+            eligibleKeyCode = nil
+            return shouldToggle
+        }
+
+        pressedShiftKeys.insert(keyCode)
+        let hasConflictingModifier = !modifierFlags
+            .intersection([.command, .control, .option, .function])
+            .isEmpty
+        eligibleKeyCode = pressedShiftKeys.count == 1 && !hasConflictingModifier
+            ? keyCode
+            : nil
+        return false
+    }
+
+    mutating func noteKeyDown() {
+        guard !pressedShiftKeys.isEmpty else {
+            return
+        }
+        eligibleKeyCode = nil
+    }
+
+    mutating func reset() {
+        pressedShiftKeys.removeAll()
+        eligibleKeyCode = nil
+    }
+}
+
 struct RimeMappedKey: Equatable {
     let keyCode: Int32
     let modifierMask: Int32

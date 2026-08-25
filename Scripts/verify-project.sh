@@ -97,6 +97,10 @@ for required_file in \
     "$project_root/Resources/Rime/default.yaml" \
     "$project_root/Resources/Rime/luna_pinyin.schema.yaml" \
     "$project_root/Resources/Rime/luna_pinyin.dict.yaml" \
+    "$project_root/Resources/Rime/flypy.schema.yaml" \
+    "$project_root/Resources/Rime/flypy.dict.yaml" \
+    "$project_root/Resources/Rime/flypydz.dict.yaml" \
+    "$project_root/Scripts/generate-flypy-dictionary.swift" \
     "$project_root/LICENSES/librime-BSD-3-Clause.txt"; do
     if [[ ! -f "$required_file" ]]; then
         echo "Required M2 dependency file is missing: $required_file" >&2
