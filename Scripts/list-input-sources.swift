@@ -26,7 +26,7 @@ func urlProperty(_ source: TISInputSource, _ key: CFString) -> URL? {
 }
 
 let expectedBundleID = CommandLine.arguments.dropFirst().first
-    ?? "com.shendongchun.inputmethod.rime.dev"
+    ?? "com.shendongchun.inputmethod.fengyu.local"
 let includeAllInstalled = CommandLine.arguments.dropFirst(2).first != "enabled-only"
 let filter = [kTISPropertyBundleID as String: expectedBundleID] as CFDictionary
 guard let result = TISCreateInputSourceList(filter, includeAllInstalled) else {

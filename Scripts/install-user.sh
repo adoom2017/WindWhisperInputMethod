@@ -12,8 +12,10 @@ previous_app="$install_directory/RimeInputMethod.previous"
 failed_migration_app="$install_directory/FengYuInputMethod.app"
 system_app="/Library/Input Methods/RimeInputMethod.app"
 failed_system_app="/Library/Input Methods/FengYuInputMethod.app"
-expected_bundle_id="com.shendongchun.inputmethod.rime.dev"
-input_mode_id="com.shendongchun.inputmethod.rime.dev.Hans"
+expected_bundle_id="com.shendongchun.inputmethod.fengyu.local"
+input_mode_id="com.shendongchun.inputmethod.fengyu.local.Hans"
+legacy_bundle_id="com.shendongchun.inputmethod.rime.dev"
+legacy_input_mode_id="com.shendongchun.inputmethod.rime.dev.Hans"
 failed_bundle_id="com.shendongchun.inputmethod.fengyu"
 failed_input_mode_id="com.shendongchun.inputmethod.fengyu.Hans"
 transitional_input_mode_id="com.shendongchun.inputmethod.rime.dev.FengYuHans"
@@ -67,12 +69,17 @@ done < <(
 /usr/bin/codesign --verify --deep --strict "$source_app"
 
 previous_input_source="$($source_app/Contents/MacOS/RimeInputMethod --current-input-source)"
-if [[ "$previous_input_source" == "$failed_input_mode_id" \
+if [[ "$previous_input_source" == "$legacy_input_mode_id" \
+    || "$previous_input_source" == "$failed_input_mode_id" \
     || "$previous_input_source" == "$transitional_input_mode_id" ]]; then
     "$source_app/Contents/MacOS/RimeInputMethod" \
         --select-input-source-id "$fallback_input_mode_id"
     previous_input_source="$fallback_input_mode_id"
 fi
+"$source_app/Contents/MacOS/RimeInputMethod" \
+    --disable-input-source-id "$legacy_input_mode_id" >/dev/null 2>&1 || true
+"$source_app/Contents/MacOS/RimeInputMethod" \
+    --disable-input-source-id "$legacy_bundle_id" >/dev/null 2>&1 || true
 "$source_app/Contents/MacOS/RimeInputMethod" \
     --disable-input-source-id "$failed_input_mode_id" >/dev/null 2>&1 || true
 "$source_app/Contents/MacOS/RimeInputMethod" \
@@ -139,8 +146,6 @@ if [[ "$parent_status" != *"found=true"* ]]; then
     false
 fi
 
-"$installed_binary" --enable-input-method-parent
-
 input_source_status="found=false"
 for _ in {1..60}; do
     input_source_status="$("$installed_binary" --input-source-status)"
@@ -155,40 +160,53 @@ if [[ "$input_source_status" != *"found=true"* ]]; then
     false
 fi
 
-"$installed_binary" --enable-input-source
-for _ in {1..60}; do
-    input_source_status="$("$installed_binary" --input-source-status)"
-    if [[ "$input_source_status" == *"enabled=true"* ]]; then
-        break
-    fi
-    /bin/sleep 0.5
-done
-if [[ "$input_source_status" != *"enabled=true"* ]]; then
-    echo "$input_source_status"
-    echo "RimeInputMethod install failed: input mode did not become enabled" >&2
-    false
+enabled_third_party_sources="$(
+    /usr/bin/defaults read \
+        com.apple.inputsources AppleEnabledThirdPartyInputSources 2>/dev/null || true
+)"
+authorization_required=false
+if [[ "$enabled_third_party_sources" != *"$input_mode_id"* ]]; then
+    authorization_required=true
+    echo "macOS authorization is required for the new FengYu input-source identity."
 fi
 
-/usr/bin/open -gj "$installed_app" 2>/dev/null || true
-/bin/sleep 1
+if [[ "$authorization_required" == false ]]; then
+    "$installed_binary" --enable-input-method-parent >/dev/null 2>&1 || true
+    "$installed_binary" --enable-input-source >/dev/null 2>&1 || true
+    for _ in {1..60}; do
+        input_source_status="$("$installed_binary" --input-source-status)"
+        if [[ "$input_source_status" == *"enabled=true"* ]]; then
+            break
+        fi
+        /bin/sleep 0.5
+    done
+    if [[ "$input_source_status" != *"enabled=true"* ]]; then
+        echo "RimeInputMethod install failed: authorized input mode did not become enabled" >&2
+        false
+    fi
 
-select_succeeded=false
-for _ in {1..60}; do
-    if "$installed_binary" --select-input-source >/dev/null 2>&1; then
-        select_succeeded=true
+    /usr/bin/open -gj "$installed_app" 2>/dev/null || true
+    /bin/sleep 1
+
+    select_succeeded=false
+    for _ in {1..60}; do
+        if "$installed_binary" --select-input-source >/dev/null 2>&1; then
+            select_succeeded=true
+        fi
+        input_source_status="$("$installed_binary" --input-source-status)"
+        if [[ "$select_succeeded" == true && "$input_source_status" == *"selected=true"* ]]; then
+            break
+        fi
+        /bin/sleep 0.5
+    done
+    if [[ "$input_source_status" != *"selected=true"* ]]; then
+        echo "Input mode is enabled; initial selection is deferred until macOS finishes refreshing it."
     fi
-    input_source_status="$("$installed_binary" --input-source-status)"
-    if [[ "$select_succeeded" == true && "$input_source_status" == *"selected=true"* ]]; then
-        break
-    fi
-    /bin/sleep 0.5
-done
-if [[ "$input_source_status" != *"selected=true"* ]]; then
-    echo "Input mode is enabled; initial selection is deferred until macOS finishes refreshing it."
 fi
 
 if [[ -n "$previous_input_source" \
     && "$previous_input_source" != "$input_mode_id" \
+    && "$previous_input_source" != "$legacy_input_mode_id" \
     && "$previous_input_source" != "$failed_input_mode_id" \
     && "$previous_input_source" != "$transitional_input_mode_id" ]]; then
     "$installed_binary" --select-input-source-id "$previous_input_source" >/dev/null || true
@@ -208,5 +226,10 @@ fi
 trap - ERR
 
 echo "$input_source_status"
-echo "Installed and enabled without logout: $installed_app"
+if [[ "$authorization_required" == true ]]; then
+    echo "Installed with a fresh identity: $installed_app"
+    echo "Add FengYu in System Settings > Keyboard > Text Input > Edit before selecting it."
+else
+    echo "Installed and enabled without logout: $installed_app"
+fi
 echo "Current input source: $("$installed_binary" --current-input-source)"

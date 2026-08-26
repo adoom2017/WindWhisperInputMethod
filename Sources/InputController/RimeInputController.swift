@@ -17,6 +17,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     private lazy var candidateWindow = CandidateWindowCoordinator { [weak self] action in
         self?.handleCandidateWindowAction(action)
     }
+    private lazy var inputModeIndicator = InputModeIndicatorCoordinator()
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         self.inputClient = inputClient as? IMKTextInput
@@ -52,6 +53,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
             inputClient = sender
         }
         finishComposition()
+        hideInputModeIndicator()
         inputClient = nil
         logger.debug("Input session deactivated")
     }
@@ -59,6 +61,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     override func inputControllerWillClose() {
         finishComposition()
         hideCandidateWindow()
+        hideInputModeIndicator()
         removeSettingsObservers()
         session = nil
         inputClient = nil
@@ -130,12 +133,22 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
             return false
         }
 
+        let previousASCIIMode = session.option("ascii_mode")
         let handled = session.process(
             keyCode: mappedKey.keyCode,
             modifierMask: mappedKey.modifierMask
         )
         do {
-            apply(try session.readSnapshot(), to: client)
+            let snapshot = try session.readSnapshot()
+            apply(snapshot, to: client)
+            if let previousASCIIMode,
+                let indicatorState = InputModeIndicatorTransition.state(
+                    before: previousASCIIMode,
+                    after: snapshot.status.isASCIIMode
+                )
+            {
+                presentInputModeIndicator(indicatorState, client: client)
+            }
         } catch {
             logger.error("Unable to refresh modifier state: \(error.localizedDescription, privacy: .public)")
         }
@@ -214,6 +227,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     private func prepareForRedeploy() {
         finishComposition()
         hideCandidateWindow()
+        hideInputModeIndicator()
         session = nil
     }
 
@@ -320,6 +334,40 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         let operation: () -> Void = { [weak self] in
             guard let self else { return }
             self.candidateWindow.hide()
+        }
+        if Thread.isMainThread {
+            operation()
+        } else {
+            DispatchQueue.main.async(execute: operation)
+        }
+    }
+
+    private func presentInputModeIndicator(
+        _ state: InputModeIndicatorState,
+        client: IMKTextInput
+    ) {
+        guard let anchorRect = CandidateAnchorResolver.anchorRect(in: client) else {
+            hideInputModeIndicator()
+            return
+        }
+        let clientWindowLevel = client.windowLevel()
+        let operation: () -> Void = { [weak self] in
+            self?.inputModeIndicator.show(
+                state: state,
+                anchorRect: anchorRect,
+                clientWindowLevel: clientWindowLevel
+            )
+        }
+        if Thread.isMainThread {
+            operation()
+        } else {
+            DispatchQueue.main.async(execute: operation)
+        }
+    }
+
+    private func hideInputModeIndicator() {
+        let operation: () -> Void = { [weak self] in
+            self?.inputModeIndicator.hide()
         }
         if Thread.isMainThread {
             operation()

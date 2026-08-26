@@ -4,9 +4,10 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 info_plist="$project_root/Resources/Info.plist"
-expected_bundle_id="com.shendongchun.inputmethod.rime.dev"
+expected_bundle_id="com.shendongchun.inputmethod.fengyu.local"
 expected_mode_id="$expected_bundle_id.Hans"
-legacy_mode_id="com.shendongchun.inputmethod.fengyu.Hans"
+legacy_mode_id="com.shendongchun.inputmethod.rime.dev.Hans"
+older_mode_id="com.shendongchun.inputmethod.fengyu.Hans"
 transitional_mode_id="com.shendongchun.inputmethod.rime.dev.FengYuHans"
 expected_display_name="风语"
 
@@ -30,7 +31,7 @@ if [[ "$plist_mode_id" != "$expected_mode_id" ]]; then
     exit 65
 fi
 
-if grep -Eq "$legacy_mode_id|$transitional_mode_id" "$info_plist"; then
+if grep -Eq "$legacy_mode_id|$older_mode_id|$transitional_mode_id" "$info_plist"; then
     echo "Legacy input mode IDs must not remain in Info.plist." >&2
     exit 65
 fi

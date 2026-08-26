@@ -15,6 +15,8 @@ enum M3SmokeTest {
             print("shortcutMapping=passed")
             try verifyModifierMapping()
             print("modifierMapping=passed")
+            try verifyInputModeIndicatorTransition()
+            print("inputModeIndicatorTransition=passed")
             try verifyCompositionEditing(root: temporaryRoot)
             print("compositionEditing=passed")
             try verifyShiftModeSwitch(root: temporaryRoot)
@@ -93,6 +95,19 @@ enum M3SmokeTest {
         )
         else {
             throw RimeBridgeError.smokeAssertion("Shift press/release mapping is incorrect.")
+        }
+    }
+
+    private static func verifyInputModeIndicatorTransition() throws {
+        guard InputModeIndicatorTransition.state(before: false, after: true) == .english,
+            InputModeIndicatorTransition.state(before: true, after: false) == .chinese,
+            InputModeIndicatorTransition.state(before: false, after: false) == nil,
+            InputModeIndicatorState.chinese.displayText == "中",
+            InputModeIndicatorState.english.displayText == "英",
+            InputModeIndicatorState.chinese.accessibilityText == "中文",
+            InputModeIndicatorState.english.accessibilityText == "英文"
+        else {
+            throw RimeBridgeError.smokeAssertion("Input mode indicator transition is incorrect.")
         }
     }
 

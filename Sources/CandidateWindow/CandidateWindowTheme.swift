@@ -42,11 +42,11 @@ struct CandidateWindowTheme: Equatable, Sendable {
             reduceTransparency: environment.reduceTransparency,
             increaseContrast: environment.increaseContrast,
             reduceMotion: environment.reduceMotion,
-            cornerRadius: environment.increaseContrast ? 11 : 13,
-            horizontalPadding: 9,
-            verticalPadding: 8,
-            candidateHeight: 38,
-            candidateSpacing: 4,
+            cornerRadius: environment.increaseContrast ? 13 : 15,
+            horizontalPadding: 7,
+            verticalPadding: 6,
+            candidateHeight: 36,
+            candidateSpacing: 5,
             candidateHorizontalPadding: 10,
             minimumCandidateWidth: 68,
             maximumCandidateWidth: 220,
@@ -56,7 +56,7 @@ struct CandidateWindowTheme: Equatable, Sendable {
             primaryFontSize: 16,
             commentFontSize: 12,
             shortcutFontSize: 11,
-            animationDuration: environment.reduceMotion ? 0 : 0.08
+            animationDuration: environment.reduceMotion ? 0 : 0.1
         )
     }
 
@@ -77,6 +77,14 @@ struct CandidateWindowTheme: Equatable, Sendable {
     }
 
     var highlightColor: NSColor {
-        NSColor.controlAccentColor.withAlphaComponent(increaseContrast ? 1 : 0.92)
+        NSColor.controlAccentColor.withAlphaComponent(increaseContrast ? 0.26 : 0.16)
+    }
+
+    var highlightBorderColor: NSColor {
+        NSColor.controlAccentColor.withAlphaComponent(increaseContrast ? 0.9 : 0.42)
+    }
+
+    var paginationBackgroundColor: NSColor {
+        NSColor.quaternaryLabelColor.withAlphaComponent(increaseContrast ? 0.4 : 0.2)
     }
 }

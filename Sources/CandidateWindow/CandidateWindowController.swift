@@ -84,7 +84,7 @@ final class CandidateWindowCoordinator {
         if #available(macOS 26.0, *) {
             let glassView = NSGlassEffectView(frame: contentBounds)
             glassView.style = .clear
-            glassView.cornerRadius = 13
+            glassView.cornerRadius = 15
             glassView.contentView = candidateView
             materialView = glassView
         } else {
@@ -360,20 +360,30 @@ final class CandidateListView: NSView {
         let isHighlighted = index == model.highlightedIndex
         if isHighlighted {
             theme.highlightColor.setFill()
-            NSBezierPath(
+            let highlightPath = NSBezierPath(
                 roundedRect: frame,
                 xRadius: theme.cornerRadius - 4,
                 yRadius: theme.cornerRadius - 4
-            ).fill()
+            )
+            highlightPath.fill()
+            theme.highlightBorderColor.setStroke()
+            let highlightBorder = NSBezierPath(
+                roundedRect: frame.insetBy(dx: 0.5, dy: 0.5),
+                xRadius: theme.cornerRadius - 4.5,
+                yRadius: theme.cornerRadius - 4.5
+            )
+            highlightBorder.lineWidth = theme.increaseContrast ? 1.5 : 1
+            highlightBorder.stroke()
         }
 
-        let primaryColor: NSColor = isHighlighted ? .selectedMenuItemTextColor : .labelColor
-        let secondaryColor: NSColor = isHighlighted
-            ? .selectedMenuItemTextColor.withAlphaComponent(0.78)
-            : .secondaryLabelColor
+        let primaryColor = NSColor.labelColor
+        let secondaryColor = NSColor.secondaryLabelColor
         let shortcutBackground = isHighlighted
-            ? NSColor.selectedMenuItemTextColor.withAlphaComponent(0.18)
+            ? NSColor.selectedContentBackgroundColor
             : NSColor.quaternaryLabelColor.withAlphaComponent(theme.increaseContrast ? 0.38 : 0.22)
+        let shortcutTextColor: NSColor = isHighlighted
+            ? .alternateSelectedControlTextColor
+            : secondaryColor
 
         let shortcutRect = NSRect(
             x: frame.minX + theme.candidateHorizontalPadding,
@@ -388,7 +398,7 @@ final class CandidateListView: NSView {
                 ofSize: theme.shortcutFontSize,
                 weight: .medium
             ),
-            .foregroundColor: secondaryColor,
+            .foregroundColor: shortcutTextColor,
         ]
         let shortcutSize = (entry.shortcut as NSString).size(withAttributes: shortcutAttributes)
         (entry.shortcut as NSString).draw(
@@ -462,17 +472,15 @@ final class CandidateListView: NSView {
     }
 
     private func drawPageIndicator(layout: CandidateWindowLayout) {
-        NSColor.separatorColor.withAlphaComponent(theme.increaseContrast ? 0.8 : 0.45).setStroke()
-        let divider = NSBezierPath()
-        if layout.orientation == .horizontal {
-            divider.move(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.minY + 7))
-            divider.line(to: NSPoint(x: layout.pageFrame.minX - 3, y: layout.pageFrame.maxY - 7))
-        } else {
-            divider.move(to: NSPoint(x: layout.pageFrame.minX + 7, y: layout.pageFrame.minY - 2))
-            divider.line(to: NSPoint(x: layout.pageFrame.maxX - 7, y: layout.pageFrame.minY - 2))
+        let chromeRect = layout.pageFrame.insetBy(dx: 1, dy: 5)
+        let chromePath = NSBezierPath(roundedRect: chromeRect, xRadius: 9, yRadius: 9)
+        theme.paginationBackgroundColor.setFill()
+        chromePath.fill()
+        if theme.increaseContrast {
+            NSColor.separatorColor.setStroke()
+            chromePath.lineWidth = 1
+            chromePath.stroke()
         }
-        divider.lineWidth = 1
-        divider.stroke()
 
         let enabledColor = NSColor.secondaryLabelColor
         let disabledColor = NSColor.tertiaryLabelColor.withAlphaComponent(0.45)

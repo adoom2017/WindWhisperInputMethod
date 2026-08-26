@@ -183,10 +183,11 @@ enum CandidateVerticalLayout {
                 height: theme.candidateHeight
             )
         }
+        let verticalPageWidth = min(theme.pageIndicatorWidth, rowWidth)
         let pageFrame = NSRect(
-            x: theme.horizontalPadding,
+            x: floor((panelWidth - verticalPageWidth) / 2),
             y: pageTop,
-            width: rowWidth,
+            width: verticalPageWidth,
             height: theme.candidateHeight
         )
         let controlWidth = floor(pageFrame.width / 3)

@@ -14,6 +14,7 @@ enum M5SmokeTest {
             print("nativeMaterialConfiguration=passed")
             try MainActor.assumeIsolated {
                 try verifyVisualSnapshots()
+                try verifyInputModeIndicatorSnapshots()
             }
             print("visualSnapshots=passed")
             return EXIT_SUCCESS
@@ -50,6 +51,34 @@ enum M5SmokeTest {
             menu: previewMenu,
             anchorRect: anchorRect,
             clientWindowLevel: CGWindowLevel(kCGNormalWindowLevel)
+        )
+        RunLoop.main.run(until: Date().addingTimeInterval(20))
+        coordinator.hide()
+        return EXIT_SUCCESS
+    }
+
+    @MainActor
+    static func previewInputModeIndicator() -> Int32 {
+        let application = NSApplication.shared
+        application.setActivationPolicy(.accessory)
+
+        guard let visibleFrame = NSScreen.main?.visibleFrame else {
+            fputs("Input mode indicator preview failed: no visible screen.\n", stderr)
+            return EXIT_FAILURE
+        }
+
+        let coordinator = InputModeIndicatorCoordinator()
+        let anchorRect = NSRect(
+            x: visibleFrame.midX,
+            y: visibleFrame.midY + 40,
+            width: 2,
+            height: 24
+        )
+        coordinator.show(
+            state: .english,
+            anchorRect: anchorRect,
+            clientWindowLevel: CGWindowLevel(kCGNormalWindowLevel),
+            autoHide: false
         )
         RunLoop.main.run(until: Date().addingTimeInterval(20))
         coordinator.hide()
@@ -177,6 +206,38 @@ enum M5SmokeTest {
                     png.count > 1_000
                 else {
                     throw RimeBridgeError.smokeAssertion("candidate visual snapshot was empty.")
+                }
+            }
+        }
+    }
+
+    @MainActor
+    private static func verifyInputModeIndicatorSnapshots() throws {
+        let appearances = [NSAppearance.Name.aqua, NSAppearance.Name.darkAqua]
+        for appearanceName in appearances {
+            for state in [InputModeIndicatorState.chinese, .english] {
+                let view = InputModeIndicatorView(
+                    frame: NSRect(origin: .zero, size: InputModeIndicatorCoordinator.panelSize)
+                )
+                view.appearance = NSAppearance(named: appearanceName)
+                view.updateAccessibilityEnvironment(
+                    reduceTransparency: false,
+                    increaseContrast: false
+                )
+                view.update(state: state)
+                guard let representation = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+                    throw RimeBridgeError.smokeAssertion(
+                        "input mode indicator bitmap could not be created."
+                    )
+                }
+                view.cacheDisplay(in: view.bounds, to: representation)
+                guard
+                    let png = representation.representation(using: .png, properties: [:]),
+                    png.count > 500
+                else {
+                    throw RimeBridgeError.smokeAssertion(
+                        "input mode indicator snapshot was empty."
+                    )
                 }
             }
         }

@@ -6,7 +6,7 @@
 
 **M1—M7 已完成实现和自动化验收；当前版本已进入 M7 本机使用确认。**
 
-应用现已自带官方 librime 1.16.0、Rime 基础词库、风语全拼、自然码双拼、小鹤双拼（音形辅码与纯音码）、微软双拼、智能 ABC 双拼、OpenCC 1.1.9 繁简转换数据和可复现生成的辅码索引。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。单按左/右 Shift 可切换中英文，Shift 与字母或系统快捷键组合时不会误切换；Command、Control、Option 组合保持透传。候选面板不抢焦点并跟随插入点；macOS 26 使用系统 `NSGlassEffectView` clear 玻璃，旧系统回退到 `NSVisualEffectView`。窗口显示页码、候选序号、注释/辅码与 Rime 高亮；鼠标点击、滚轮翻页和键盘选词共用同一 Rime session。M7 已加入持久化设置菜单，可切换方案、全/半角、简繁、横/竖排和系统/浅色/深色主题，并提供重新部署、用户目录、脱敏诊断和恢复默认设置。
+应用现已自带官方 librime 1.16.0、Rime 基础词库、风语全拼、自然码双拼、小鹤双拼（音形辅码与纯音码）、微软双拼、智能 ABC 双拼、OpenCC 1.1.9 繁简转换数据和可复现生成的辅码索引。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。单按左 Shift 可切换中英文，并在插入点附近短暂显示带强调色徽章的“中/英”玻璃指示器；右 Shift 保持 `noop`，Shift 与字母或系统快捷键组合时不会误切换。候选面板不抢焦点并跟随插入点；macOS 26 使用系统 `NSGlassEffectView` clear 玻璃，旧系统回退到 `NSVisualEffectView`。窗口使用与状态指示器一致的 48pt 紧凑视觉，选中项采用浅强调色底、细描边与实色数字徽章，分页入口收进独立胶囊；鼠标点击、滚轮翻页和键盘选词共用同一 Rime session。M7 已加入持久化设置菜单，可切换方案、全/半角、简繁、横/竖排和系统/浅色/深色主题，并提供重新部署、用户目录、脱敏诊断和恢复默认设置。
 
 本机为 Apple Silicon，Debug 只构建 arm64；Release 应用和内置 librime 都包含 arm64 + x86_64。安装脚本使用本地签名、父输入法/子模式分阶段启用和当前会话热刷新；M3 最终 Debug 构建已成功热安装，没有上传构建包、注销或重启，并恢复了安装前使用的鼠须管输入源。
 
@@ -111,8 +111,8 @@ RimeInputMethod/
 
 - 产品显示名：风语
 - 内部工程名：`RimeInputMethod`（为保持安装、输入源注册和用户数据兼容而保留）
-- Bundle ID：`com.shendongchun.inputmethod.rime.dev`
-- 简体输入模式 ID：`com.shendongchun.inputmethod.rime.dev.Hans`
+- Bundle ID：`com.shendongchun.inputmethod.fengyu.local`
+- 简体输入模式 ID：`com.shendongchun.inputmethod.fengyu.local.Hans`
 - 最低版本：macOS 13
 - Release 架构：arm64 + x86_64
 
@@ -129,7 +129,7 @@ RimeInputMethod/
 - 其他方案：风语全拼、自然码、微软、智能 ABC 和仓颉五代均可直接从“输入方案”子菜单选择。
 - 通用辅码：在其他拼音方案中可先输入 `;`，再输入完整拼音和可选的仓颉首码，例如 `;zuok` 定位“左”。它与小鹤音形四码互不干扰。
 - 中英文：遵循原配置：左 Shift 为 `commit_code`，右 Shift、Caps Lock 不执行切换；Control/Option 快捷键交给 Rime 处理。
-- 用户词典和 `.custom.yaml` 继续保存在 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`；Bundle 身份迁移、更新应用和重新部署都不会覆盖这些文件。
+- 用户词典和 `.custom.yaml` 继续保存在 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`；新的 `com.shendongchun.inputmethod.fengyu.local` Bundle 身份只用于系统注册，不迁移或覆盖用户数据。
 - `/Users/shendongchun/Documents/rime-origin/build` 中的 `flypy.table.bin`、`flypy.prism.bin`、`flypy.reverse.bin` 已逐字节纳入应用，并在部署后强制恢复，避免 librime 重新生成改变候选行为。
 - 数据来源、固定提交、许可证和修改见 `Resources/Rime/DATA_LOCK.json`、`docs/RIME_DATA.md` 与 `LICENSES/`。
 

@@ -3,7 +3,7 @@
 set -euo pipefail
 
 installed_app="$HOME/Library/Input Methods/RimeInputMethod.app"
-expected_bundle_id="com.shendongchun.inputmethod.rime.dev"
+expected_bundle_id="com.shendongchun.inputmethod.fengyu.local"
 lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 if [[ ! -d "$installed_app" ]]; then

@@ -39,6 +39,7 @@
 		A1000000000000000000001E /* FengYuSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* FengYuSettings.swift */; };
 		A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* FengYuSettingsMenu.swift */; };
 		A10000000000000000000020 /* M7SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* M7SmokeTest.swift */; };
+		A10000000000000000000021 /* InputModeIndicatorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* InputModeIndicatorController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -92,6 +93,7 @@
 		A20000000000000000000022 /* FengYuSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSettings.swift; sourceTree = "<group>"; };
 		A20000000000000000000023 /* FengYuSettingsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSettingsMenu.swift; sourceTree = "<group>"; };
 		A20000000000000000000024 /* M7SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M7SmokeTest.swift; sourceTree = "<group>"; };
+		A20000000000000000000025 /* InputModeIndicatorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModeIndicatorController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -236,6 +238,7 @@
 				A2000000000000000000001C /* CandidateWindowPositioner.swift */,
 				A2000000000000000000001E /* CandidateWindowTheme.swift */,
 				A2000000000000000000001F /* CandidateWindowLayout.swift */,
+				A20000000000000000000025 /* InputModeIndicatorController.swift */,
 				A2000000000000000000001D /* M4SmokeTest.swift */,
 				A20000000000000000000020 /* M5SmokeTest.swift */,
 			);
@@ -353,6 +356,7 @@
 				A1000000000000000000001E /* FengYuSettings.swift in Sources */,
 				A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */,
 				A10000000000000000000020 /* M7SmokeTest.swift in Sources */,
+				A10000000000000000000021 /* InputModeIndicatorController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -418,7 +422,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.rime.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.fengyu.local;
 				PRODUCT_MODULE_NAME = RimeInputMethod;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = NO;
@@ -446,7 +450,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.rime.dev;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.fengyu.local;
 				PRODUCT_MODULE_NAME = RimeInputMethod;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = NO;

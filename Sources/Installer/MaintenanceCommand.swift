@@ -79,6 +79,10 @@ enum MaintenanceCommand {
             return MainActor.assumeIsolated {
                 M5SmokeTest.preview()
             }
+        case "--mode-indicator-preview":
+            return MainActor.assumeIsolated {
+                M5SmokeTest.previewInputModeIndicator()
+            }
         case "--help":
             printHelp()
             return EXIT_SUCCESS
@@ -176,6 +180,7 @@ enum MaintenanceCommand {
               --m4-smoke               Run the M4 candidate window and interaction test
               --m5-smoke               Run the M5 native material and layout test
               --m5-preview             Show the M5 candidate window visual preview
+              --mode-indicator-preview Show the English mode indicator visual preview
               --m6-smoke               Run the M6 schemas, auxiliary code, and upgrade test
               --m7-smoke               Run the M7 settings, synchronization, and diagnostics test
               --help                   Show this help

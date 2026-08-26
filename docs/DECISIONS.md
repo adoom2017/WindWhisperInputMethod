@@ -174,9 +174,17 @@
 ### ADR-027：输入源身份迁移实验回滚
 
 - 日期：2026-08-25
-- 状态：已回滚
+- 状态：已被 ADR-028 替代
 - 原因：钉钉 8.3.5 的光标输入源 HUD 在选择旧模式 ID 时，`TISCopyInputSourceRefForInputSourceID` 返回空值，随后系统辅助代码对空值调用 `CFRelease` 并终止钉钉。图标、签名、arm64 架构与 Caps Lock 元数据均已排除。
 - 结果：仅迁移子模式 ID 会生成可枚举但无法持久显示的记录；迁移完整 Bundle 身份则触发 macOS 对全新第三方输入法的首次用户授权要求，无法在现有免注销热更新流程中自动完成。为立即恢复用户可用性，继续使用已获授权的 `com.shendongchun.inputmethod.rime.dev.Hans`，失败的迁移包移出输入法目录并保留在构建目录供诊断。
+
+### ADR-028：使用全新完整身份重新授权输入源
+
+- 日期：2026-08-26
+- 状态：已接受
+- 证据：钉钉 8.3.5 在菜单 HUD 选择旧模式时持续于 `TUINSCursorUIController` 中执行 `CFRelease(NULL)`；菜单栏也无法选中该模式。改用 Apple Development 证书后故障同栈复现，排除 ad-hoc 签名与 TeamIdentifier 缺失。
+- 选择：Bundle ID 与模式 ID 一并迁移到全新的 `com.shendongchun.inputmethod.fengyu.local` 和 `.Hans`，使用稳定 Apple Development 证书，并接受 macOS 对新第三方输入法进行一次人工授权。连接名同步迁移，避免复用旧服务身份。
+- 数据：`persistentDataIdentifier` 继续使用 `com.shendongchun.inputmethod.rime.dev`，保留原用户词典、配置与日志目录；安装器禁用旧父/子输入源，但不会删除用户数据。
 
 ## 待用户确认
 
