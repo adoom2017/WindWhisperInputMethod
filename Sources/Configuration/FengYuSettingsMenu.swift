@@ -15,8 +15,8 @@ enum FengYuDiagnostics {
         bundleIdentifier=\(bundleIdentifier)
         executableArchitecture=\(executableArchitecture)
         macOS=\(ProcessInfo.processInfo.operatingSystemVersionString)
-        librimeReady=\(runtime.isReady)
-        librimeVersion=\(runtime.version)
+        engineReady=\(runtime.isReady)
+        engineVersion=\(runtime.version)
         selectedSchema=\(settings.schema.rawValue)
         fullWidth=\(settings.usesFullWidth)
         simplifiedChinese=\(settings.usesSimplifiedChinese)
@@ -111,7 +111,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
 
         menu.addItem(.separator())
         let redeploy = actionItem(
-            title: isRedeploying ? "正在重新部署…" : "重新部署 Rime",
+            title: isRedeploying ? "正在重新部署…" : "重新部署输入引擎",
             action: #selector(RimeInputController.fengYuRedeployCommand(_:))
         )
         redeploy.isEnabled = !isRedeploying
@@ -248,7 +248,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
                 style: .warning
             )
         } else {
-            showMessage(title: "重新部署完成", message: "Rime 配置已经更新。")
+            showMessage(title: "重新部署完成", message: "风语配置已经更新。")
         }
     }
 

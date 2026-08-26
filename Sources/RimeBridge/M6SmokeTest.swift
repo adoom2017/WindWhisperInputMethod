@@ -40,10 +40,11 @@ enum M6SmokeTest {
             print("missingSchemaRejected=passed")
             print("userOverridePreserved=passed")
             print("userDictionaryPreserved=passed")
+            print("legacyUserDataMigration=passed")
             print("dataLockValidated=passed")
             return EXIT_SUCCESS
         } catch {
-            fputs("RimeInputMethod M6: \(error.localizedDescription)\n", stderr)
+            fputs("windwhisper M6: \(error.localizedDescription)\n", stderr)
             return EXIT_FAILURE
         }
     }
@@ -64,7 +65,7 @@ enum M6SmokeTest {
         let explicitRoot = argumentValue(after: "--user-data-root", in: arguments)
         let root = explicitRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? FileManager.default.temporaryDirectory
-                .appendingPathComponent("RimeInputMethod-M6-\(UUID().uuidString)", isDirectory: true)
+                .appendingPathComponent("windwhisper-M6-\(UUID().uuidString)", isDirectory: true)
         let shouldRemoveRoot = explicitRoot == nil
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer {
@@ -72,6 +73,8 @@ enum M6SmokeTest {
                 try? FileManager.default.removeItem(at: root)
             }
         }
+
+        try verifyLegacyUserDataMigration(root: root, sharedData: sharedData)
 
         let paths = RimeServicePaths.temporary(root: root, sharedData: sharedData)
         let customURL = paths.userData.appendingPathComponent("default.custom.yaml")
@@ -380,6 +383,59 @@ enum M6SmokeTest {
                     "rime-origin prebuilt table was not installed exactly: \(fileName)"
                 )
             }
+        }
+    }
+
+    private static func verifyLegacyUserDataMigration(root: URL, sharedData: URL) throws {
+        let fileManager = FileManager.default
+        let migrationRoot = root.appendingPathComponent("legacy-migration", isDirectory: true)
+        let legacyUserData = migrationRoot.appendingPathComponent("legacy", isDirectory: true)
+        let newRoot = migrationRoot.appendingPathComponent("new", isDirectory: true)
+        let sentinelName = "custom-dictionary-sentinel.txt"
+        let sentinelContents = "windwhisper migration sentinel"
+        try fileManager.createDirectory(at: legacyUserData, withIntermediateDirectories: true)
+        try sentinelContents.write(
+            to: legacyUserData.appendingPathComponent(sentinelName),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let paths = RimeServicePaths.temporary(
+            root: newRoot,
+            sharedData: sharedData,
+            legacyUserData: [legacyUserData]
+        )
+        do {
+            let service = try RimeService(paths: paths, minLogLevel: 2)
+            _ = service
+        }
+
+        let migratedSentinel = paths.userData.appendingPathComponent(sentinelName)
+        let originalSentinel = legacyUserData.appendingPathComponent(sentinelName)
+        guard
+            fileManager.fileExists(atPath: legacyUserData.path),
+            try String(contentsOf: originalSentinel, encoding: .utf8) == sentinelContents,
+            try String(contentsOf: migratedSentinel, encoding: .utf8) == sentinelContents
+        else {
+            throw RimeBridgeError.smokeAssertion("legacy user data was not copied safely")
+        }
+
+        let protectedRoot = migrationRoot.appendingPathComponent("existing", isDirectory: true)
+        let protectedPaths = RimeServicePaths.temporary(
+            root: protectedRoot,
+            sharedData: sharedData,
+            legacyUserData: [legacyUserData]
+        )
+        try fileManager.createDirectory(at: protectedPaths.userData, withIntermediateDirectories: true)
+        let protectedSentinel = protectedPaths.userData.appendingPathComponent(sentinelName)
+        let protectedContents = "existing windwhisper data"
+        try protectedContents.write(to: protectedSentinel, atomically: true, encoding: .utf8)
+        do {
+            let service = try RimeService(paths: protectedPaths, minLogLevel: 2)
+            _ = service
+        }
+        guard try String(contentsOf: protectedSentinel, encoding: .utf8) == protectedContents else {
+            throw RimeBridgeError.smokeAssertion("legacy migration overwrote existing user data")
         }
     }
 

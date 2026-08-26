@@ -5,7 +5,7 @@ set -euo pipefail
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 configuration="${1:-Debug}"
 derived_data_path="$project_root/build/DerivedData"
-build_number="${RIME_BUILD_NUMBER:-$(date +%s)}"
+build_number="${WINDWHISPER_BUILD_NUMBER:-$(date +%s)}"
 
 case "$configuration" in
     Debug|Release) ;;
@@ -20,7 +20,7 @@ if [[ "$configuration" == "Debug" ]]; then
     destination="platform=macOS,arch=arm64"
     xcodebuild \
         -project "$project_root/RimeInputMethod.xcodeproj" \
-        -scheme RimeInputMethod \
+        -scheme windwhisper \
         -configuration "$configuration" \
         -destination "$destination" \
         -derivedDataPath "$derived_data_path" \
@@ -31,7 +31,7 @@ if [[ "$configuration" == "Debug" ]]; then
 else
     xcodebuild \
         -project "$project_root/RimeInputMethod.xcodeproj" \
-        -scheme RimeInputMethod \
+        -scheme windwhisper \
         -configuration "$configuration" \
         -destination "$destination" \
         -derivedDataPath "$derived_data_path" \
@@ -39,4 +39,4 @@ else
         build
 fi
 
-echo "$derived_data_path/Build/Products/$configuration/RimeInputMethod.app"
+echo "$derived_data_path/Build/Products/$configuration/windwhisper.app"

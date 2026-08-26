@@ -79,7 +79,7 @@ struct FengYuSettingsSnapshot: Equatable, Sendable {
         guard optionsApplied else {
             throw RimeBridgeError.bridge(
                 code: -3,
-                message: "librime runtime options are unavailable."
+                message: "Input engine runtime options are unavailable."
             )
         }
     }
@@ -108,10 +108,35 @@ final class FengYuSettingsStore: @unchecked Sendable {
     private let lock = NSLock()
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults? = nil) {
-        self.defaults = defaults
-            ?? UserDefaults(suiteName: InputSourceMetadata.persistentDataIdentifier)
-            ?? .standard
+    init(defaults: UserDefaults? = nil, legacyDefaults: [UserDefaults]? = nil) {
+        if let defaults {
+            self.defaults = defaults
+            migrateLegacyValues(from: legacyDefaults ?? [])
+        } else {
+            self.defaults =
+                UserDefaults(suiteName: InputSourceMetadata.persistentDataIdentifier)
+                ?? .standard
+            let sources = legacyDefaults
+                ?? InputSourceMetadata.legacyPersistentDataIdentifiers.compactMap(UserDefaults.init(suiteName:))
+            migrateLegacyValues(from: sources)
+        }
+    }
+
+    private func migrateLegacyValues(from legacyDefaults: [UserDefaults]) {
+        let keys = [
+            Key.schema,
+            Key.legacySchema,
+            Key.fullWidth,
+            Key.simplified,
+            Key.orientation,
+            Key.colorScheme,
+        ]
+        for key in keys where defaults.object(forKey: key) == nil {
+            guard let value = legacyDefaults.lazy.compactMap({ $0.object(forKey: key) }).first else {
+                continue
+            }
+            defaults.set(value, forKey: key)
+        }
     }
 
     var snapshot: FengYuSettingsSnapshot {

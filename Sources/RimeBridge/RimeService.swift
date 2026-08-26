@@ -10,15 +10,15 @@ enum RimeBridgeError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingBundledData:
-            "The bundled Rime data directory is missing."
+            "The bundled input-engine data directory is missing."
         case .invalidCString:
-            "A librime path could not be represented as UTF-8."
-        case .bridge(let code, let message):
-            "librime bridge error \(code): \(message)"
+            "An input-engine path could not be represented as UTF-8."
+        case .bridge(let code, _):
+            "Input engine error \(code)."
         case .invalidUTF8Offset:
-            "librime returned an invalid UTF-8 composition offset."
+            "The input engine returned an invalid composition offset."
         case .smokeAssertion(let message):
-            "Rime smoke test failed: \(message)"
+            "Input-engine smoke test failed: \(message)"
         }
     }
 }
@@ -29,6 +29,7 @@ struct RimeServicePaths: Sendable {
     let prebuiltData: URL
     let staging: URL
     let logs: URL
+    let legacyUserData: [URL]
 
     static func applicationDefaults(bundle: Bundle = .main) throws -> Self {
         guard let resources = bundle.resourceURL else {
@@ -44,11 +45,18 @@ struct RimeServicePaths: Sendable {
         let identifier = InputSourceMetadata.persistentDataIdentifier
         let library = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library", isDirectory: true)
-        let userData =
+        let applicationSupport =
             library
             .appendingPathComponent("Application Support", isDirectory: true)
+        let userData =
+            applicationSupport
             .appendingPathComponent(identifier, isDirectory: true)
-            .appendingPathComponent("Rime", isDirectory: true)
+            .appendingPathComponent("Data", isDirectory: true)
+        let legacyUserData = InputSourceMetadata.legacyPersistentDataIdentifiers.map { identifier in
+            applicationSupport
+                .appendingPathComponent(identifier, isDirectory: true)
+                .appendingPathComponent("Rime", isDirectory: true)
+        }
         return Self(
             sharedData: sharedData,
             userData: userData,
@@ -57,18 +65,24 @@ struct RimeServicePaths: Sendable {
             logs:
                 library
                 .appendingPathComponent("Logs", isDirectory: true)
-                .appendingPathComponent(identifier, isDirectory: true)
+                .appendingPathComponent(identifier, isDirectory: true),
+            legacyUserData: legacyUserData
         )
     }
 
-    static func temporary(root: URL, sharedData: URL) -> Self {
+    static func temporary(
+        root: URL,
+        sharedData: URL,
+        legacyUserData: [URL] = []
+    ) -> Self {
         let userData = root.appendingPathComponent("user", isDirectory: true)
         return Self(
             sharedData: sharedData,
             userData: userData,
             prebuiltData: sharedData.appendingPathComponent("build", isDirectory: true),
             staging: userData.appendingPathComponent("build", isDirectory: true),
-            logs: root.appendingPathComponent("logs", isDirectory: true)
+            logs: root.appendingPathComponent("logs", isDirectory: true),
+            legacyUserData: legacyUserData
         )
     }
 }
@@ -102,6 +116,7 @@ final class RimeService: @unchecked Sendable {
     init(paths: RimeServicePaths, minLogLevel: Int32 = 2) throws {
         self.paths = paths
         let fileManager = FileManager.default
+        try Self.migrateLegacyUserDataIfNeeded(at: paths, using: fileManager)
         try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.staging, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
@@ -114,10 +129,10 @@ final class RimeService: @unchecked Sendable {
             paths.prebuiltData.path,
             paths.staging.path,
             paths.logs.path,
-            "风语",
-            "rime_input_method",
+            "windwhisper",
+            "windwhisper",
             "0.2.0",
-            "rime.rime_input_method",
+            "windwhisper.input_method",
         ])
         var configuration = RBServiceConfiguration(
             shared_data_dir: UnsafePointer(strings.values[0]),
@@ -139,6 +154,26 @@ final class RimeService: @unchecked Sendable {
         }
         handle = createdHandle
         version = rb_service_version(createdHandle).map(String.init(cString:)) ?? "unknown"
+    }
+
+    private static func migrateLegacyUserDataIfNeeded(
+        at paths: RimeServicePaths,
+        using fileManager: FileManager
+    ) throws {
+        guard !fileManager.fileExists(atPath: paths.userData.path) else {
+            return
+        }
+        guard let source = paths.legacyUserData.first(where: {
+            fileManager.fileExists(atPath: $0.path)
+        }) else {
+            return
+        }
+
+        try fileManager.createDirectory(
+            at: paths.userData.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try fileManager.copyItem(at: source, to: paths.userData)
     }
 
     deinit {

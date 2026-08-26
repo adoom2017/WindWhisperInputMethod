@@ -3,8 +3,8 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
-application_path="${1:-$project_root/build/DerivedData/Build/Products/Debug/RimeInputMethod.app}"
-executable="$application_path/Contents/MacOS/RimeInputMethod"
+application_path="${1:-$project_root/build/DerivedData/Build/Products/Debug/windwhisper.app}"
+executable="$application_path/Contents/MacOS/windwhisper"
 library="$application_path/Contents/Frameworks/librime.1.dylib"
 
 if [[ ! -x "$executable" || ! -f "$library" ]]; then

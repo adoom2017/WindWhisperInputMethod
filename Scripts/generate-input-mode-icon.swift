@@ -29,13 +29,13 @@ context.beginPDFPage(nil)
 // Draw a black rounded input-source badge and punch the glyph out of its alpha
 // mask. It therefore reads as black-on-white normally and remains legible when
 // macOS tints the badge for a selected menu row.
-let font = CTFontCreateWithName("PingFangSC-Semibold" as CFString, 32, nil)
-let characters: [UniChar] = Array("风".utf16)
+let font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, 32, nil)
+let characters: [UniChar] = Array("w".utf16)
 var glyphs = [CGGlyph](repeating: 0, count: characters.count)
 guard CTFontGetGlyphsForCharacters(font, characters, &glyphs, characters.count),
       let glyph = glyphs.first,
       let outline = CTFontCreatePathForGlyph(font, glyph, nil) else {
-    fputs("Unable to create the FengYu menu glyph.\n", stderr)
+    fputs("Unable to create the windwhisper menu glyph.\n", stderr)
     exit(1)
 }
 
@@ -51,7 +51,7 @@ var transform = CGAffineTransform(
     ty: mediaBox.midY - bounds.midY * scale
 )
 guard let centeredOutline = outline.copy(using: &transform) else {
-    fputs("Unable to center the FengYu menu glyph.\n", stderr)
+    fputs("Unable to center the windwhisper menu glyph.\n", stderr)
     exit(1)
 }
 

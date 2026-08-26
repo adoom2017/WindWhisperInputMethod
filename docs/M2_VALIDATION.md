@@ -33,7 +33,7 @@ sessionLifecycle=passed
 - Release 主程序与内嵌 librime：arm64 + x86_64。
 - Debug/Release 均通过 `codesign --verify --deep --strict`。
 - `xcodebuild analyze` Debug 通过，无项目代码分析问题。
-- 已将 Debug 热更新到 `~/Library/Input Methods/RimeInputMethod.app`，嵌套 dylib 先签、app 后签；注册、启用、临时切换和恢复鼠须管成功，无注销、无重启、无上传。
+- 当前 Debug 安装目标为 `~/Library/Input Methods/windwhisper.app`，嵌套 dylib 先签、app 后签；新 Bundle 身份首次启用需要 macOS 人工授权。
 - 已安装 bundle 再次独立运行同一 M2 smoke，全部断言通过。
 
 ## 未包含

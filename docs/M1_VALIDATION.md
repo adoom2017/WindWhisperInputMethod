@@ -40,6 +40,6 @@ arch -x86_64 <Release app executable> --diagnose
 - 已执行第二次完整构建和热替换，注册、启用、临时选择、恢复原输入法全流程再次成功；未注销、未重启、未上传构建包。
 - 原生 `NSTextView` 测试宿主通过当前 `NSTextInputContext` 输入 `abc`，结果保持为 `abc`，证明 passthrough 不吞键。
 - 自动控制 TextEdit 被系统辅助功能权限拒绝，因此没有为了测试扩大权限；当前输入源已恢复为 `im.rime.inputmethod.Squirrel.Hans`。
-- 本机安装位于 `~/Library/Input Methods/RimeInputMethod.app`，主程序仅包含 arm64。
+- 当前本机安装目标为 `~/Library/Input Methods/windwhisper.app`；Debug 主程序仅包含 arm64。
 
 本机开发安装流程已验收完成，不需要 Apple 公证凭据。M1 仅保留用户在 TextEdit 中人工输入一段文字的最终确认。

@@ -13,7 +13,7 @@
 		A10000000000000000000004 /* InputSourceMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* InputSourceMetadata.swift */; };
 		A10000000000000000000005 /* MaintenanceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* MaintenanceCommand.swift */; };
 		A10000000000000000000006 /* InputSourceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* InputSourceManager.swift */; };
-		A10000000000000000000007 /* FengYuInputModeIcon.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* FengYuInputModeIcon.pdf */; };
+		A10000000000000000000007 /* WindWhisperInputIcon-v1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */; };
 		A10000000000000000000008 /* zh_CN.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* zh_CN.lproj */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Assets.xcassets */; };
 		A1000000000000000000000A /* RimeBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* RimeBridge.c */; };
@@ -28,7 +28,6 @@
 		A10000000000000000000013 /* M3SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* M3SmokeTest.swift */; };
 		A10000000000000000000014 /* zh-Hans.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* zh-Hans.lproj */; };
 		A10000000000000000000015 /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* en.lproj */; };
-		A10000000000000000000016 /* FengYuInputSwitcherIcon-v1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */; };
 		A10000000000000000000017 /* CandidateWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001B /* CandidateWindowController.swift */; };
 		A10000000000000000000018 /* CandidateWindowPositioner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001C /* CandidateWindowPositioner.swift */; };
 		A10000000000000000000019 /* M4SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001D /* M4SmokeTest.swift */; };
@@ -63,9 +62,9 @@
 		A20000000000000000000004 /* InputSourceMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceMetadata.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* MaintenanceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceCommand.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A20000000000000000000007 /* RimeInputMethod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RimeInputMethod.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A20000000000000000000007 /* windwhisper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = windwhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A20000000000000000000008 /* InputSourceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceManager.swift; sourceTree = "<group>"; };
-		A20000000000000000000009 /* FengYuInputModeIcon.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = FengYuInputModeIcon.pdf; sourceTree = "<group>"; };
+		A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "WindWhisperInputIcon-v1.pdf"; sourceTree = "<group>"; };
 		A2000000000000000000000A /* zh_CN.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = zh_CN.lproj; sourceTree = "<group>"; };
 		A2000000000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A2000000000000000000000C /* RimeBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RimeBridge.c; sourceTree = "<group>"; };
@@ -82,7 +81,6 @@
 		A20000000000000000000017 /* M3SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M3SmokeTest.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* zh-Hans.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "zh-Hans.lproj"; sourceTree = "<group>"; };
 		A20000000000000000000019 /* en.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = en.lproj; sourceTree = "<group>"; };
-		A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "FengYuInputSwitcherIcon-v1.pdf"; sourceTree = "<group>"; };
 		A2000000000000000000001B /* CandidateWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowController.swift; sourceTree = "<group>"; };
 		A2000000000000000000001C /* CandidateWindowPositioner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowPositioner.swift; sourceTree = "<group>"; };
 		A2000000000000000000001D /* M4SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M4SmokeTest.swift; sourceTree = "<group>"; };
@@ -165,8 +163,7 @@
 			isa = PBXGroup;
 			children = (
 				A20000000000000000000006 /* Info.plist */,
-				A20000000000000000000009 /* FengYuInputModeIcon.pdf */,
-				A2000000000000000000001A /* FengYuInputSwitcherIcon-v1.pdf */,
+				A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */,
 				A2000000000000000000000B /* Assets.xcassets */,
 				A20000000000000000000013 /* Rime */,
 				A2000000000000000000000A /* zh_CN.lproj */,
@@ -179,7 +176,7 @@
 		A40000000000000000000007 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000007 /* RimeInputMethod.app */,
+				A20000000000000000000007 /* windwhisper.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -258,9 +255,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A50000000000000000000001 /* RimeInputMethod */ = {
+		A50000000000000000000001 /* windwhisper */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "RimeInputMethod" */;
+			buildConfigurationList = A90000000000000000000002 /* Build configuration list for PBXNativeTarget "windwhisper" */;
 			buildPhases = (
 				A60000000000000000000001 /* Sources */,
 				A30000000000000000000001 /* Frameworks */,
@@ -271,9 +268,9 @@
 			);
 			dependencies = (
 			);
-			name = RimeInputMethod;
-			productName = RimeInputMethod;
-			productReference = A20000000000000000000007 /* RimeInputMethod.app */;
+			name = windwhisper;
+			productName = windwhisper;
+			productReference = A20000000000000000000007 /* windwhisper.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -291,7 +288,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "RimeInputMethod" */;
+			buildConfigurationList = A90000000000000000000001 /* Build configuration list for PBXProject "windwhisper" */;
 			compatibilityVersion = "Xcode 15.0";
 			developmentRegion = zh_CN;
 			hasScannedForEncodings = 0;
@@ -306,7 +303,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A50000000000000000000001 /* RimeInputMethod */,
+				A50000000000000000000001 /* windwhisper */,
 			);
 		};
 /* End PBXProject section */
@@ -316,13 +313,12 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A10000000000000000000007 /* FengYuInputModeIcon.pdf in Resources */,
+				A10000000000000000000007 /* WindWhisperInputIcon-v1.pdf in Resources */,
 				A10000000000000000000008 /* zh_CN.lproj in Resources */,
 				A10000000000000000000009 /* Assets.xcassets in Resources */,
 				A10000000000000000000010 /* Rime in Resources */,
 				A10000000000000000000014 /* zh-Hans.lproj in Resources */,
 				A10000000000000000000015 /* en.lproj in Resources */,
-				A10000000000000000000016 /* FengYuInputSwitcherIcon-v1.pdf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -422,9 +418,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.fengyu.local;
-				PRODUCT_MODULE_NAME = RimeInputMethod;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.windwhisper.local;
+				PRODUCT_MODULE_NAME = windwhisper;
+				PRODUCT_NAME = windwhisper;
 				SKIP_INSTALL = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RimeBridge/RimeBridge-Bridging-Header.h";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -450,9 +446,9 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.fengyu.local;
-				PRODUCT_MODULE_NAME = RimeInputMethod;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.windwhisper.local;
+				PRODUCT_MODULE_NAME = windwhisper;
+				PRODUCT_NAME = windwhisper;
 				SKIP_INSTALL = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RimeBridge/RimeBridge-Bridging-Header.h";
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -462,7 +458,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A90000000000000000000001 /* Build configuration list for PBXProject "RimeInputMethod" */ = {
+		A90000000000000000000001 /* Build configuration list for PBXProject "windwhisper" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA0000000000000000000001 /* Debug */,
@@ -471,7 +467,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "RimeInputMethod" */ = {
+		A90000000000000000000002 /* Build configuration list for PBXNativeTarget "windwhisper" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA0000000000000000000003 /* Debug */,

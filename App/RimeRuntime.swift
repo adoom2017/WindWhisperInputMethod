@@ -53,7 +53,7 @@ final class RimeRuntime: @unchecked Sendable {
         guard start() else {
             throw RimeBridgeError.bridge(
                 code: -1,
-                message: startupErrorDescription ?? "librime service could not be started."
+                message: startupErrorDescription ?? "The input engine could not be started."
             )
         }
 
@@ -61,7 +61,7 @@ final class RimeRuntime: @unchecked Sendable {
         let service = self.service
         stateLock.unlock()
         guard let service else {
-            throw RimeBridgeError.bridge(code: -1, message: "librime service is unavailable.")
+            throw RimeBridgeError.bridge(code: -1, message: "The input engine is unavailable.")
         }
         let session = try service.makeSession()
         try FengYuSettingsStore.shared.snapshot.apply(to: session)
@@ -72,14 +72,14 @@ final class RimeRuntime: @unchecked Sendable {
         guard start() else {
             throw RimeBridgeError.bridge(
                 code: -1,
-                message: startupErrorDescription ?? "librime service could not be started."
+                message: startupErrorDescription ?? "The input engine could not be started."
             )
         }
         stateLock.lock()
         let service = self.service
         stateLock.unlock()
         guard let service else {
-            throw RimeBridgeError.bridge(code: -1, message: "librime service is unavailable.")
+            throw RimeBridgeError.bridge(code: -1, message: "The input engine is unavailable.")
         }
         try service.deploy(fullCheck: fullCheck)
     }

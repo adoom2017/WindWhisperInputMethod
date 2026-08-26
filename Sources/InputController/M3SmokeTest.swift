@@ -5,7 +5,7 @@ import Foundation
 enum M3SmokeTest {
     static func run() -> Int32 {
         let temporaryRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RimeInputMethod-M3-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("windwhisper-M3-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: temporaryRoot) }
 
         do {
@@ -469,7 +469,7 @@ final class M3InputClientDouble: NSObject, IMKTextInput {
     }
 
     func uniqueClientIdentifierString() -> String! {
-        "RimeInputMethod-M3-Smoke"
+        "windwhisper-M3-Smoke"
     }
 
     func string(from range: NSRange, actualRange: NSRangePointer!) -> String! {

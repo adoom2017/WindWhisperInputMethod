@@ -4,7 +4,7 @@ import Foundation
 enum M4SmokeTest {
     static func run() -> Int32 {
         let temporaryRoot = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RimeInputMethod-M4-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("windwhisper-M4-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: temporaryRoot) }
 
         do {

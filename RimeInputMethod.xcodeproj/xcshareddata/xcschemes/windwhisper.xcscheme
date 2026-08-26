@@ -16,8 +16,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A50000000000000000000001"
-               BuildableName = "RimeInputMethod.app"
-               BlueprintName = "RimeInputMethod"
+               BuildableName = "windwhisper.app"
+               BlueprintName = "windwhisper"
                ReferencedContainer = "container:RimeInputMethod.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -43,8 +43,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A50000000000000000000001"
-            BuildableName = "RimeInputMethod.app"
-            BlueprintName = "RimeInputMethod"
+            BuildableName = "windwhisper.app"
+            BlueprintName = "windwhisper"
             ReferencedContainer = "container:RimeInputMethod.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -59,8 +59,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A50000000000000000000001"
-            BuildableName = "RimeInputMethod.app"
-            BlueprintName = "RimeInputMethod"
+            BuildableName = "windwhisper.app"
+            BlueprintName = "windwhisper"
             ReferencedContainer = "container:RimeInputMethod.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -72,4 +72,3 @@
       revealArchiveInOrganizer = "YES">
    </ArchiveAction>
 </Scheme>
-

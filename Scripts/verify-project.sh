@@ -4,12 +4,12 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 info_plist="$project_root/Resources/Info.plist"
-expected_bundle_id="com.shendongchun.inputmethod.fengyu.local"
+expected_bundle_id="com.shendongchun.inputmethod.windwhisper.local"
 expected_mode_id="$expected_bundle_id.Hans"
 legacy_mode_id="com.shendongchun.inputmethod.rime.dev.Hans"
 older_mode_id="com.shendongchun.inputmethod.fengyu.Hans"
 transitional_mode_id="com.shendongchun.inputmethod.rime.dev.FengYuHans"
-expected_display_name="风语"
+expected_display_name="windwhisper"
 
 plutil -lint "$info_plist"
 
@@ -21,7 +21,7 @@ if [[ "$display_name" != "$expected_display_name" || "$bundle_name" != "$expecte
 fi
 
 if /usr/libexec/PlistBuddy -c 'Print :TICapsLockLanguageSwitchCapable' "$info_plist" >/dev/null 2>&1; then
-    echo "Caps Lock language switching must not be advertised; Rime owns modifier behavior." >&2
+    echo "Caps Lock language switching must not be advertised; the input engine owns modifier behavior." >&2
     exit 65
 fi
 
@@ -44,33 +44,39 @@ fi
 menu_icon="$(/usr/libexec/PlistBuddy -c "Print :ComponentInputModeDict:tsInputModeListKey:$expected_mode_id:tsInputModeMenuIconFileKey" "$info_plist")"
 alternate_icon="$(/usr/libexec/PlistBuddy -c "Print :ComponentInputModeDict:tsInputModeListKey:$expected_mode_id:tsInputModeAlternateMenuIconFileKey" "$info_plist")"
 palette_icon="$(/usr/libexec/PlistBuddy -c "Print :ComponentInputModeDict:tsInputModeListKey:$expected_mode_id:tsInputModePaletteIconFileKey" "$info_plist")"
-stable_input_source_icon="FengYuInputSwitcherIcon-v1.pdf"
+stable_input_source_icon="WindWhisperInputIcon-v1.pdf"
 if [[ "$menu_icon" != "$stable_input_source_icon" \
     || "$alternate_icon" != "$stable_input_source_icon" \
     || "$palette_icon" != "$stable_input_source_icon" ]]; then
-    echo "All input-source icon fields must use one stable FengYu resource." >&2
+    echo "All input-source icon fields must use one stable windwhisper resource." >&2
     exit 65
 fi
 
 for brand_file in \
-    "$project_root/Resources/Assets/FengYuIconMaster.png" \
+    "$project_root/Resources/Assets/WindWhisperIconMaster.png" \
 	"$project_root/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json" \
-	"$project_root/Resources/FengYuInputModeIcon.pdf" \
-	"$project_root/Resources/FengYuInputSwitcherIcon-v1.pdf"; do
+    "$project_root/Resources/WindWhisperInputIcon-v1.pdf"; do
     if [[ ! -f "$brand_file" ]]; then
-        echo "Required FengYu brand asset is missing: $brand_file" >&2
+        echo "Required windwhisper brand asset is missing: $brand_file" >&2
         exit 66
     fi
 done
 
-for localization in zh_CN zh-Hans en; do
+for localization in zh_CN zh-Hans; do
     localization_file="$project_root/Resources/$localization.lproj/InfoPlist.strings"
     localized_mode_name="$(/usr/libexec/PlistBuddy -c "Print :$expected_mode_id" "$localization_file")"
-    if [[ "$localized_mode_name" != "$expected_display_name" ]]; then
-        echo "Input mode name is not localized as $expected_display_name in $localization." >&2
+    if [[ "$localized_mode_name" != "风语" ]]; then
+        echo "Input mode name is not localized as 风语 in $localization." >&2
         exit 65
     fi
 done
+
+english_localization="$project_root/Resources/en.lproj/InfoPlist.strings"
+english_mode_name="$(/usr/libexec/PlistBuddy -c "Print :$expected_mode_id" "$english_localization")"
+if [[ "$english_mode_name" != "$expected_display_name" ]]; then
+    echo "English input mode name must be $expected_display_name." >&2
+    exit 65
+fi
 
 if grep -Eq 'Rime\.icns|Resources/InputModeIcon\.pdf' \
     "$info_plist" "$project_root/RimeInputMethod.xcodeproj/project.pbxproj"; then

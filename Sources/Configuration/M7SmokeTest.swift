@@ -24,6 +24,7 @@ enum M7SmokeTest {
         do {
             let result = try execute(arguments: arguments)
             print("settingsPersistence=passed")
+            print("legacyPreferenceMigration=passed")
             print("invalidPreferenceFallback=passed")
             print("multiSessionSynchronization=\(result.sessionCount)")
             print("compositionPreservation=passed")
@@ -35,7 +36,7 @@ enum M7SmokeTest {
             print("restoreDefaults=passed")
             return EXIT_SUCCESS
         } catch {
-            fputs("RimeInputMethod M7: \(error.localizedDescription)\n", stderr)
+            fputs("windwhisper M7: \(error.localizedDescription)\n", stderr)
             return EXIT_FAILURE
         }
     }
@@ -51,6 +52,8 @@ enum M7SmokeTest {
             throw RimeBridgeError.smokeAssertion("could not create isolated M7 preferences")
         }
         defer { defaults.removePersistentDomain(forName: suiteName) }
+
+        try verifyLegacyPreferenceMigration()
 
         let store = FengYuSettingsStore(defaults: defaults)
         guard store.snapshot == .defaults else {
@@ -111,6 +114,7 @@ enum M7SmokeTest {
         try verifyLayouts()
         try verifyMenu(store: store)
         try verifyDiagnostics(settings: store.snapshot)
+        try verifyUserFacingEngineError()
 
         guard let resources = Bundle.main.resourceURL else {
             throw RimeBridgeError.missingBundledData
@@ -119,7 +123,7 @@ enum M7SmokeTest {
         let explicitRoot = argumentValue(after: "--user-data-root", in: arguments)
         let root = explicitRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? FileManager.default.temporaryDirectory
-                .appendingPathComponent("RimeInputMethod-M7-\(UUID().uuidString)", isDirectory: true)
+                .appendingPathComponent("windwhisper-M7-\(UUID().uuidString)", isDirectory: true)
         let shouldRemoveRoot = explicitRoot == nil
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer {
@@ -202,6 +206,46 @@ enum M7SmokeTest {
         }
     }
 
+    private static func verifyLegacyPreferenceMigration() throws {
+        let suffix = UUID().uuidString
+        let currentSuiteName = "com.shendongchun.inputmethod.windwhisper.m7-current.\(suffix)"
+        let legacySuiteName = "com.shendongchun.inputmethod.windwhisper.m7-legacy.\(suffix)"
+        guard
+            let currentDefaults = UserDefaults(suiteName: currentSuiteName),
+            let legacyDefaults = UserDefaults(suiteName: legacySuiteName)
+        else {
+            throw RimeBridgeError.smokeAssertion("could not create migration preference suites")
+        }
+        defer {
+            currentDefaults.removePersistentDomain(forName: currentSuiteName)
+            legacyDefaults.removePersistentDomain(forName: legacySuiteName)
+        }
+
+        currentDefaults.set("flypy", forKey: "settings.schema.v2")
+        legacyDefaults.set("luna_pinyin", forKey: "settings.schema.v2")
+        legacyDefaults.set(true, forKey: "settings.fullWidth.v1")
+        legacyDefaults.set(false, forKey: "settings.simplified.v1")
+        legacyDefaults.set("vertical", forKey: "settings.candidateOrientation.v1")
+        legacyDefaults.set("dark", forKey: "settings.colorScheme.v1")
+
+        let snapshot = FengYuSettingsStore(
+            defaults: currentDefaults,
+            legacyDefaults: [legacyDefaults]
+        ).snapshot
+        guard
+            snapshot.schema == .flypy,
+            snapshot.usesFullWidth,
+            !snapshot.usesSimplifiedChinese,
+            snapshot.candidateOrientation == .vertical,
+            snapshot.colorScheme == .dark,
+            legacyDefaults.string(forKey: "settings.schema.v2") == "luna_pinyin"
+        else {
+            throw RimeBridgeError.smokeAssertion(
+                "legacy preferences were not migrated without overwriting current values"
+            )
+        }
+    }
+
     private static func verifyLayouts() throws {
         let model = CandidateWindowModel(
             menu: RimeMenuSnapshot(
@@ -278,7 +322,7 @@ enum M7SmokeTest {
             titles.contains("简体中文"),
             titles.contains("候选排列"),
             titles.contains("候选主题"),
-            titles.contains("重新部署 Rime"),
+            titles.contains("重新部署输入引擎"),
             titles.contains("打开用户目录"),
             titles.contains("查看脱敏诊断…"),
             titles.contains("恢复默认设置…"),
@@ -311,6 +355,11 @@ enum M7SmokeTest {
                 "M7 settings menu is incomplete or has an unroutable InputMethodKit command: \(details)"
             )
         }
+
+        let visibleText = ([controller.menu.title] + titles).joined(separator: "\n")
+        guard visibleText.contains("风语"), !visibleText.localizedCaseInsensitiveContains("Rime") else {
+            throw RimeBridgeError.smokeAssertion("settings menu contains a legacy product name")
+        }
     }
 
     @MainActor
@@ -335,6 +384,20 @@ enum M7SmokeTest {
             diagnostics.contains("startupErrorPresent=true")
         else {
             throw RimeBridgeError.smokeAssertion("diagnostics exposed sensitive content or paths")
+        }
+        guard
+            diagnostics.contains("风语脱敏诊断"),
+            !diagnostics.localizedCaseInsensitiveContains("Rime")
+        else {
+            throw RimeBridgeError.smokeAssertion("diagnostics contain a legacy product name")
+        }
+    }
+
+    private static func verifyUserFacingEngineError() throws {
+        let error = RimeBridgeError.bridge(code: -1, message: "Rime internal sentinel")
+        let message = error.localizedDescription
+        guard message.contains("Input engine"), !message.localizedCaseInsensitiveContains("Rime") else {
+            throw RimeBridgeError.smokeAssertion("user-facing engine errors expose an internal name")
         }
     }
 

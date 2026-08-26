@@ -61,7 +61,7 @@
 Release 构建固定生成 arm64 + x86_64 通用产物。构建结果位于：
 
 ```text
-build/DerivedData/Build/Products/<Configuration>/RimeInputMethod.app
+build/DerivedData/Build/Products/<Configuration>/windwhisper.app
 ```
 
 本机开发安装不需要 Apple 公证凭据。每次验证只需：
@@ -79,7 +79,7 @@ build/DerivedData/Build/Products/<Configuration>/RimeInputMethod.app
 
 卸载脚本不会直接删除应用，而是验证 Bundle ID 后移动到废纸篓。
 
-安装固定使用 `~/Library/Input Methods/RimeInputMethod.app`，并拒绝同 Bundle ID 的系统级重复副本。Debug 只包含 arm64，不会启动 Rosetta 或触发 Intel App 兼容提示；通用 Release 产物仍保留给后续分发验证。
+安装固定使用 `~/Library/Input Methods/windwhisper.app`，并拒绝同 Bundle ID 的系统级重复副本。首次从旧身份升级时，macOS 会要求在“系统设置 > 键盘 > 文本输入 > 编辑”中授权一次；授权完成前安装器会保留并恢复旧输入法，不会让当前输入源失效。Debug 只包含 arm64，不会启动 Rosetta 或触发 Intel App 兼容提示；通用 Release 产物仍保留给后续分发验证。
 
 ## 工程目录
 
@@ -109,10 +109,11 @@ RimeInputMethod/
 
 ## 已采用的工程标识
 
-- 产品显示名：风语
-- 内部工程名：`RimeInputMethod`（为保持安装、输入源注册和用户数据兼容而保留）
-- Bundle ID：`com.shendongchun.inputmethod.fengyu.local`
-- 简体输入模式 ID：`com.shendongchun.inputmethod.fengyu.local.Hans`
+- 中文显示名：风语
+- 英文名、构建目标与应用包：`windwhisper`
+- Xcode 工程容器：`RimeInputMethod.xcodeproj`（只作为源码工程文件名保留）
+- Bundle ID：`com.shendongchun.inputmethod.windwhisper.local`
+- 简体输入模式 ID：`com.shendongchun.inputmethod.windwhisper.local.Hans`
 - 最低版本：macOS 13
 - Release 架构：arm64 + x86_64
 
@@ -129,22 +130,33 @@ RimeInputMethod/
 - 其他方案：风语全拼、自然码、微软、智能 ABC 和仓颉五代均列在“输入方案”顶层分组中，可直接选择。
 - 通用辅码：在其他拼音方案中可先输入 `;`，再输入完整拼音和可选的仓颉首码，例如 `;zuok` 定位“左”。它与小鹤音形四码互不干扰。
 - 中英文：遵循原配置：左 Shift 为 `commit_code`，右 Shift、Caps Lock 不执行切换；Control/Option 快捷键交给 Rime 处理。
-- 用户词典和 `.custom.yaml` 继续保存在 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`；新的 `com.shendongchun.inputmethod.fengyu.local` Bundle 身份只用于系统注册，不迁移或覆盖用户数据。
+- 用户词典和 `.custom.yaml` 保存在 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/Data`。首次运行时若新目录尚不存在，会从旧目录 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime` 完整复制；旧目录保留不删，已有新目录也绝不会被迁移覆盖。
 - `/Users/shendongchun/Documents/rime-origin/build` 中的 `flypy.table.bin`、`flypy.prism.bin`、`flypy.reverse.bin` 已逐字节纳入应用，并在部署后强制恢复，避免 librime 重新生成改变候选行为。
 - 数据来源、固定提交、许可证和修改见 `Resources/Rime/DATA_LOCK.json`、`docs/RIME_DATA.md` 与 `LICENSES/`。
+
+## 添加自定义词
+
+默认“小鹤双拼（音形辅码）”可直接维护文本词库：
+
+1. 切换到“风语”，在输入法菜单选择“打开用户目录”。
+2. 用 UTF-8 纯文本编辑器打开 `flypy_user.txt`；普通自定义词加在这个文件末尾，需要置顶的词加到 `flypy_top.txt`。
+3. 每行写成 `词条<Tab>编码`，可选第三列权重，例如 `词条<Tab>编码<Tab>100`。分隔符必须是真正的 Tab，不能用空格替代。
+4. 保存后在输入法菜单选择“重新部署输入引擎”，新词即可生效。
+
+不要编辑用户目录内的 `build/`；它是可重新生成的部署结果。正常选词产生的词频学习会自动写入用户数据库，无需手工维护。当前手工文本入口针对默认小鹤方案，其他拼音方案仍会自动学习用户选词。
 
 ## 设置与维护
 
 - “全角字符”未勾选时为半角；“简体中文”未勾选时为传统汉字。
 - 候选排列可选横排或竖排；主题可跟随系统，或固定浅色/深色。降低透明度等系统辅助功能仍有最高优先级。
-- “重新部署 Rime”会先提交当前组合，再在后台部署配置；完成后自动恢复输入 session。
+- “重新部署输入引擎”会先提交当前组合，再在后台部署配置；完成后自动恢复输入 session。
 - “查看脱敏诊断”只显示版本、设置和目录是否存在，不包含按键、组合、候选、提交文本或完整用户路径。
 - “恢复默认设置”恢复小鹤双拼（音形辅码）、半角、简体、横排和跟随系统主题，不删除用户词典或 `.custom.yaml`。
 
 ## 品牌资源
 
-- 主应用图标：`Resources/Assets/FengYuIconMaster.png`
+- 主应用图标：`Resources/Assets/WindWhisperIconMaster.png`
 - macOS App Icon 资源：`Resources/Assets.xcassets/AppIcon.appiconset`
-- 输入源图标：菜单、`Control + Space` 切换器和 palette 统一使用 `Resources/FengYuInputSwitcherIcon-v1.pdf`（22×16pt 黑底白字）。统一资源标识可避免部分宿主在 macOS 光标输入源 HUD 中切换不同图标对象时触发系统兼容问题。
+- 输入源图标：菜单、`Control + Space` 切换器和 palette 统一使用 `Resources/WindWhisperInputIcon-v1.pdf`（22×16pt 黑底白字）。统一资源标识可避免部分宿主在 macOS 光标输入源 HUD 中切换不同图标对象时触发系统兼容问题。
 
 “风语”使用原创的风带与对话气泡组合标识，不使用 Rime/鼠须管图标或其视觉元素。

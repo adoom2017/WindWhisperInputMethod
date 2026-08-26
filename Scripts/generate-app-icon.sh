@@ -3,11 +3,11 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
-source_image="${1:-$project_root/Resources/Assets/FengYuIconMaster.png}"
+source_image="${1:-$project_root/Resources/Assets/WindWhisperIconMaster.png}"
 output_iconset="${2:-$project_root/Resources/Assets.xcassets/AppIcon.appiconset}"
 
 if [[ ! -f "$source_image" ]]; then
-    echo "FengYu icon master is missing: $source_image" >&2
+    echo "windwhisper icon master is missing: $source_image" >&2
     exit 66
 fi
 

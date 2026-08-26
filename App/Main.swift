@@ -3,7 +3,7 @@ import Foundation
 import InputMethodKit
 
 @main
-enum RimeInputMethodApplication {
+enum WindWhisperApplication {
     static func main() {
         if let exitCode = MaintenanceCommand.runIfRequested(arguments: CommandLine.arguments) {
             exit(exitCode)
@@ -18,12 +18,12 @@ enum RimeInputMethodApplication {
             ) as? String,
             !connectionName.isEmpty
         else {
-            fputs("RimeInputMethod: invalid input method metadata\n", stderr)
+            fputs("windwhisper: invalid input method metadata\n", stderr)
             exit(EXIT_FAILURE)
         }
 
         guard let server = IMKServer(name: connectionName, bundleIdentifier: bundleIdentifier) else {
-            fputs("RimeInputMethod: unable to start InputMethodKit server\n", stderr)
+            fputs("windwhisper: unable to start InputMethodKit server\n", stderr)
             exit(EXIT_FAILURE)
         }
 

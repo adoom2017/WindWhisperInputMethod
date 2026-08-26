@@ -54,7 +54,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - Staging/build：部署生成物，与源配置分离，可重建。
 - Logs：独立目录并可清理；默认不含输入明文。
 
-M2 已固定路径：shared data 为应用包的 `Contents/Resources/Rime`；user data 为 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`；staging 为 user data 下的 `build`；日志为 `~/Library/Logs/com.shendongchun.inputmethod.rime.dev`。命令行集成测试改用 `/private/tmp` 隔离根目录，不读写正式用户数据。
+当前路径：shared data 为应用包的 `Contents/Resources/Rime`；user data 为 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/Data`；staging 为 user data 下的 `build`；日志为 `~/Library/Logs/com.shendongchun.inputmethod.windwhisper.local`。新 user data 不存在时会从旧的 `com.shendongchun.inputmethod.rime.dev/Rime` 目录复制一次，源目录保留，已存在的新目录不覆盖。命令行集成测试改用 `/private/tmp` 隔离根目录，不读写正式用户数据。
 
 ## M2 桥接所有权
 

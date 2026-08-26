@@ -13,7 +13,7 @@ enum RimeSmokeTest {
             print("sessionLifecycle=passed")
             return EXIT_SUCCESS
         } catch {
-            fputs("RimeInputMethod: \(error.localizedDescription)\n", stderr)
+            fputs("windwhisper: \(error.localizedDescription)\n", stderr)
             return EXIT_FAILURE
         }
     }
@@ -45,7 +45,7 @@ enum RimeSmokeTest {
             shouldRemoveRoot = false
         } else {
             temporaryRoot = FileManager.default.temporaryDirectory
-                .appendingPathComponent("RimeInputMethod-M2-\(UUID().uuidString)", isDirectory: true)
+                .appendingPathComponent("windwhisper-M2-\(UUID().uuidString)", isDirectory: true)
             shouldRemoveRoot = true
         }
         try FileManager.default.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)

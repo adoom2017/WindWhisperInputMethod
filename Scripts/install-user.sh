@@ -4,16 +4,20 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 configuration="${1:-Debug}"
-source_app="$project_root/build/DerivedData/Build/Products/$configuration/RimeInputMethod.app"
+source_app="$project_root/build/DerivedData/Build/Products/$configuration/windwhisper.app"
 install_directory="$HOME/Library/Input Methods"
-installed_app="$install_directory/RimeInputMethod.app"
-installing_app="$install_directory/RimeInputMethod.installing"
-previous_app="$install_directory/RimeInputMethod.previous"
-failed_migration_app="$install_directory/FengYuInputMethod.app"
-system_app="/Library/Input Methods/RimeInputMethod.app"
-failed_system_app="/Library/Input Methods/FengYuInputMethod.app"
-expected_bundle_id="com.shendongchun.inputmethod.fengyu.local"
-input_mode_id="com.shendongchun.inputmethod.fengyu.local.Hans"
+installed_app="$install_directory/windwhisper.app"
+installing_app="$install_directory/windwhisper.installing"
+previous_app="$install_directory/windwhisper.previous"
+legacy_primary_app="$install_directory/RimeInputMethod.app"
+legacy_failed_app="$install_directory/FengYuInputMethod.app"
+system_app="/Library/Input Methods/windwhisper.app"
+legacy_system_app="/Library/Input Methods/RimeInputMethod.app"
+legacy_failed_system_app="/Library/Input Methods/FengYuInputMethod.app"
+expected_bundle_id="com.shendongchun.inputmethod.windwhisper.local"
+input_mode_id="com.shendongchun.inputmethod.windwhisper.local.Hans"
+legacy_current_bundle_id="com.shendongchun.inputmethod.fengyu.local"
+legacy_current_input_mode_id="com.shendongchun.inputmethod.fengyu.local.Hans"
 legacy_bundle_id="com.shendongchun.inputmethod.rime.dev"
 legacy_input_mode_id="com.shendongchun.inputmethod.rime.dev.Hans"
 failed_bundle_id="com.shendongchun.inputmethod.fengyu"
@@ -23,7 +27,7 @@ fallback_input_mode_id="com.apple.keylayout.ABC"
 lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 fail() {
-    echo "RimeInputMethod install failed: $*" >&2
+    echo "windwhisper install failed: $*" >&2
     exit 1
 }
 
@@ -40,8 +44,8 @@ if [[ "$actual_bundle_id" != "$expected_bundle_id" ]]; then
     fail "refusing unexpected bundle: $actual_bundle_id"
 fi
 
-if [[ -e "$system_app" || -e "$failed_system_app" ]]; then
-    fail "a system-wide FengYu/RimeInputMethod copy exists; keep exactly one development bundle"
+if [[ -e "$system_app" || -e "$legacy_system_app" || -e "$legacy_failed_system_app" ]]; then
+    fail "a system-wide windwhisper or legacy copy exists; keep exactly one development bundle"
 fi
 
 if [[ -e "$installing_app" || -e "$previous_app" ]]; then
@@ -68,36 +72,27 @@ done < <(
 /usr/bin/codesign --force --sign "$signing_identity" "$source_app"
 /usr/bin/codesign --verify --deep --strict "$source_app"
 
-previous_input_source="$($source_app/Contents/MacOS/RimeInputMethod --current-input-source)"
-if [[ "$previous_input_source" == "$legacy_input_mode_id" \
-    || "$previous_input_source" == "$failed_input_mode_id" \
-    || "$previous_input_source" == "$transitional_input_mode_id" ]]; then
-    "$source_app/Contents/MacOS/RimeInputMethod" \
+source_binary="$source_app/Contents/MacOS/windwhisper"
+original_input_source="$($source_binary --current-input-source)"
+if [[ "$original_input_source" == "$legacy_current_input_mode_id" \
+    || "$original_input_source" == "$legacy_input_mode_id" \
+    || "$original_input_source" == "$failed_input_mode_id" \
+    || "$original_input_source" == "$transitional_input_mode_id" ]]; then
+    "$source_binary" \
         --select-input-source-id "$fallback_input_mode_id"
-    previous_input_source="$fallback_input_mode_id"
 fi
-"$source_app/Contents/MacOS/RimeInputMethod" \
-    --disable-input-source-id "$legacy_input_mode_id" >/dev/null 2>&1 || true
-"$source_app/Contents/MacOS/RimeInputMethod" \
-    --disable-input-source-id "$legacy_bundle_id" >/dev/null 2>&1 || true
-"$source_app/Contents/MacOS/RimeInputMethod" \
-    --disable-input-source-id "$failed_input_mode_id" >/dev/null 2>&1 || true
-"$source_app/Contents/MacOS/RimeInputMethod" \
-    --disable-input-source-id "$transitional_input_mode_id" >/dev/null 2>&1 || true
-"$source_app/Contents/MacOS/RimeInputMethod" \
-    --disable-input-source-id "$failed_bundle_id" >/dev/null 2>&1 || true
 
 /bin/mkdir -p "$install_directory"
+/usr/bin/pkill -x windwhisper 2>/dev/null || true
 /usr/bin/pkill -x RimeInputMethod 2>/dev/null || true
 "$lsregister" -u "$source_app" 2>/dev/null || true
 "$lsregister" -u "$installed_app" 2>/dev/null || true
-"$lsregister" -u "$failed_migration_app" 2>/dev/null || true
 
 /bin/mv "$source_app" "$installing_app"
 restore_previous_install() {
     trap - ERR
-    if [[ -n "${previous_input_source:-}" && -x "${installed_binary:-}" ]]; then
-        "$installed_binary" --select-input-source-id "$previous_input_source" >/dev/null 2>&1 || true
+    if [[ -n "${original_input_source:-}" && -x "${installed_binary:-}" ]]; then
+        "$installed_binary" --select-input-source-id "$original_input_source" >/dev/null 2>&1 || true
     fi
     "$lsregister" -u "$installed_app" 2>/dev/null || true
     /bin/mkdir -p "$(/usr/bin/dirname "$source_app")"
@@ -110,9 +105,8 @@ restore_previous_install() {
         /bin/mv "$previous_app" "$installed_app"
         "$lsregister" -f "$installed_app" 2>/dev/null || true
     fi
-    if [[ -e "$failed_migration_app" ]]; then
-        "$lsregister" -f "$failed_migration_app" 2>/dev/null || true
-    fi
+    [[ ! -e "$legacy_primary_app" ]] || "$lsregister" -f "$legacy_primary_app" 2>/dev/null || true
+    [[ ! -e "$legacy_failed_app" ]] || "$lsregister" -f "$legacy_failed_app" 2>/dev/null || true
 }
 trap restore_previous_install ERR
 
@@ -121,7 +115,7 @@ if [[ -e "$installed_app" ]]; then
 fi
 /bin/mv "$installing_app" "$installed_app"
 
-installed_binary="$installed_app/Contents/MacOS/RimeInputMethod"
+installed_binary="$installed_app/Contents/MacOS/windwhisper"
 "$lsregister" -f "$installed_app"
 "$installed_binary" --register-input-source
 
@@ -142,7 +136,7 @@ for _ in {1..60}; do
 done
 if [[ "$parent_status" != *"found=true"* ]]; then
     echo "$parent_status"
-    echo "RimeInputMethod install failed: macOS did not expose parent input method $expected_bundle_id" >&2
+    echo "windwhisper install failed: macOS did not expose parent input method $expected_bundle_id" >&2
     false
 fi
 
@@ -156,7 +150,7 @@ for _ in {1..60}; do
 done
 if [[ "$input_source_status" != *"found=true"* ]]; then
     echo "$input_source_status"
-    echo "RimeInputMethod install failed: macOS did not expose input mode $input_mode_id" >&2
+    echo "windwhisper install failed: macOS did not expose input mode $input_mode_id" >&2
     false
 fi
 
@@ -167,7 +161,7 @@ enabled_third_party_sources="$(
 authorization_required=false
 if [[ "$enabled_third_party_sources" != *"$input_mode_id"* ]]; then
     authorization_required=true
-    echo "macOS authorization is required for the new FengYu input-source identity."
+    echo "macOS authorization is required for the new windwhisper input-source identity."
 fi
 
 if [[ "$authorization_required" == false ]]; then
@@ -181,7 +175,7 @@ if [[ "$authorization_required" == false ]]; then
         /bin/sleep 0.5
     done
     if [[ "$input_source_status" != *"enabled=true"* ]]; then
-        echo "RimeInputMethod install failed: authorized input mode did not become enabled" >&2
+        echo "windwhisper install failed: authorized input mode did not become enabled" >&2
         false
     fi
 
@@ -204,20 +198,44 @@ if [[ "$authorization_required" == false ]]; then
     fi
 fi
 
-if [[ -n "$previous_input_source" \
-    && "$previous_input_source" != "$input_mode_id" \
-    && "$previous_input_source" != "$legacy_input_mode_id" \
-    && "$previous_input_source" != "$failed_input_mode_id" \
-    && "$previous_input_source" != "$transitional_input_mode_id" ]]; then
-    "$installed_binary" --select-input-source-id "$previous_input_source" >/dev/null || true
-fi
+if [[ "$authorization_required" == false ]]; then
+    for legacy_identifier in \
+        "$legacy_current_input_mode_id" \
+        "$legacy_current_bundle_id" \
+        "$legacy_input_mode_id" \
+        "$legacy_bundle_id" \
+        "$failed_input_mode_id" \
+        "$transitional_input_mode_id" \
+        "$failed_bundle_id"; do
+        "$installed_binary" \
+            --disable-input-source-id "$legacy_identifier" >/dev/null 2>&1 || true
+    done
 
-if [[ -e "$failed_migration_app" ]]; then
-    failed_migration_directory="$project_root/build/FailedMigration"
-    failed_migration_backup="$failed_migration_directory/FengYuInputMethod-$build_version.app"
-    /bin/mkdir -p "$failed_migration_directory"
-    /bin/mv "$failed_migration_app" "$failed_migration_backup"
-    echo "Preserved failed migration bundle at: $failed_migration_backup"
+    if [[ -n "$original_input_source" \
+        && "$original_input_source" != "$input_mode_id" \
+        && "$original_input_source" != "$legacy_current_input_mode_id" \
+        && "$original_input_source" != "$legacy_input_mode_id" \
+        && "$original_input_source" != "$failed_input_mode_id" \
+        && "$original_input_source" != "$transitional_input_mode_id" ]]; then
+        "$installed_binary" --select-input-source-id "$original_input_source" >/dev/null || true
+    fi
+
+    legacy_backup_directory="$project_root/build/LegacyInputMethods"
+    for legacy_app in "$legacy_primary_app" "$legacy_failed_app"; do
+        if [[ -e "$legacy_app" ]]; then
+            "$lsregister" -u "$legacy_app" 2>/dev/null || true
+            /bin/mkdir -p "$legacy_backup_directory"
+            legacy_name="$(/usr/bin/basename "$legacy_app" .app)"
+            legacy_backup="$legacy_backup_directory/$legacy_name-$build_version.app"
+            /bin/mv "$legacy_app" "$legacy_backup"
+            echo "Preserved legacy input method at: $legacy_backup"
+        fi
+    done
+else
+    if [[ -n "$original_input_source" ]]; then
+        "$installed_binary" --select-input-source-id "$original_input_source" >/dev/null 2>&1 || true
+    fi
+    echo "The installed legacy input method was kept active until windwhisper is authorized."
 fi
 
 if [[ -e "$previous_app" ]]; then
@@ -228,7 +246,7 @@ trap - ERR
 echo "$input_source_status"
 if [[ "$authorization_required" == true ]]; then
     echo "Installed with a fresh identity: $installed_app"
-    echo "Add FengYu in System Settings > Keyboard > Text Input > Edit before selecting it."
+    echo "Add windwhisper in System Settings > Keyboard > Text Input > Edit before selecting it."
 else
     echo "Installed and enabled without logout: $installed_app"
 fi

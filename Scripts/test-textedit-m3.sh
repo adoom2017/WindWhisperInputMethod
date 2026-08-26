@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-installed_binary="$HOME/Library/Input Methods/RimeInputMethod.app/Contents/MacOS/RimeInputMethod"
+installed_binary="$HOME/Library/Input Methods/windwhisper.app/Contents/MacOS/windwhisper"
 expected_text="你好"
 previous_input_source=""
 
@@ -17,7 +17,7 @@ restore_input_source() {
 trap restore_input_source EXIT
 
 if [[ ! -x "$installed_binary" ]]; then
-    echo "Installed RimeInputMethod binary is missing." >&2
+    echo "Installed windwhisper binary is missing." >&2
     exit 1
 fi
 

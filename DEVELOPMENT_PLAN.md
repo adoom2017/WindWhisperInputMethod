@@ -49,8 +49,8 @@
 
 | 编号 | 决策 | 建议默认值 | 影响 |
 |---|---|---|---|
-| D-01 | 产品显示名称 | 已采用“风语”；内部工程名保持 `RimeInputMethod` | 菜单、安装路径、资源命名 |
-| D-02 | Bundle ID | 开发版采用 `com.shendongchun.inputmethod.rime.dev` | macOS 26 注册、签名、输入源 ID、升级兼容 |
+| D-01 | 产品显示名称 | 中文显示“风语”，英文名与构建产物使用 `windwhisper` | 菜单、安装路径、资源命名 |
+| D-02 | Bundle ID | 开发版采用 `com.shendongchun.inputmethod.windwhisper.local` | macOS 26 注册、签名、输入源 ID、升级兼容 |
 | D-03 | 最低 macOS | 已采用 macOS 13 | API 可用性、测试矩阵 |
 | D-04 | 架构 | 已采用 arm64 + x86_64 通用 Release | librime 产物、包体、CI |
 | D-05 | 默认输入方案 | 已采用“小鹤双拼（音形辅码）”，纯音码保留可选 | 首次使用体验 |

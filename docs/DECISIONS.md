@@ -187,6 +187,15 @@
 - 选择：Bundle ID 与模式 ID 一并迁移到全新的 `com.shendongchun.inputmethod.fengyu.local` 和 `.Hans`，使用稳定 Apple Development 证书，并接受 macOS 对新第三方输入法进行一次人工授权。连接名同步迁移，避免复用旧服务身份。
 - 数据：`persistentDataIdentifier` 继续使用 `com.shendongchun.inputmethod.rime.dev`，保留原用户词典、配置与日志目录；安装器禁用旧父/子输入源，但不会删除用户数据。
 
+### ADR-029：品牌身份统一为 windwhisper，并安全复制旧数据
+
+- 日期：2026-08-26
+- 状态：已接受，替代 ADR-028 的身份与数据路径选择
+- 品牌：中文界面显示“风语”，英文资源、构建目标、应用包和可执行文件使用 `windwhisper`；用户界面不显示旧内核品牌名。
+- 身份：Bundle ID 为 `com.shendongchun.inputmethod.windwhisper.local`，输入模式 ID 为其 `.Hans` 子项。新身份需要 macOS 首次人工授权。
+- 数据：正式 user data 改为 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/Data`。仅当目标不存在时从旧目录复制，源目录保留，已有目标不覆盖；偏好设置同样只迁移新 suite 中缺失的 key。
+- 安装：先并存注册新应用并检查授权；新输入源启用成功后才禁用和归档旧应用。授权尚未完成时保留旧应用，并恢复安装前选中的旧输入源。
+
 ## 待用户确认
 
 - ADR-013：正式发布签名、notarization 与分发渠道。

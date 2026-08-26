@@ -24,7 +24,7 @@ enum MaintenanceCommand {
             return updateInputSource(action: "disable") { $0.disable() }
         case "--disable-input-source-id":
             guard arguments.count == 3 else {
-                fputs("RimeInputMethod: --disable-input-source-id requires one identifier\n", stderr)
+                fputs("windwhisper: --disable-input-source-id requires one identifier\n", stderr)
                 return EXIT_FAILURE
             }
             return updateInputSource(
@@ -40,7 +40,7 @@ enum MaintenanceCommand {
             return updateInputSource(action: "select") { $0.select() }
         case "--select-input-source-id":
             guard arguments.count == 3 else {
-                fputs("RimeInputMethod: --select-input-source-id requires one identifier\n", stderr)
+                fputs("windwhisper: --select-input-source-id requires one identifier\n", stderr)
                 return EXIT_FAILURE
             }
             return updateInputSource(
@@ -61,7 +61,7 @@ enum MaintenanceCommand {
         case "--diagnose":
             printDiagnostics()
             return EXIT_SUCCESS
-        case "--rime-smoke":
+        case "--engine-smoke":
             return RimeSmokeTest.run(arguments: arguments)
         case "--m3-smoke":
             return M3SmokeTest.run()
@@ -87,7 +87,7 @@ enum MaintenanceCommand {
             printHelp()
             return EXIT_SUCCESS
         default:
-            fputs("RimeInputMethod: unknown command: \(command)\n", stderr)
+            fputs("windwhisper: unknown command: \(command)\n", stderr)
             printHelp()
             return EXIT_FAILURE
         }
@@ -96,7 +96,7 @@ enum MaintenanceCommand {
     private static func registerInputSource() -> Int32 {
         let status = InputSourceManager().registerCurrentBundle()
         guard status == noErr else {
-            fputs("RimeInputMethod: TISRegisterInputSource failed (status \(status))\n", stderr)
+            fputs("windwhisper: TISRegisterInputSource failed (status \(status))\n", stderr)
             return EXIT_FAILURE
         }
 
@@ -110,11 +110,11 @@ enum MaintenanceCommand {
         operation: (InputSourceManager) -> OSStatus?
     ) -> Int32 {
         guard let status = operation(manager) else {
-            fputs("RimeInputMethod: input source not found\n", stderr)
+            fputs("windwhisper: input source not found\n", stderr)
             return EXIT_FAILURE
         }
         guard status == noErr else {
-            fputs("RimeInputMethod: \(action) failed (status \(status))\n", stderr)
+            fputs("windwhisper: \(action) failed (status \(status))\n", stderr)
             return EXIT_FAILURE
         }
         print("Input source action succeeded: \(action)")
@@ -161,7 +161,7 @@ enum MaintenanceCommand {
     private static func printHelp() {
         print(
             """
-            Usage: RimeInputMethod [command]
+            Usage: windwhisper [command]
 
               --register-input-source  Register this installed bundle with macOS
               --enable-input-source    Enable the Simplified Chinese input mode
@@ -175,7 +175,7 @@ enum MaintenanceCommand {
               --input-method-parent-status Print parent registration state
               --current-input-source   Print the current keyboard input source ID
               --diagnose               Print non-sensitive bundle diagnostics
-              --rime-smoke             Run the isolated librime M2 integration test
+              --engine-smoke           Run the isolated input-engine M2 integration test
               --m3-smoke               Run the M3 key mapping and composition test
               --m4-smoke               Run the M4 candidate window and interaction test
               --m5-smoke               Run the M5 native material and layout test

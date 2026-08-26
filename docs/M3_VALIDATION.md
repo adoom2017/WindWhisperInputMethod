@@ -33,7 +33,7 @@ inputClientFlow=passed
 
 M2 回归项也全部通过：librime 版本、schema、候选、提交、UTF-8/UTF-16 范围转换和 session 生命周期。`xcodebuild analyze` 成功，项目元数据、运行时依赖、架构和签名检查成功。
 
-最终 Debug 构建已安装到 `~/Library/Input Methods/RimeInputMethod.app`。安装过程只使用本地 ad-hoc 签名和当前会话热刷新，没有注销、重启、Apple 公证或构建上传；安装后恢复了鼠须管输入源。
+当前 Debug 构建安装目标为 `~/Library/Input Methods/windwhisper.app`。安装过程使用本地签名和当前会话热刷新，不涉及注销、重启、Apple 公证或构建上传；新 Bundle 身份首次启用需要 macOS 人工授权。
 
 ## 尚待人工确认
 

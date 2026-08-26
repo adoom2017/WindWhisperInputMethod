@@ -7,13 +7,13 @@
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleDisplayName</key>
-	<string>风语</string>
+	<string>windwhisper</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>风语</string>
+	<string>windwhisper</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleSignature</key>
@@ -26,10 +26,10 @@
 	<dict>
 		<key>tsInputModeListKey</key>
 		<dict>
-			<key>com.shendongchun.inputmethod.fengyu.local.Hans</key>
+			<key>com.shendongchun.inputmethod.windwhisper.local.Hans</key>
 			<dict>
 				<key>TISInputSourceID</key>
-				<string>com.shendongchun.inputmethod.fengyu.local.Hans</string>
+				<string>com.shendongchun.inputmethod.windwhisper.local.Hans</string>
 				<key>TISIntendedLanguage</key>
 				<string>zh-Hans</string>
 				<key>tsInputModeCharacterRepertoireKey</key>
@@ -40,15 +40,15 @@
 				<key>tsInputModeDefaultStateKey</key>
 				<true/>
 				<key>tsInputModeAlternateMenuIconFileKey</key>
-				<string>FengYuInputSwitcherIcon-v1.pdf</string>
+				<string>WindWhisperInputIcon-v1.pdf</string>
 				<key>tsInputModeIsVisibleKey</key>
 				<true/>
 				<key>tsInputModeKeyEquivalentModifiersKey</key>
 				<integer>4608</integer>
 				<key>tsInputModeMenuIconFileKey</key>
-				<string>FengYuInputSwitcherIcon-v1.pdf</string>
+				<string>WindWhisperInputIcon-v1.pdf</string>
 				<key>tsInputModePaletteIconFileKey</key>
-				<string>FengYuInputSwitcherIcon-v1.pdf</string>
+				<string>WindWhisperInputIcon-v1.pdf</string>
 				<key>tsInputModePrimaryInScriptKey</key>
 				<true/>
 				<key>tsInputModeScriptKey</key>
@@ -57,15 +57,15 @@
 		</dict>
 		<key>tsVisibleInputModeOrderedArrayKey</key>
 		<array>
-			<string>com.shendongchun.inputmethod.fengyu.local.Hans</string>
+			<string>com.shendongchun.inputmethod.windwhisper.local.Hans</string>
 		</array>
 	</dict>
 	<key>InputMethodConnectionName</key>
-	<string>FengYu_Local_Connection</string>
+	<string>WindWhisper_Local_Connection</string>
 	<key>InputMethodServerControllerClass</key>
-	<string>RimeInputMethod.RimeInputController</string>
+	<string>windwhisper.RimeInputController</string>
 	<key>InputMethodServerDelegateClass</key>
-	<string>RimeInputMethod.RimeInputController</string>
+	<string>windwhisper.RimeInputController</string>
 	<key>LSBackgroundOnly</key>
 	<false/>
 	<key>LSUIElement</key>
@@ -73,6 +73,6 @@
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>TISInputSourceID</key>
-	<string>com.shendongchun.inputmethod.fengyu.local</string>
+	<string>com.shendongchun.inputmethod.windwhisper.local</string>
 </dict>
 </plist>
