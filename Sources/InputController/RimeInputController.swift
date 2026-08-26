@@ -38,7 +38,66 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     }
 
     override func menu() -> NSMenu! {
-        FengYuSettingsMenuController.shared.menu
+        let menu = FengYuSettingsMenuController.shared.menu
+        bindMenuTargets(in: menu)
+        return menu
+    }
+
+    private func bindMenuTargets(in menu: NSMenu) {
+        for item in menu.items {
+            if let submenu = item.submenu {
+                bindMenuTargets(in: submenu)
+            } else if item.action != nil {
+                // A nil target relies on TextInputMenuAgent's responder chain,
+                // which does not include this out-of-process input controller
+                // on current macOS releases. Bind every leaf command to the
+                // active controller; doCommand remains the XPC fallback path.
+                item.target = self
+            }
+        }
+    }
+
+    override func doCommand(
+        by selector: Selector!,
+        command infoDictionary: [AnyHashable: Any]!
+    ) {
+        guard let selector else {
+            return
+        }
+        logger.notice("Received input menu command: \(NSStringFromSelector(selector), privacy: .public)")
+
+        switch selector {
+        case #selector(fengYuSelectFlypySchemaCommand(_:)):
+            FengYuSettingsMenuController.shared.selectSchema(.flypy)
+        case #selector(fengYuSelectFlypyPhoneticSchemaCommand(_:)):
+            FengYuSettingsMenuController.shared.selectSchema(.flypyPhonetic)
+        case #selector(fengYuSelectFullPinyinSchemaCommand(_:)):
+            FengYuSettingsMenuController.shared.selectSchema(.fullPinyin)
+        case #selector(fengYuSelectNaturalSchemaCommand(_:)):
+            FengYuSettingsMenuController.shared.selectSchema(.natural)
+        case #selector(fengYuSelectMicrosoftSchemaCommand(_:)):
+            FengYuSettingsMenuController.shared.selectSchema(.microsoft)
+        case #selector(fengYuSelectABCSchemaCommand(_:)):
+            FengYuSettingsMenuController.shared.selectSchema(.abc)
+        case #selector(fengYuSelectCangjieSchemaCommand(_:)):
+            FengYuSettingsMenuController.shared.selectSchema(.cangjie)
+        case #selector(fengYuToggleFullWidthCommand(_:)):
+            FengYuSettingsMenuController.shared.toggleFullWidth()
+        case #selector(fengYuToggleSimplifiedChineseCommand(_:)):
+            FengYuSettingsMenuController.shared.toggleSimplifiedChinese()
+        case #selector(fengYuSelectHorizontalOrientationCommand(_:)):
+            FengYuSettingsMenuController.shared.selectOrientation(.horizontal)
+        case #selector(fengYuSelectVerticalOrientationCommand(_:)):
+            FengYuSettingsMenuController.shared.selectOrientation(.vertical)
+        case #selector(fengYuSelectSystemColorSchemeCommand(_:)):
+            FengYuSettingsMenuController.shared.selectColorScheme(.system)
+        case #selector(fengYuSelectLightColorSchemeCommand(_:)):
+            FengYuSettingsMenuController.shared.selectColorScheme(.light)
+        case #selector(fengYuSelectDarkColorSchemeCommand(_:)):
+            FengYuSettingsMenuController.shared.selectColorScheme(.dark)
+        default:
+            super.doCommand(by: selector, command: infoDictionary)
+        }
     }
 
     override func activateServer(_ sender: Any!) {
@@ -378,11 +437,32 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
 }
 
 extension RimeInputController {
-    @objc func fengYuSelectSchemaCommand(_ command: Any) {
-        guard let menuItem = fengYuMenuItem(from: command) else {
-            return
-        }
-        FengYuSettingsMenuController.shared.selectSchema(menuItem: menuItem)
+    @objc func fengYuSelectFlypySchemaCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectSchema(.flypy)
+    }
+
+    @objc func fengYuSelectFlypyPhoneticSchemaCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectSchema(.flypyPhonetic)
+    }
+
+    @objc func fengYuSelectFullPinyinSchemaCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectSchema(.fullPinyin)
+    }
+
+    @objc func fengYuSelectNaturalSchemaCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectSchema(.natural)
+    }
+
+    @objc func fengYuSelectMicrosoftSchemaCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectSchema(.microsoft)
+    }
+
+    @objc func fengYuSelectABCSchemaCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectSchema(.abc)
+    }
+
+    @objc func fengYuSelectCangjieSchemaCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectSchema(.cangjie)
     }
 
     @objc func fengYuToggleFullWidthCommand(_ command: Any) {
@@ -393,18 +473,24 @@ extension RimeInputController {
         FengYuSettingsMenuController.shared.toggleSimplifiedChinese()
     }
 
-    @objc func fengYuSelectOrientationCommand(_ command: Any) {
-        guard let menuItem = fengYuMenuItem(from: command) else {
-            return
-        }
-        FengYuSettingsMenuController.shared.selectOrientation(menuItem: menuItem)
+    @objc func fengYuSelectHorizontalOrientationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectOrientation(.horizontal)
     }
 
-    @objc func fengYuSelectColorSchemeCommand(_ command: Any) {
-        guard let menuItem = fengYuMenuItem(from: command) else {
-            return
-        }
-        FengYuSettingsMenuController.shared.selectColorScheme(menuItem: menuItem)
+    @objc func fengYuSelectVerticalOrientationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectOrientation(.vertical)
+    }
+
+    @objc func fengYuSelectSystemColorSchemeCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectColorScheme(.system)
+    }
+
+    @objc func fengYuSelectLightColorSchemeCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectColorScheme(.light)
+    }
+
+    @objc func fengYuSelectDarkColorSchemeCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.selectColorScheme(.dark)
     }
 
     @objc func fengYuRedeployCommand(_ command: Any) {
@@ -423,15 +509,6 @@ extension RimeInputController {
         FengYuSettingsMenuController.shared.resetSettings()
     }
 
-    private func fengYuMenuItem(from command: Any) -> NSMenuItem? {
-        if let menuItem = command as? NSMenuItem {
-            return menuItem
-        }
-        guard let dictionary = command as? NSDictionary else {
-            return nil
-        }
-        return dictionary.object(forKey: kIMKCommandMenuItemName) as? NSMenuItem
-    }
 }
 
 enum CandidateAnchorResolver {

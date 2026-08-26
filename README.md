@@ -126,7 +126,7 @@ RimeInputMethod/
 - 词库层级：`top` 用于置顶词，`sys` 包含符号编码与二重简码，`user` 用于日常用户词，`full` 补全全码字；四者都由 Rime 独立加载，不再重复合并进主词典。
 - 纯音码：菜单中保留“小鹤双拼（纯音码）”，例如“你好”输入 `nihc`。
 - 设置入口：切换到“风语”后点击菜单栏输入法图标，即可在风语菜单中切换方案、全角、简繁、候选排列和主题；设置会立即同步到所有会话并在重启后恢复。
-- 其他方案：风语全拼、自然码、微软、智能 ABC 和仓颉五代均可直接从“输入方案”子菜单选择。
+- 其他方案：风语全拼、自然码、微软、智能 ABC 和仓颉五代均列在“输入方案”顶层分组中，可直接选择。
 - 通用辅码：在其他拼音方案中可先输入 `;`，再输入完整拼音和可选的仓颉首码，例如 `;zuok` 定位“左”。它与小鹤音形四码互不干扰。
 - 中英文：遵循原配置：左 Shift 为 `commit_code`，右 Shift、Caps Lock 不执行切换；Control/Option 快捷键交给 Rime 处理。
 - 用户词典和 `.custom.yaml` 继续保存在 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`；新的 `com.shendongchun.inputmethod.fengyu.local` Bundle 身份只用于系统注册，不迁移或覆盖用户数据。

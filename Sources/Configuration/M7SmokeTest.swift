@@ -245,7 +245,27 @@ enum M7SmokeTest {
         let controller = FengYuSettingsMenuController(store: store)
         controller.menuNeedsUpdate(controller.menu)
         let titles = controller.menu.items.map(\.title)
-        let commandItems = actionableItems(in: controller.menu)
+        let commandItems = controller.menu.items.filter { $0.action != nil }
+        let schemaCommands = menuItems(
+            in: controller.menu,
+            titles: FengYuSchema.allCases.map(\.displayName)
+        )
+        let orientationCommands = menuItems(
+            in: controller.menu,
+            titles: CandidateOrientation.allCases.map(\.displayName)
+        )
+        let colorSchemeCommands = menuItems(
+            in: controller.menu,
+            titles: CandidateColorScheme.allCases.map(\.displayName)
+        )
+        let schemaSelectors = Set(schemaCommands.compactMap(\.action).map(NSStringFromSelector))
+        let orientationSelectors = Set(orientationCommands.compactMap(\.action).map(NSStringFromSelector))
+        let colorSchemeSelectors = Set(colorSchemeCommands.compactMap(\.action).map(NSStringFromSelector))
+        let groupHeadings = menuItems(
+            in: controller.menu,
+            titles: ["输入方案", "候选排列", "候选主题"]
+        )
+        let settings = store.snapshot
         let unroutableCommands = commandItems.filter { item in
             guard let action = item.action else {
                 return true
@@ -262,8 +282,25 @@ enum M7SmokeTest {
             titles.contains("打开用户目录"),
             titles.contains("查看脱敏诊断…"),
             titles.contains("恢复默认设置…"),
+            controller.menu.items.allSatisfy({ $0.submenu == nil }),
             !commandItems.isEmpty,
             commandItems.allSatisfy(\.isEnabled),
+            schemaCommands.count == FengYuSchema.allCases.count,
+            schemaSelectors.count == FengYuSchema.allCases.count,
+            orientationCommands.count == CandidateOrientation.allCases.count,
+            orientationSelectors.count == CandidateOrientation.allCases.count,
+            colorSchemeCommands.count == CandidateColorScheme.allCases.count,
+            colorSchemeSelectors.count == CandidateColorScheme.allCases.count,
+            groupHeadings.count == 3,
+            groupHeadings.allSatisfy({ !$0.isEnabled && $0.action == nil }),
+            schemaCommands.filter({ $0.state == .on }).map(\.title) == [settings.schema.displayName],
+            orientationCommands.filter({ $0.state == .on }).map(\.title)
+                == [settings.candidateOrientation.displayName],
+            colorSchemeCommands.filter({ $0.state == .on }).map(\.title)
+                == [settings.colorScheme.displayName],
+            schemaCommands.allSatisfy({ $0.indentationLevel == 1 }),
+            orientationCommands.allSatisfy({ $0.indentationLevel == 1 }),
+            colorSchemeCommands.allSatisfy({ $0.indentationLevel == 1 }),
             unroutableCommands.isEmpty
         else {
             let details = unroutableCommands.map { item in
@@ -277,16 +314,8 @@ enum M7SmokeTest {
     }
 
     @MainActor
-    private static func actionableItems(in menu: NSMenu) -> [NSMenuItem] {
-        menu.items.flatMap { item -> [NSMenuItem] in
-            // AppKit assigns its own submenuAction: target to submenu parents;
-            // only leaf items are InputMethodKit commands owned by 风语.
-            var result = item.submenu == nil && item.action != nil ? [item] : []
-            if let submenu = item.submenu {
-                result.append(contentsOf: actionableItems(in: submenu))
-            }
-            return result
-        }
+    private static func menuItems(in menu: NSMenu, titles: [String]) -> [NSMenuItem] {
+        menu.items.filter { titles.contains($0.title) }
     }
 
     private static func verifyDiagnostics(settings: FengYuSettingsSnapshot) throws {

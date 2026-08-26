@@ -91,7 +91,7 @@ M2 已固定路径：shared data 为应用包的 `Contents/Resources/Rime`；use
 ## M7 设置、状态与维护
 
 - `FengYuSettingsStore` 是设置唯一来源，使用版本化 `UserDefaults` key 保存方案、全角、简繁、候选方向和颜色主题；未知枚举值自动回退产品默认，不让损坏偏好阻止输入。
-- `IMKInputController.menu()` 返回风语设置菜单，设置只出现在系统输入法菜单中，不创建额外常驻状态栏图标。菜单 target 不访问 marked text 或候选内容。
+- `IMKInputController.menu()` 返回风语设置菜单，设置只出现在系统输入法菜单中，不创建额外常驻状态栏图标。方案、候选排列和候选主题以顶层叶子按分组排列，规避 `TextInputMenuAgent` 不转发嵌套叶子 action 的限制；菜单 target 不访问 marked text 或候选内容。
 - 新 Rime session 由 `RimeRuntime.makeSession()` 统一应用设置；现有 controller 监听进程内通知，在设置变化前先提交组合，再更新自身 session。重新部署同样先提交并释放所有 session，后台部署结束后重新创建。
 - Rime C 窄桥接只新增 `set_option/get_option` 语义接口；Swift 同时设置 `simplification` 与 `zh_simp/zh_trad`，兼容双拼 schema 的二态开关和全拼 schema 的多态简繁开关。
 - 横排与竖排是两个纯布局策略，共享同一候选模型、绘制、点击和翻页动作；主题只固定系统/浅色/深色 appearance，不绕过系统降低透明度、增强对比度和减少动态效果。

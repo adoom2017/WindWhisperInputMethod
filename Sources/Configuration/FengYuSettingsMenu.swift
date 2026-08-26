@@ -67,14 +67,15 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         status.isEnabled = false
         menu.addItem(status)
 
-        menu.addItem(submenuItem(
+        addSelectionGroup(
             title: "输入方案",
             values: FengYuSchema.allCases,
             selected: settings.schema,
             title: \.displayName,
-            rawValue: \.rawValue,
-            action: #selector(RimeInputController.fengYuSelectSchemaCommand(_:))
-        ))
+            action: schemaAction(for:)
+        )
+
+        menu.addItem(.separator())
 
         let fullWidth = actionItem(
             title: "全角字符",
@@ -90,23 +91,23 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         )
         menu.addItem(simplified)
 
-        menu.addItem(submenuItem(
+        menu.addItem(.separator())
+        addSelectionGroup(
             title: "候选排列",
             values: CandidateOrientation.allCases,
             selected: settings.candidateOrientation,
             title: \.displayName,
-            rawValue: \.rawValue,
-            action: #selector(RimeInputController.fengYuSelectOrientationCommand(_:))
-        ))
+            action: orientationAction(for:)
+        )
 
-        menu.addItem(submenuItem(
+        menu.addItem(.separator())
+        addSelectionGroup(
             title: "候选主题",
             values: CandidateColorScheme.allCases,
             selected: settings.colorScheme,
             title: \.displayName,
-            rawValue: \.rawValue,
-            action: #selector(RimeInputController.fengYuSelectColorSchemeCommand(_:))
-        ))
+            action: colorSchemeAction(for:)
+        )
 
         menu.addItem(.separator())
         let redeploy = actionItem(
@@ -143,33 +144,53 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         return item
     }
 
-    private func submenuItem<Value: RawRepresentable & Equatable>(
+    private func addSelectionGroup<Value: Equatable>(
         title: String,
         values: [Value],
         selected: Value,
         title titleKeyPath: KeyPath<Value, String>,
-        rawValue rawValueKeyPath: KeyPath<Value, String>,
-        action: Selector
-    ) -> NSMenuItem where Value.RawValue == String {
-        let parent = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: title)
-        submenu.autoenablesItems = false
+        action: (Value) -> Selector
+    ) {
+        let heading = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        heading.isEnabled = false
+        menu.addItem(heading)
+
         for value in values {
-            let item = actionItem(title: value[keyPath: titleKeyPath], action: action)
-            item.representedObject = value[keyPath: rawValueKeyPath]
+            let item = actionItem(title: value[keyPath: titleKeyPath], action: action(value))
+            item.indentationLevel = 1
             item.state = value == selected ? .on : .off
-            submenu.addItem(item)
+            menu.addItem(item)
         }
-        parent.submenu = submenu
-        return parent
     }
 
-    func selectSchema(menuItem: NSMenuItem) {
-        guard let rawValue = menuItem.representedObject as? String,
-            let schema = FengYuSchema(rawValue: rawValue)
-        else {
-            return
+    private func schemaAction(for schema: FengYuSchema) -> Selector {
+        switch schema {
+        case .flypy: #selector(RimeInputController.fengYuSelectFlypySchemaCommand(_:))
+        case .flypyPhonetic: #selector(RimeInputController.fengYuSelectFlypyPhoneticSchemaCommand(_:))
+        case .fullPinyin: #selector(RimeInputController.fengYuSelectFullPinyinSchemaCommand(_:))
+        case .natural: #selector(RimeInputController.fengYuSelectNaturalSchemaCommand(_:))
+        case .microsoft: #selector(RimeInputController.fengYuSelectMicrosoftSchemaCommand(_:))
+        case .abc: #selector(RimeInputController.fengYuSelectABCSchemaCommand(_:))
+        case .cangjie: #selector(RimeInputController.fengYuSelectCangjieSchemaCommand(_:))
         }
+    }
+
+    private func orientationAction(for orientation: CandidateOrientation) -> Selector {
+        switch orientation {
+        case .horizontal: #selector(RimeInputController.fengYuSelectHorizontalOrientationCommand(_:))
+        case .vertical: #selector(RimeInputController.fengYuSelectVerticalOrientationCommand(_:))
+        }
+    }
+
+    private func colorSchemeAction(for colorScheme: CandidateColorScheme) -> Selector {
+        switch colorScheme {
+        case .system: #selector(RimeInputController.fengYuSelectSystemColorSchemeCommand(_:))
+        case .light: #selector(RimeInputController.fengYuSelectLightColorSchemeCommand(_:))
+        case .dark: #selector(RimeInputController.fengYuSelectDarkColorSchemeCommand(_:))
+        }
+    }
+
+    func selectSchema(_ schema: FengYuSchema) {
         store.update { $0.schema = schema }
         rebuildMenu()
     }
@@ -184,22 +205,12 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         rebuildMenu()
     }
 
-    func selectOrientation(menuItem: NSMenuItem) {
-        guard let rawValue = menuItem.representedObject as? String,
-            let orientation = CandidateOrientation(rawValue: rawValue)
-        else {
-            return
-        }
+    func selectOrientation(_ orientation: CandidateOrientation) {
         store.update { $0.candidateOrientation = orientation }
         rebuildMenu()
     }
 
-    func selectColorScheme(menuItem: NSMenuItem) {
-        guard let rawValue = menuItem.representedObject as? String,
-            let colorScheme = CandidateColorScheme(rawValue: rawValue)
-        else {
-            return
-        }
+    func selectColorScheme(_ colorScheme: CandidateColorScheme) {
         store.update { $0.colorScheme = colorScheme }
         rebuildMenu()
     }
