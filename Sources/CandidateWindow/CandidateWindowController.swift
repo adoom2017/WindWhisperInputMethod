@@ -37,6 +37,10 @@ struct CandidateWindowModel: Equatable, Sendable {
     var pageLabel: String {
         "\(pageNumber + 1)"
     }
+
+    var showsPagination: Bool {
+        pageNumber > 0 || !isLastPage
+    }
 }
 
 enum CandidateWindowHitTester {
@@ -472,6 +476,9 @@ final class CandidateListView: NSView {
     }
 
     private func drawPageIndicator(layout: CandidateWindowLayout) {
+        guard layout.showsPagination else {
+            return
+        }
         let chromeRect = layout.pageFrame.insetBy(dx: 1, dy: 5)
         let chromePath = NSBezierPath(roundedRect: chromeRect, xRadius: 9, yRadius: 9)
         theme.paginationBackgroundColor.setFill()

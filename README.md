@@ -6,7 +6,7 @@
 
 **M1—M7 已完成实现和自动化验收；当前版本已进入 M7 本机使用确认。**
 
-应用现已自带官方 librime 1.16.0、Rime 基础词库、风语全拼、自然码双拼、小鹤双拼（音形辅码与纯音码）、微软双拼、智能 ABC 双拼、OpenCC 1.1.9 繁简转换数据和可复现生成的辅码索引。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。单按左 Shift 可切换中英文，并在插入点附近短暂显示带强调色徽章的“中/英”玻璃指示器；右 Shift 保持 `noop`，Shift 与字母或系统快捷键组合时不会误切换。候选面板不抢焦点并跟随插入点；macOS 26 使用系统 `NSGlassEffectView` clear 玻璃，旧系统回退到 `NSVisualEffectView`。窗口使用与状态指示器一致的 48pt 紧凑视觉，选中项采用浅强调色底、细描边与实色数字徽章，分页入口收进独立胶囊；鼠标点击、滚轮翻页和键盘选词共用同一 Rime session。M7 已加入持久化设置菜单，可切换方案、全/半角、简繁、横/竖排和系统/浅色/深色主题，并提供重新部署、用户目录、脱敏诊断和恢复默认设置。
+应用现已自带官方 librime 1.16.0、Rime 基础词库、风语全拼、自然码双拼、小鹤双拼（音形辅码与纯音码）、微软双拼、智能 ABC 双拼、OpenCC 1.1.9 繁简转换数据和可复现生成的辅码索引。InputMethodKit controller 已连接每会话 Rime session，可处理字母、数字选词、Space、Return、Backspace、Escape、方向键与 PageUp/PageDown，并通过 `setMarkedText` 显示行内组合、通过 `insertText` 提交中文。单按左 Shift 可切换中英文，并在插入点附近短暂显示带强调色徽章的“中/英”玻璃指示器；右 Shift 保持 `noop`，Shift 与字母或系统快捷键组合时不会误切换，中文模式下 `Shift+数字/标点` 可正常输入上档符号。候选面板不抢焦点并跟随插入点；macOS 26 使用系统 `NSGlassEffectView` clear 玻璃，旧系统回退到 `NSVisualEffectView`。窗口使用与状态指示器一致的 48pt 紧凑视觉，选中项采用浅强调色底、细描边与实色数字徽章；仅在需要翻页时显示分页胶囊，单页会回收其空间。鼠标点击、滚轮翻页和键盘选词共用同一 Rime session。M7 已加入持久化设置菜单，可切换方案、全/半角、简繁、横/竖排和系统/浅色/深色主题，并提供重新部署、用户目录、脱敏诊断和恢复默认设置。
 
 本机为 Apple Silicon，Debug 只构建 arm64；Release 应用和内置 librime 都包含 arm64 + x86_64。安装脚本使用本地签名、父输入法/子模式分阶段启用和当前会话热刷新；M3 最终 Debug 构建已成功热安装，没有上传构建包、注销或重启，并恢复了安装前使用的鼠须管输入源。
 

@@ -10,6 +10,7 @@
 - macOS 按键到 Rime key symbol/mask 的映射。
 - Command 快捷键透传给应用；Control/Option 和 modifier 按下/释放映射给 Rime。左 Shift 遵循原配置 `commit_code`，右 Shift 与 Caps Lock 为 `noop`。
 - 左 Shift 真正改变 `ascii_mode` 后，在插入点附近显示 48×48 的“中/英”非激活玻璃指示器；内层强调色徽章保持字形居中，0.1 秒淡入、0.8 秒停留、0.12 秒淡出；降低透明度时使用实色底，减少动态效果时取消动画，辅助功能标签仍使用完整的“中文/英文”。
+- 中文模式下 `Shift+数字/标点` 使用 macOS 已解析的上档字符传给 librime，例如 `Shift+1` 提交 `！`；Control/Option 快捷键仍使用忽略修饰键的基础字符。
 - marked text、光标范围、commit、Backspace、Escape、Space、Return 与停用提交。
 - 可重复执行的 `--m3-smoke` 和 `Scripts/test-m3.sh`。
 - 本机安装签名顺序修复：先嵌入 librime，再主程序，最后 app bundle。

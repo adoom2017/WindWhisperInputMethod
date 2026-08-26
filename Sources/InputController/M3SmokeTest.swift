@@ -11,6 +11,8 @@ enum M3SmokeTest {
         do {
             try verifyKeyMapping()
             print("keyMapping=passed")
+            try verifyShiftedPunctuation(root: temporaryRoot)
+            print("shiftedPunctuation=passed")
             try verifyShortcutMapping()
             print("shortcutMapping=passed")
             try verifyModifierMapping()
@@ -43,6 +45,39 @@ enum M3SmokeTest {
         let backspace = try requireEvent(character: "\u{7F}", keyCode: UInt16(kVK_Delete))
         guard RimeKeyMapper.map(backspace)?.keyCode == 0xFF08 else {
             throw RimeBridgeError.smokeAssertion("Backspace mapping is incorrect.")
+        }
+
+        let exclamation = try requireEvent(
+            character: "!",
+            charactersIgnoringModifiers: "1",
+            keyCode: UInt16(kVK_ANSI_1),
+            flags: .shift
+        )
+        guard RimeKeyMapper.map(exclamation) == RimeMappedKey(
+            keyCode: 0x21,
+            modifierMask: RimeKeyMapper.ModifierMask.shift
+        ) else {
+            throw RimeBridgeError.smokeAssertion("Shifted punctuation mapping is incorrect.")
+        }
+    }
+
+    private static func verifyShiftedPunctuation(root: URL) throws {
+        let session = try makeSession(
+            root: root.appendingPathComponent("shifted-punctuation", isDirectory: true)
+        )
+        let event = try requireEvent(
+            character: "!",
+            charactersIgnoringModifiers: "1",
+            keyCode: UInt16(kVK_ANSI_1),
+            flags: .shift
+        )
+        guard let mapped = RimeKeyMapper.map(event),
+            session.process(keyCode: mapped.keyCode, modifierMask: mapped.modifierMask),
+            try session.readSnapshot().commitText == "！"
+        else {
+            throw RimeBridgeError.smokeAssertion(
+                "Shift+1 did not commit the Chinese exclamation mark."
+            )
         }
     }
 
@@ -334,6 +369,7 @@ enum M3SmokeTest {
 
     private static func requireEvent(
         character: String,
+        charactersIgnoringModifiers: String? = nil,
         keyCode: UInt16,
         flags: NSEvent.ModifierFlags = []
     ) throws -> NSEvent {
@@ -346,7 +382,7 @@ enum M3SmokeTest {
                 windowNumber: 0,
                 context: nil,
                 characters: character,
-                charactersIgnoringModifiers: character,
+                charactersIgnoringModifiers: charactersIgnoringModifiers ?? character,
                 isARepeat: false,
                 keyCode: keyCode
             )

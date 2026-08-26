@@ -72,8 +72,11 @@ enum RimeKeyMapper {
             return RimeMappedKey(keyCode: specialKey, modifierMask: modifierMask)
         }
 
+        let printableCharacters = flags.intersection([.control, .option]).isEmpty
+            ? (event.characters ?? event.charactersIgnoringModifiers)
+            : event.charactersIgnoringModifiers
         guard
-            let characters = event.charactersIgnoringModifiers,
+            let characters = printableCharacters,
             characters.unicodeScalars.count == 1,
             let scalar = characters.unicodeScalars.first,
             scalar.value >= 0x20,
@@ -82,13 +85,7 @@ enum RimeKeyMapper {
             return nil
         }
 
-        var keyCode = Int32(scalar.value)
-        if keyCode >= 0x61, keyCode <= 0x7A,
-            flags.contains(.shift) != flags.contains(.capsLock)
-        {
-            keyCode -= 0x20
-        }
-        return RimeMappedKey(keyCode: keyCode, modifierMask: modifierMask)
+        return RimeMappedKey(keyCode: Int32(scalar.value), modifierMask: modifierMask)
     }
 
     static func mapModifierChange(

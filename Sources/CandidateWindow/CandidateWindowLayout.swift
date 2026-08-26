@@ -2,6 +2,7 @@ import AppKit
 
 struct CandidateWindowLayout: Equatable {
     let orientation: CandidateOrientation
+    let showsPagination: Bool
     let size: NSSize
     let candidateFrames: [NSRect]
     let pageFrame: NSRect
@@ -89,7 +90,8 @@ enum CandidateHorizontalLayout {
         }
 
         let itemGapTotal = theme.candidateSpacing * CGFloat(max(model.entries.count - 1, 0))
-        let fixedWidth = theme.horizontalPadding * 2 + theme.pageIndicatorWidth + itemGapTotal
+        let paginationWidth = model.showsPagination ? theme.pageIndicatorWidth : 0
+        let fixedWidth = theme.horizontalPadding * 2 + paginationWidth + itemGapTotal
         let maximumItemsWidth = max(theme.maximumPanelWidth - fixedWidth, 0)
         let itemWidths = CandidateWidthDistributor.distribute(
             desiredWidths: desiredWidths,
@@ -118,28 +120,43 @@ enum CandidateHorizontalLayout {
             x += width + theme.candidateSpacing
         }
 
-        let pageFrame = NSRect(
-            x: panelWidth - theme.horizontalPadding - theme.pageIndicatorWidth,
-            y: theme.verticalPadding,
-            width: theme.pageIndicatorWidth,
-            height: theme.candidateHeight
-        )
-        let controlWidth = floor(pageFrame.width / 3)
-        let previousPageFrame = NSRect(
-            x: pageFrame.minX,
-            y: pageFrame.minY,
-            width: controlWidth,
-            height: pageFrame.height
-        )
-        let nextPageFrame = NSRect(
-            x: pageFrame.maxX - controlWidth,
-            y: pageFrame.minY,
-            width: controlWidth,
-            height: pageFrame.height
-        )
+        let pageFrame: NSRect
+        let previousPageFrame: NSRect
+        let nextPageFrame: NSRect
+        if model.showsPagination {
+            pageFrame = NSRect(
+                x: panelWidth - theme.horizontalPadding - theme.pageIndicatorWidth,
+                y: theme.verticalPadding,
+                width: theme.pageIndicatorWidth,
+                height: theme.candidateHeight
+            )
+            let controlWidth = floor(pageFrame.width / 3)
+            previousPageFrame = NSRect(
+                x: pageFrame.minX,
+                y: pageFrame.minY,
+                width: controlWidth,
+                height: pageFrame.height
+            )
+            nextPageFrame = NSRect(
+                x: pageFrame.maxX - controlWidth,
+                y: pageFrame.minY,
+                width: controlWidth,
+                height: pageFrame.height
+            )
+        } else {
+            pageFrame = NSRect(
+                x: panelWidth - theme.horizontalPadding,
+                y: theme.verticalPadding,
+                width: 0,
+                height: theme.candidateHeight
+            )
+            previousPageFrame = .zero
+            nextPageFrame = .zero
+        }
 
         return CandidateWindowLayout(
             orientation: .horizontal,
+            showsPagination: model.showsPagination,
             size: NSSize(width: ceil(panelWidth), height: ceil(panelHeight)),
             candidateFrames: candidateFrames,
             pageFrame: pageFrame,
@@ -171,7 +188,11 @@ enum CandidateVerticalLayout {
         let rowGaps = theme.candidateSpacing * CGFloat(max(model.entries.count - 1, 0))
         let rowsHeight = rowCount * theme.candidateHeight + rowGaps
         let pageTop = theme.verticalPadding + rowsHeight + theme.candidateSpacing
-        let panelHeight = pageTop + theme.candidateHeight + theme.verticalPadding
+        let paginationHeight = model.showsPagination
+            ? theme.candidateSpacing + theme.candidateHeight
+            : 0
+        let panelHeight = theme.verticalPadding + rowsHeight
+            + paginationHeight + theme.verticalPadding
         let rowWidth = panelWidth - theme.horizontalPadding * 2
 
         let candidateFrames = model.entries.indices.map { index in
@@ -183,29 +204,39 @@ enum CandidateVerticalLayout {
                 height: theme.candidateHeight
             )
         }
-        let verticalPageWidth = min(theme.pageIndicatorWidth, rowWidth)
-        let pageFrame = NSRect(
-            x: floor((panelWidth - verticalPageWidth) / 2),
-            y: pageTop,
-            width: verticalPageWidth,
-            height: theme.candidateHeight
-        )
-        let controlWidth = floor(pageFrame.width / 3)
-        let previousPageFrame = NSRect(
-            x: pageFrame.minX,
-            y: pageFrame.minY,
-            width: controlWidth,
-            height: pageFrame.height
-        )
-        let nextPageFrame = NSRect(
-            x: pageFrame.maxX - controlWidth,
-            y: pageFrame.minY,
-            width: controlWidth,
-            height: pageFrame.height
-        )
+        let pageFrame: NSRect
+        let previousPageFrame: NSRect
+        let nextPageFrame: NSRect
+        if model.showsPagination {
+            let verticalPageWidth = min(theme.pageIndicatorWidth, rowWidth)
+            pageFrame = NSRect(
+                x: floor((panelWidth - verticalPageWidth) / 2),
+                y: pageTop,
+                width: verticalPageWidth,
+                height: theme.candidateHeight
+            )
+            let controlWidth = floor(pageFrame.width / 3)
+            previousPageFrame = NSRect(
+                x: pageFrame.minX,
+                y: pageFrame.minY,
+                width: controlWidth,
+                height: pageFrame.height
+            )
+            nextPageFrame = NSRect(
+                x: pageFrame.maxX - controlWidth,
+                y: pageFrame.minY,
+                width: controlWidth,
+                height: pageFrame.height
+            )
+        } else {
+            pageFrame = .zero
+            previousPageFrame = .zero
+            nextPageFrame = .zero
+        }
 
         return CandidateWindowLayout(
             orientation: .vertical,
+            showsPagination: model.showsPagination,
             size: NSSize(width: ceil(panelWidth), height: ceil(panelHeight)),
             candidateFrames: candidateFrames,
             pageFrame: pageFrame,

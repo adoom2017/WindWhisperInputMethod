@@ -8,6 +8,8 @@ enum M5SmokeTest {
             print("themeFallbacks=passed")
             try verifyHorizontalLayout()
             print("horizontalLayout=passed")
+            try verifySinglePagePaginationVisibility()
+            print("singlePagePagination=passed")
             try verifyWidthDistribution()
             print("longTextTruncation=passed")
             try verifyNativeMaterialConfiguration()
@@ -42,13 +44,13 @@ enum M5SmokeTest {
             height: 24
         )
         coordinator.update(
-            menu: previewMenu,
+            menu: singlePagePreviewMenu,
             anchorRect: anchorRect,
             clientWindowLevel: CGWindowLevel(kCGNormalWindowLevel)
         )
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         coordinator.update(
-            menu: previewMenu,
+            menu: singlePagePreviewMenu,
             anchorRect: anchorRect,
             clientWindowLevel: CGWindowLevel(kCGNormalWindowLevel)
         )
@@ -156,6 +158,45 @@ enum M5SmokeTest {
         }
     }
 
+    private static func verifySinglePagePaginationVisibility() throws {
+        let theme = CandidateWindowTheme.system(
+            environment: CandidateAccessibilityEnvironment(
+                reduceTransparency: false,
+                increaseContrast: false,
+                reduceMotion: false
+            )
+        )
+        let singlePageModel = CandidateWindowModel(menu: singlePagePreviewMenu)
+        let pagedModel = CandidateWindowModel(menu: previewMenu)
+        let singleHorizontal = CandidateHorizontalLayout.make(
+            model: singlePageModel,
+            theme: theme
+        )
+        let pagedHorizontal = CandidateHorizontalLayout.make(model: pagedModel, theme: theme)
+        let singleVertical = CandidateVerticalLayout.make(model: singlePageModel, theme: theme)
+        let pagedVertical = CandidateVerticalLayout.make(model: pagedModel, theme: theme)
+
+        guard
+            !singlePageModel.showsPagination,
+            !singleHorizontal.showsPagination,
+            singleHorizontal.pageFrame.width == 0,
+            singleHorizontal.previousPageFrame.isEmpty,
+            singleHorizontal.nextPageFrame.isEmpty,
+            singleHorizontal.candidateFrames.map(\.width).reduce(0, +)
+                > pagedHorizontal.candidateFrames.map(\.width).reduce(0, +),
+            (singleHorizontal.candidateFrames.last?.maxX ?? 0)
+                <= singleHorizontal.size.width - theme.horizontalPadding,
+            !singleVertical.showsPagination,
+            singleVertical.pageFrame.isEmpty,
+            singleVertical.size.height
+                == pagedVertical.size.height - theme.candidateHeight - theme.candidateSpacing
+        else {
+            throw RimeBridgeError.smokeAssertion(
+                "single-page candidate layout still reserved pagination chrome."
+            )
+        }
+    }
+
     private static func verifyNativeMaterialConfiguration() throws {
         guard
             CandidatePanelConfiguration.styleMask.contains(.nonactivatingPanel),
@@ -260,6 +301,16 @@ enum M5SmokeTest {
                 RimeCandidateSnapshot(text: "候选", comment: nil),
                 RimeCandidateSnapshot(text: "毛玻璃", comment: "native material"),
             ]
+        )
+    }
+
+    private static var singlePagePreviewMenu: RimeMenuSnapshot {
+        RimeMenuSnapshot(
+            pageSize: previewMenu.pageSize,
+            pageNumber: 0,
+            isLastPage: true,
+            highlightedIndex: previewMenu.highlightedIndex,
+            candidates: previewMenu.candidates
         )
     }
 }
