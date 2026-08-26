@@ -108,8 +108,10 @@ final class FengYuSettingsStore: @unchecked Sendable {
     private let lock = NSLock()
     private let defaults: UserDefaults
 
-    init(defaults: UserDefaults = .standard) {
+    init(defaults: UserDefaults? = nil) {
         self.defaults = defaults
+            ?? UserDefaults(suiteName: InputSourceMetadata.persistentDataIdentifier)
+            ?? .standard
     }
 
     var snapshot: FengYuSettingsSnapshot {

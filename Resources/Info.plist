@@ -46,7 +46,7 @@
 				<key>tsInputModeKeyEquivalentModifiersKey</key>
 				<integer>4608</integer>
 				<key>tsInputModeMenuIconFileKey</key>
-				<string>FengYuInputModeIcon.pdf</string>
+				<string>FengYuInputSwitcherIcon-v1.pdf</string>
 				<key>tsInputModePaletteIconFileKey</key>
 				<string>FengYuInputSwitcherIcon-v1.pdf</string>
 				<key>tsInputModePrimaryInScriptKey</key>
@@ -74,7 +74,5 @@
 	<string>NSApplication</string>
 	<key>TISInputSourceID</key>
 	<string>com.shendongchun.inputmethod.rime.dev</string>
-	<key>TICapsLockLanguageSwitchCapable</key>
-	<true/>
 </dict>
 </plist>

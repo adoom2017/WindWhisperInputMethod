@@ -140,8 +140,10 @@ recognizer:
     url: "^(www[.]|https?:|ftp:|mailto:).*$|^[a-z]+[.].+$"
 
 ascii_composer:
+  good_old_caps_lock: true
   switch_key:
     Shift_L: commit_code
-    Shift_R: commit_code
+    Shift_R: noop
     Control_L: noop
     Control_R: noop
+    Caps_Lock: noop

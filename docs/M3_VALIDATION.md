@@ -8,7 +8,7 @@
 - 进程级 `RimeRuntime`，负责正式用户数据目录中的初始化和快速部署。
 - 每个 InputMethodKit controller 独立 Rime session，以及服务级串行化引擎访问。
 - macOS 按键到 Rime key symbol/mask 的映射。
-- Command、Control、Option 快捷键透传；左右 Shift 单击切换中英文；Shift 与字母/快捷键组合不误触；Caps Lock 映射保持兼容。
+- Command 快捷键透传给应用；Control/Option 和 modifier 按下/释放映射给 Rime。左 Shift 遵循原配置 `commit_code`，右 Shift 与 Caps Lock 为 `noop`。
 - marked text、光标范围、commit、Backspace、Escape、Space、Return 与停用提交。
 - 可重复执行的 `--m3-smoke` 和 `Scripts/test-m3.sh`。
 - 本机安装签名顺序修复：先嵌入 librime，再主程序，最后 app bundle。
@@ -19,8 +19,11 @@ Debug arm64 与 Release arm64+x86_64 均通过：
 
 ```text
 keyMapping=passed
-shortcutPassthrough=passed
+shortcutMapping=passed
+modifierMapping=passed
 compositionEditing=passed
+shiftModeSwitch=passed
+rimeShortcutRouting=passed
 frontendCommit=passed
 inputClientFlow=passed
 ```

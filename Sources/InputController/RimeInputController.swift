@@ -2,33 +2,6 @@ import AppKit
 import InputMethodKit
 import OSLog
 
-struct RimeInputModeTransition {
-    let codeToCommit: String?
-    let snapshot: RimeSnapshot
-}
-
-enum RimeInputModeSwitcher {
-    static func toggle(in session: RimeSession) throws -> RimeInputModeTransition {
-        let before = try session.readSnapshot()
-        let codeToCommit = before.composition?.text
-        if codeToCommit != nil {
-            session.clearComposition()
-        }
-        guard let isASCIIMode = session.option("ascii_mode"),
-            session.setOption("ascii_mode", enabled: !isASCIIMode)
-        else {
-            throw RimeBridgeError.bridge(
-                code: -4,
-                message: "The Rime ASCII mode option is unavailable."
-            )
-        }
-        return RimeInputModeTransition(
-            codeToCommit: codeToCommit,
-            snapshot: try session.readSnapshot()
-        )
-    }
-}
-
 final class RimeInputController: IMKInputController, @unchecked Sendable {
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? InputSourceMetadata.bundleIdentifier,
@@ -38,7 +11,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     private weak var inputClient: IMKTextInput?
     private var session: RimeSession?
     private var hasMarkedText = false
-    private var shiftTapTracker = ShiftTapTracker()
+    private var lastModifierFlags: NSEvent.ModifierFlags = []
     private var didLogSessionError = false
     private var settingsObservers = [NSObjectProtocol]()
     private lazy var candidateWindow = CandidateWindowCoordinator { [weak self] action in
@@ -69,6 +42,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
 
     override func activateServer(_ sender: Any!) {
         inputClient = sender as? IMKTextInput
+        lastModifierFlags = Self.currentCapsLockFlags()
         ensureSession()
         logger.debug("Input session activated")
     }
@@ -78,7 +52,6 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
             inputClient = sender
         }
         finishComposition()
-        shiftTapTracker.reset()
         inputClient = nil
         logger.debug("Input session deactivated")
     }
@@ -89,7 +62,6 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         removeSettingsObservers()
         session = nil
         inputClient = nil
-        shiftTapTracker.reset()
         super.inputControllerWillClose()
     }
 
@@ -116,10 +88,6 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         if event.type == .flagsChanged {
             return handleModifierFlagsChanged(event, session: session, client: client)
         }
-        if event.type == .keyDown {
-            shiftTapTracker.noteKeyDown()
-        }
-
         guard let mappedKey = RimeKeyMapper.map(event) else {
             return false
         }
@@ -148,29 +116,36 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         session: RimeSession?,
         client: IMKTextInput
     ) -> Bool {
-        let shouldToggle = shiftTapTracker.update(
+        let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let changes = lastModifierFlags.symmetricDifference(modifierFlags)
+        lastModifierFlags = modifierFlags
+        guard changes.isEmpty == false else {
+            return true
+        }
+        guard let mappedKey = RimeKeyMapper.mapModifierChange(
             keyCode: event.keyCode,
-            modifierFlags: event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        )
-        guard shouldToggle, let session else {
+            modifierFlags: modifierFlags,
+            changedFlags: changes
+        ), let session else {
             return false
         }
 
+        let handled = session.process(
+            keyCode: mappedKey.keyCode,
+            modifierMask: mappedKey.modifierMask
+        )
         do {
-            let transition = try RimeInputModeSwitcher.toggle(in: session)
-            if let code = transition.codeToCommit {
-                hasMarkedText = RimeClientUpdater.clearMarkedText(in: client)
-                client.insertText(
-                    code,
-                    replacementRange: NSRange(location: NSNotFound, length: 0)
-                )
-            }
-            apply(transition.snapshot, to: client)
+            apply(try session.readSnapshot(), to: client)
         } catch {
-            logger.error("Unable to refresh input mode: \(error.localizedDescription, privacy: .public)")
-            return false
+            logger.error("Unable to refresh modifier state: \(error.localizedDescription, privacy: .public)")
         }
-        return true
+        return handled
+    }
+
+    private static func currentCapsLockFlags() -> NSEvent.ModifierFlags {
+        CGEventSource.flagsState(.combinedSessionState).contains(.maskAlphaShift)
+            ? .capsLock
+            : []
     }
 
     private func ensureSession() {

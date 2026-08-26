@@ -1,13 +1,17 @@
 # Xcode / Swift build products
 .build/
-build/
+/build/
 DerivedData/
 *.xcuserstate
 xcuserdata/
 
 # Local dependencies and generated Rime data
 Vendor/Build/
-Resources/Rime/build/
+Resources/Rime/build/*
+!Resources/Rime/build/
+!Resources/Rime/build/flypy.table.bin
+!Resources/Rime/build/flypy.prism.bin
+!Resources/Rime/build/flypy.reverse.bin
 *.userdb/
 
 # Logs and local configuration

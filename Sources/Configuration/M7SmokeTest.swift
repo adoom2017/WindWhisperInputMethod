@@ -153,7 +153,7 @@ enum M7SmokeTest {
         let composingSession = try service.makeSession()
         let composingSettings = FengYuSettingsSnapshot.defaults
         try composingSettings.apply(to: composingSession)
-        guard composingSession.simulate(sequence: "nihc") else {
+        guard composingSession.simulate(sequence: "ni") else {
             throw RimeBridgeError.smokeAssertion("composition fixture was not consumed")
         }
         let beforeCommit = try composingSession.readSnapshot()

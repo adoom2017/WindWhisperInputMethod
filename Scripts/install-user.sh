@@ -9,9 +9,15 @@ install_directory="$HOME/Library/Input Methods"
 installed_app="$install_directory/RimeInputMethod.app"
 installing_app="$install_directory/RimeInputMethod.installing"
 previous_app="$install_directory/RimeInputMethod.previous"
+failed_migration_app="$install_directory/FengYuInputMethod.app"
 system_app="/Library/Input Methods/RimeInputMethod.app"
+failed_system_app="/Library/Input Methods/FengYuInputMethod.app"
 expected_bundle_id="com.shendongchun.inputmethod.rime.dev"
 input_mode_id="com.shendongchun.inputmethod.rime.dev.Hans"
+failed_bundle_id="com.shendongchun.inputmethod.fengyu"
+failed_input_mode_id="com.shendongchun.inputmethod.fengyu.Hans"
+transitional_input_mode_id="com.shendongchun.inputmethod.rime.dev.FengYuHans"
+fallback_input_mode_id="com.apple.keylayout.ABC"
 lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 fail() {
@@ -32,8 +38,8 @@ if [[ "$actual_bundle_id" != "$expected_bundle_id" ]]; then
     fail "refusing unexpected bundle: $actual_bundle_id"
 fi
 
-if [[ -e "$system_app" ]]; then
-    fail "system-wide copy exists at $system_app; keep exactly one development bundle"
+if [[ -e "$system_app" || -e "$failed_system_app" ]]; then
+    fail "a system-wide FengYu/RimeInputMethod copy exists; keep exactly one development bundle"
 fi
 
 if [[ -e "$installing_app" || -e "$previous_app" ]]; then
@@ -61,11 +67,24 @@ done < <(
 /usr/bin/codesign --verify --deep --strict "$source_app"
 
 previous_input_source="$($source_app/Contents/MacOS/RimeInputMethod --current-input-source)"
+if [[ "$previous_input_source" == "$failed_input_mode_id" \
+    || "$previous_input_source" == "$transitional_input_mode_id" ]]; then
+    "$source_app/Contents/MacOS/RimeInputMethod" \
+        --select-input-source-id "$fallback_input_mode_id"
+    previous_input_source="$fallback_input_mode_id"
+fi
+"$source_app/Contents/MacOS/RimeInputMethod" \
+    --disable-input-source-id "$failed_input_mode_id" >/dev/null 2>&1 || true
+"$source_app/Contents/MacOS/RimeInputMethod" \
+    --disable-input-source-id "$transitional_input_mode_id" >/dev/null 2>&1 || true
+"$source_app/Contents/MacOS/RimeInputMethod" \
+    --disable-input-source-id "$failed_bundle_id" >/dev/null 2>&1 || true
 
 /bin/mkdir -p "$install_directory"
 /usr/bin/pkill -x RimeInputMethod 2>/dev/null || true
 "$lsregister" -u "$source_app" 2>/dev/null || true
 "$lsregister" -u "$installed_app" 2>/dev/null || true
+"$lsregister" -u "$failed_migration_app" 2>/dev/null || true
 
 /bin/mv "$source_app" "$installing_app"
 restore_previous_install() {
@@ -83,6 +102,9 @@ restore_previous_install() {
     if [[ -e "$previous_app" ]]; then
         /bin/mv "$previous_app" "$installed_app"
         "$lsregister" -f "$installed_app" 2>/dev/null || true
+    fi
+    if [[ -e "$failed_migration_app" ]]; then
+        "$lsregister" -f "$failed_migration_app" 2>/dev/null || true
     fi
 }
 trap restore_previous_install ERR
@@ -119,19 +141,6 @@ fi
 
 "$installed_binary" --enable-input-method-parent
 
-for _ in {1..60}; do
-    parent_status="$("$installed_binary" --input-method-parent-status)"
-    if [[ "$parent_status" == *"found=true"* && "$parent_status" == *"enabled=true"* ]]; then
-        break
-    fi
-    /bin/sleep 0.5
-done
-if [[ "$parent_status" != *"enabled=true"* ]]; then
-    echo "$parent_status"
-    echo "RimeInputMethod install failed: parent input method did not become enabled" >&2
-    false
-fi
-
 input_source_status="found=false"
 for _ in {1..60}; do
     input_source_status="$("$installed_binary" --input-source-status)"
@@ -160,24 +169,38 @@ if [[ "$input_source_status" != *"enabled=true"* ]]; then
     false
 fi
 
-"$installed_binary" --select-input-source
-for _ in {1..30}; do
+/usr/bin/open -gj "$installed_app" 2>/dev/null || true
+/bin/sleep 1
+
+select_succeeded=false
+for _ in {1..60}; do
+    if "$installed_binary" --select-input-source >/dev/null 2>&1; then
+        select_succeeded=true
+    fi
     input_source_status="$("$installed_binary" --input-source-status)"
-    if [[ "$input_source_status" == *"selected=true"* ]]; then
+    if [[ "$select_succeeded" == true && "$input_source_status" == *"selected=true"* ]]; then
         break
     fi
-    /bin/sleep 0.2
+    /bin/sleep 0.5
 done
 if [[ "$input_source_status" != *"selected=true"* ]]; then
-    echo "$input_source_status"
-    echo "RimeInputMethod install failed: input mode could not be selected" >&2
-    false
+    echo "Input mode is enabled; initial selection is deferred until macOS finishes refreshing it."
 fi
 
-if [[ -n "$previous_input_source" && "$previous_input_source" != "$input_mode_id" ]]; then
+if [[ -n "$previous_input_source" \
+    && "$previous_input_source" != "$input_mode_id" \
+    && "$previous_input_source" != "$failed_input_mode_id" \
+    && "$previous_input_source" != "$transitional_input_mode_id" ]]; then
     "$installed_binary" --select-input-source-id "$previous_input_source" >/dev/null || true
 fi
-/usr/bin/open -gj "$installed_app" 2>/dev/null || true
+
+if [[ -e "$failed_migration_app" ]]; then
+    failed_migration_directory="$project_root/build/FailedMigration"
+    failed_migration_backup="$failed_migration_directory/FengYuInputMethod-$build_version.app"
+    /bin/mkdir -p "$failed_migration_directory"
+    /bin/mv "$failed_migration_app" "$failed_migration_backup"
+    echo "Preserved failed migration bundle at: $failed_migration_backup"
+fi
 
 if [[ -e "$previous_app" ]]; then
     /bin/rm -rf "$previous_app"

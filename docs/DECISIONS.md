@@ -158,11 +158,25 @@
 
 - 日期：2026-08-25
 - 状态：已接受
-- 数据：默认方案从官方纯音码 `double_pinyin_flypy` 调整为用户现有的 `flypy` 小鹤音形。因旧鼠须管二进制码表与当前 librime 部署格式不完全兼容，使用可复现生成器从 `flypydz.dict.yaml` 和用户补充表重建当前版本的源词典；纯音码方案继续保留在菜单中。
-- 辅码：两键小鹤音码后可继续输入一至两位小鹤形码，逐键缩小候选；`nirx` 固定验证为“你”。原 `;`＋全拼＋仓颉首码仍作为其他拼音方案的通用辅助入口。
-- 切换：InputMethodKit controller 接收 `flagsChanged`，只把没有伴随普通按键或 Command/Control/Option 的左/右 Shift 按下—释放识别为单击。切换前若存在组合，按旧配置 `commit_code` 语义提交编码；英文模式的普通按键直接透传给 macOS。
+- 数据：默认方案为用户现有的 `flypy` 小鹤音形，主词典直接复用 `rime-origin/build` 的三个预编译 bin；其数据格式已由 arm64 librime 1.16 验证兼容。纯音码方案继续保留在菜单中。
+- 辅码：候选与完整码完全以原始 bin 为准；例如 `ni → 你`、`nir → 倪`、`nirx → 你`。原 `;`＋全拼＋仓颉首码仍作为其他拼音方案的通用辅助入口。
+- 切换：InputMethodKit controller 将 modifier 按下和释放事件转交 Rime；原配置定义左 Shift 为 `commit_code`，右 Shift、Control、Caps Lock 为 `noop`。Control/Option 普通快捷键不再被前端吞掉。
 - 许可：用户提供的小鹤数据未附明确再分发许可，锁文件标记为 `local-use-only`；不影响当前本机安装，但公开发布前必须补齐授权或改为本机导入。
-- 验证：M3 覆盖左右 Shift、按下不切换、大写/系统快捷键防误触、中英文往返和英文透传；M6 覆盖 `ni → nir → nirx → 你`、纯音码回归和两类词典逐字节复现。
+- 验证：M3 覆盖 modifier 映射、左右 Shift 原配置语义和 Rime 快捷键；M6 覆盖原始 bin 的固定语料、三个 bin 逐字节安装、纯音码回归及用户数据保护。
+
+### ADR-026：不向 macOS 声明 Caps Lock 语言切换能力
+
+- 日期：2026-08-25
+- 状态：已接受
+- 原因：风语只有一个 Hans 输入模式，且原小鹤配置将 Caps Lock 设为 `noop`。声明 `TICapsLockLanguageSwitchCapable` 会让系统输入源 HUD 建立风语并不实现的拉丁/非拉丁切换关系。
+- 兼容：移除该声明，所有 modifier 仍交由 Rime 处理；左 Shift 中英文切换不受影响。
+
+### ADR-027：输入源身份迁移实验回滚
+
+- 日期：2026-08-25
+- 状态：已回滚
+- 原因：钉钉 8.3.5 的光标输入源 HUD 在选择旧模式 ID 时，`TISCopyInputSourceRefForInputSourceID` 返回空值，随后系统辅助代码对空值调用 `CFRelease` 并终止钉钉。图标、签名、arm64 架构与 Caps Lock 元数据均已排除。
+- 结果：仅迁移子模式 ID 会生成可枚举但无法持久显示的记录；迁移完整 Bundle 身份则触发 macOS 对全新第三方输入法的首次用户授权要求，无法在现有免注销热更新流程中自动完成。为立即恢复用户可用性，继续使用已获授权的 `com.shendongchun.inputmethod.rime.dev.Hans`，失败的迁移包移出输入法目录并保留在构建目录供诊断。
 
 ## 待用户确认
 

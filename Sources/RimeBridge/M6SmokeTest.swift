@@ -9,12 +9,16 @@ enum M6SmokeTest {
     }
 
     private static let schemes = [
-        SchemeCase(identifier: "flypy", name: "小鹤音形", sequence: "nir", expected: "你"),
+        SchemeCase(identifier: "flypy", name: "小鹤音形", sequence: "ni", expected: "你"),
         SchemeCase(identifier: "luna_pinyin", name: "风语全拼", sequence: "nihao", expected: "你好"),
         SchemeCase(identifier: "double_pinyin", name: "自然码双拼", sequence: "nihk", expected: "你好"),
         SchemeCase(identifier: "double_pinyin_flypy", name: "小鹤双拼", sequence: "nihc", expected: "你好"),
         SchemeCase(identifier: "double_pinyin_mspy", name: "微软双拼", sequence: "nihk", expected: "你好"),
         SchemeCase(identifier: "double_pinyin_abc", name: "智能 ABC 双拼", sequence: "nihk", expected: "你好"),
+    ]
+
+    private static let flypyPrimaryShortcuts: [(code: String, text: String)] = [
+        ("w", "我"), ("d", "的"), ("u", "是"),
     ]
 
     static func run(arguments: [String]) -> Int32 {
@@ -23,7 +27,10 @@ enum M6SmokeTest {
             print("schemaCorpusPassed=\(result.schemeCount)")
             print("defaultSchema=flypy")
             print("flypyAuxiliaryCode=passed")
+            print("flypyOriginPrebuiltData=passed")
+            print("flypyPrimaryShortcutOrder=passed")
             print("flypyShortCodes=passed")
+            print("flypyCompatibilityPhrases=passed")
             print("flypyFourCharacterPhrases=passed")
             print("auxiliaryBroadCandidates=\(result.broadCandidateCount)")
             print("auxiliaryNarrowCandidates=\(result.narrowCandidateCount)")
@@ -77,6 +84,7 @@ enum M6SmokeTest {
         do {
             let service = try RimeService(paths: paths, minLogLevel: 2)
             try service.deploy(fullCheck: true)
+            try verifyFlypyPrebuiltDataInstalled(paths: paths)
 
             let defaultSession = try service.makeSession()
             let defaultSnapshot = try defaultSession.readSnapshot()
@@ -102,7 +110,11 @@ enum M6SmokeTest {
                     throw RimeBridgeError.smokeAssertion("\(scheme.identifier) display name mismatch")
                 }
                 guard snapshot.menu.candidates.contains(where: { $0.text == scheme.expected }) else {
-                    throw RimeBridgeError.smokeAssertion("\(scheme.identifier) corpus candidate missing")
+                    let candidates = snapshot.menu.candidates.map(\.text).joined(separator: ",")
+                    throw RimeBridgeError.smokeAssertion(
+                        "\(scheme.identifier) corpus candidate missing "
+                            + "(sequence=\(scheme.sequence), expected=\(scheme.expected), candidates=\(candidates))"
+                    )
                 }
             }
 
@@ -128,10 +140,14 @@ enum M6SmokeTest {
                 throw RimeBridgeError.smokeAssertion("small crane auxiliary code was not consumed")
             }
             let flypyNarrow = try flypyAuxiliarySession.readSnapshot()
-            guard flypyNarrow.menu.candidates.contains(where: { $0.text == "你" }),
-                flypyBroad.menu.candidates.count > flypyNarrow.menu.candidates.count
+            guard flypyBroad.menu.candidates.first?.text == "你",
+                flypyNarrow.menu.candidates.first?.text == "倪"
             else {
-                throw RimeBridgeError.smokeAssertion("small crane shape code did not narrow to 你")
+                throw RimeBridgeError.smokeAssertion(
+                    "small crane shape code mismatch "
+                        + "(broad=\(flypyBroad.menu.candidates.map(\.text).joined(separator: ",")), "
+                        + "narrow=\(flypyNarrow.menu.candidates.map(\.text).joined(separator: ",")))"
+                )
             }
             guard flypyAuxiliarySession.simulate(sequence: "x"),
                 try flypyAuxiliarySession.readSnapshot().commitText == "你"
@@ -142,7 +158,24 @@ enum M6SmokeTest {
             try verifyFlypyCandidate(service: service, sequence: "k", expected: "可以")
             try verifyFlypyCandidate(service: service, sequence: "aj", expected: "按键")
             try verifyFlypyCandidate(service: service, sequence: "hvy", expected: "呼之欲出")
-            try verifyFlypyAutoCommit(service: service, sequence: "ahqi", expected: "爱恨情仇")
+            for shortcut in flypyPrimaryShortcuts {
+                try verifyFlypyFirstCandidate(
+                    service: service,
+                    sequence: shortcut.code,
+                    expected: shortcut.text
+                )
+            }
+            try verifyFlypyCandidateOrder(service: service, sequence: "w", expectedPrefix: ["我", "位"])
+            try verifyFlypyCandidateOrder(service: service, sequence: "d", expectedPrefix: ["的", "打"])
+            try verifyFlypyCandidateOrder(service: service, sequence: "u", expectedPrefix: ["是", "时"])
+            try verifyFlypyCompatibilityOutput(service: service, sequence: "ubu", expected: "是不是")
+            try verifyFlypyCompatibilityOutput(service: service, sequence: "hdui", expected: "还是")
+            try verifyFlypyCompatibilityOutput(service: service, sequence: "biru", expected: "比如")
+            try verifyFlypyAutoCommit(service: service, sequence: "dsdk", expected: "洞")
+            try verifyFlypyCompatibilityOutput(service: service, sequence: "ahqi", expected: "昂起")
+            try verifyFlypyCompatibilityOutput(service: service, sequence: "anui", expected: "按时")
+            try verifyFlypyCompatibilityOutput(service: service, sequence: "keyi", expected: "可以")
+            try verifyFlypyCompatibilityOutput(service: service, sequence: "quts", expected: "趋同")
 
             let auxiliarySession = try service.makeSession()
             guard auxiliarySession.selectSchema(identifier: "luna_pinyin") else {
@@ -240,16 +273,78 @@ enum M6SmokeTest {
         guard session.selectSchema(identifier: "flypy"), session.simulate(sequence: sequence) else {
             throw RimeBridgeError.smokeAssertion("Flypy did not consume phrase code \(sequence)")
         }
-        guard try session.readSnapshot().commitText == expected else {
+        let snapshot = try session.readSnapshot()
+        guard snapshot.commitText == expected else {
+            let candidates = snapshot.menu.candidates.map(\.text).joined(separator: ",")
             throw RimeBridgeError.smokeAssertion(
-                "Flypy phrase code \(sequence) did not commit \(expected)"
+                "Flypy phrase code \(sequence) did not commit \(expected) "
+                    + "(commit=\(snapshot.commitText ?? "<none>"), candidates=\(candidates))"
+            )
+        }
+    }
+
+    private static func verifyFlypyFirstCandidate(
+        service: RimeService,
+        sequence: String,
+        expected: String
+    ) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: "flypy"), session.simulate(sequence: sequence) else {
+            throw RimeBridgeError.smokeAssertion("Flypy did not consume primary shortcut \(sequence)")
+        }
+        let snapshot = try session.readSnapshot()
+        guard snapshot.menu.candidates.first?.text == expected else {
+            let candidates = snapshot.menu.candidates.map(\.text).joined(separator: ",")
+            throw RimeBridgeError.smokeAssertion(
+                "Flypy primary shortcut \(sequence) did not rank \(expected) first "
+                    + "(candidates=\(candidates))"
+            )
+        }
+    }
+
+    private static func verifyFlypyCandidateOrder(
+        service: RimeService,
+        sequence: String,
+        expectedPrefix: [String]
+    ) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: "flypy"), session.simulate(sequence: sequence) else {
+            throw RimeBridgeError.smokeAssertion("Flypy did not consume ordered shortcut \(sequence)")
+        }
+        let candidates = try session.readSnapshot().menu.candidates.map(\.text)
+        guard Array(candidates.prefix(expectedPrefix.count)) == expectedPrefix else {
+            throw RimeBridgeError.smokeAssertion(
+                "Flypy shortcut \(sequence) order mismatch "
+                    + "(expected=\(expectedPrefix.joined(separator: ",")), "
+                    + "candidates=\(candidates.joined(separator: ",")))"
+            )
+        }
+    }
+
+    private static func verifyFlypyCompatibilityOutput(
+        service: RimeService,
+        sequence: String,
+        expected: String
+    ) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: "flypy"), session.simulate(sequence: sequence) else {
+            throw RimeBridgeError.smokeAssertion("Flypy did not consume compatibility code \(sequence)")
+        }
+        let snapshot = try session.readSnapshot()
+        guard snapshot.commitText == expected || snapshot.menu.candidates.first?.text == expected else {
+            let candidates = snapshot.menu.candidates.map(\.text).joined(separator: ",")
+            throw RimeBridgeError.smokeAssertion(
+                "Flypy compatibility code \(sequence) did not output \(expected) "
+                    + "(commit=\(snapshot.commitText ?? "<none>"), candidates=\(candidates))"
             )
         }
     }
 
     private static func validateBundledData(at sharedData: URL) throws {
         let required = schemes.map { "\($0.identifier).schema.yaml" } + [
-            "flypy.dict.yaml",
+            "build/flypy.table.bin",
+            "build/flypy.prism.bin",
+            "build/flypy.reverse.bin",
             "flypydz.schema.yaml",
             "flypydz.dict.yaml",
             "fengyu_aux.schema.yaml",
@@ -270,6 +365,21 @@ enum M6SmokeTest {
             sources.count == 5
         else {
             throw RimeBridgeError.smokeAssertion("invalid Rime data lock")
+        }
+    }
+
+    private static func verifyFlypyPrebuiltDataInstalled(paths: RimeServicePaths) throws {
+        for fileName in ["flypy.table.bin", "flypy.prism.bin", "flypy.reverse.bin"] {
+            let bundled = paths.prebuiltData.appendingPathComponent(fileName)
+            let installed = paths.staging.appendingPathComponent(fileName)
+            guard FileManager.default.contentsEqual(
+                atPath: bundled.path,
+                andPath: installed.path
+            ) else {
+                throw RimeBridgeError.smokeAssertion(
+                    "rime-origin prebuilt table was not installed exactly: \(fileName)"
+                )
+            }
         }
     }
 

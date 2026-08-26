@@ -6,6 +6,8 @@ project_root="$(cd "$(dirname "$0")/.." && pwd)"
 info_plist="$project_root/Resources/Info.plist"
 expected_bundle_id="com.shendongchun.inputmethod.rime.dev"
 expected_mode_id="$expected_bundle_id.Hans"
+legacy_mode_id="com.shendongchun.inputmethod.fengyu.Hans"
+transitional_mode_id="com.shendongchun.inputmethod.rime.dev.FengYuHans"
 expected_display_name="风语"
 
 plutil -lint "$info_plist"
@@ -17,9 +19,19 @@ if [[ "$display_name" != "$expected_display_name" || "$bundle_name" != "$expecte
     exit 65
 fi
 
+if /usr/libexec/PlistBuddy -c 'Print :TICapsLockLanguageSwitchCapable' "$info_plist" >/dev/null 2>&1; then
+    echo "Caps Lock language switching must not be advertised; Rime owns modifier behavior." >&2
+    exit 65
+fi
+
 plist_mode_id="$(/usr/libexec/PlistBuddy -c 'Print :ComponentInputModeDict:tsVisibleInputModeOrderedArrayKey:0' "$info_plist")"
 if [[ "$plist_mode_id" != "$expected_mode_id" ]]; then
     echo "Input mode ID mismatch: $plist_mode_id" >&2
+    exit 65
+fi
+
+if grep -Eq "$legacy_mode_id|$transitional_mode_id" "$info_plist"; then
+    echo "Legacy input mode IDs must not remain in Info.plist." >&2
     exit 65
 fi
 
@@ -29,15 +41,13 @@ if ! grep -q "PRODUCT_BUNDLE_IDENTIFIER = $expected_bundle_id;" "$project_root/R
 fi
 
 menu_icon="$(/usr/libexec/PlistBuddy -c "Print :ComponentInputModeDict:tsInputModeListKey:$expected_mode_id:tsInputModeMenuIconFileKey" "$info_plist")"
-if [[ "$menu_icon" != "FengYuInputModeIcon.pdf" ]]; then
-    echo "Input mode menu icon must use the FengYu original artwork." >&2
-    exit 65
-fi
-
 alternate_icon="$(/usr/libexec/PlistBuddy -c "Print :ComponentInputModeDict:tsInputModeListKey:$expected_mode_id:tsInputModeAlternateMenuIconFileKey" "$info_plist")"
 palette_icon="$(/usr/libexec/PlistBuddy -c "Print :ComponentInputModeDict:tsInputModeListKey:$expected_mode_id:tsInputModePaletteIconFileKey" "$info_plist")"
-if [[ "$alternate_icon" != "FengYuInputSwitcherIcon-v1.pdf" || "$palette_icon" != "FengYuInputSwitcherIcon-v1.pdf" ]]; then
-    echo "Input switcher must use its versioned FengYu icon resource." >&2
+stable_input_source_icon="FengYuInputSwitcherIcon-v1.pdf"
+if [[ "$menu_icon" != "$stable_input_source_icon" \
+    || "$alternate_icon" != "$stable_input_source_icon" \
+    || "$palette_icon" != "$stable_input_source_icon" ]]; then
+    echo "All input-source icon fields must use one stable FengYu resource." >&2
     exit 65
 fi
 
@@ -98,10 +108,12 @@ for required_file in \
     "$project_root/Resources/Rime/luna_pinyin.schema.yaml" \
     "$project_root/Resources/Rime/luna_pinyin.dict.yaml" \
     "$project_root/Resources/Rime/flypy.schema.yaml" \
-    "$project_root/Resources/Rime/flypy.dict.yaml" \
+    "$project_root/Resources/Rime/build/flypy.table.bin" \
+    "$project_root/Resources/Rime/build/flypy.prism.bin" \
+    "$project_root/Resources/Rime/build/flypy.reverse.bin" \
     "$project_root/Resources/Rime/flypydz.dict.yaml" \
-    "$project_root/Scripts/generate-flypy-dictionary.swift" \
-    "$project_root/LICENSES/librime-BSD-3-Clause.txt"; do
+    "$project_root/LICENSES/librime-BSD-3-Clause.txt" \
+    "$project_root/LICENSES/rime-data-LGPL-3.0.txt"; do
     if [[ ! -f "$required_file" ]]; then
         echo "Required M2 dependency file is missing: $required_file" >&2
         exit 66
@@ -135,5 +147,14 @@ verify_sha256 \
 verify_sha256 \
     "$project_root/LICENSES/OpenCC-Apache-2.0.txt" \
     "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
+verify_sha256 \
+    "$project_root/Resources/Rime/build/flypy.table.bin" \
+    "66d7151fe0dbcf2b1f40e0431b158bf630e2f0743ac1ceb45c7aceb17fd64eb7"
+verify_sha256 \
+    "$project_root/Resources/Rime/build/flypy.prism.bin" \
+    "7ebbff4c8d6d199e03cd4a16229b41a27b930d5eafb58b19855a2fa937d4d7a0"
+verify_sha256 \
+    "$project_root/Resources/Rime/build/flypy.reverse.bin" \
+    "2d06614b32a22dbf2cbb26f8799231d5628b0131e8e6e0be6314d688706fb4f5"
 
 echo "Project metadata verified."

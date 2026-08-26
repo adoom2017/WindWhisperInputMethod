@@ -22,6 +22,15 @@ enum MaintenanceCommand {
             ) { $0.enable() }
         case "--disable-input-source":
             return updateInputSource(action: "disable") { $0.disable() }
+        case "--disable-input-source-id":
+            guard arguments.count == 3 else {
+                fputs("RimeInputMethod: --disable-input-source-id requires one identifier\n", stderr)
+                return EXIT_FAILURE
+            }
+            return updateInputSource(
+                action: "disable \(arguments[2])",
+                manager: InputSourceManager(inputModeIdentifier: arguments[2])
+            ) { $0.disable() }
         case "--disable-input-method-parent":
             return updateInputSource(
                 action: "disable parent",
@@ -154,6 +163,7 @@ enum MaintenanceCommand {
               --enable-input-source    Enable the Simplified Chinese input mode
               --enable-input-method-parent Enable the parent input method
               --disable-input-source   Disable the Simplified Chinese input mode
+              --disable-input-source-id Disable an input source by identifier
               --disable-input-method-parent Disable the parent input method
               --select-input-source    Select the Simplified Chinese input mode
               --select-input-source-id Select an enabled input source by identifier

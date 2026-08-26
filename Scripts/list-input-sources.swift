@@ -18,10 +18,18 @@ func boolProperty(_ source: TISInputSource, _ key: CFString) -> Bool? {
     return CFBooleanGetValue(value)
 }
 
+func urlProperty(_ source: TISInputSource, _ key: CFString) -> URL? {
+    guard let property = TISGetInputSourceProperty(source, key) else {
+        return nil
+    }
+    return Unmanaged<CFURL>.fromOpaque(property).takeUnretainedValue() as URL
+}
+
 let expectedBundleID = CommandLine.arguments.dropFirst().first
     ?? "com.shendongchun.inputmethod.rime.dev"
+let includeAllInstalled = CommandLine.arguments.dropFirst(2).first != "enabled-only"
 let filter = [kTISPropertyBundleID as String: expectedBundleID] as CFDictionary
-guard let result = TISCreateInputSourceList(filter, true) else {
+guard let result = TISCreateInputSourceList(filter, includeAllInstalled) else {
     print("sourceCount=0")
     exit(0)
 }
@@ -39,5 +47,6 @@ for source in sources {
     print("enabled=\(boolProperty(source, kTISPropertyInputSourceIsEnabled) ?? false)")
     print("selected=\(boolProperty(source, kTISPropertyInputSourceIsSelected) ?? false)")
     print("selectCapable=\(boolProperty(source, kTISPropertyInputSourceIsSelectCapable) ?? false)")
+    print("iconURL=\(urlProperty(source, kTISPropertyIconImageURL)?.path ?? "<missing>")")
     print("---")
 }

@@ -11,14 +11,16 @@ enum M3SmokeTest {
         do {
             try verifyKeyMapping()
             print("keyMapping=passed")
-            try verifyShortcutPassthrough()
-            print("shortcutPassthrough=passed")
-            try verifyShiftTapRecognition()
-            print("shiftTapRecognition=passed")
+            try verifyShortcutMapping()
+            print("shortcutMapping=passed")
+            try verifyModifierMapping()
+            print("modifierMapping=passed")
             try verifyCompositionEditing(root: temporaryRoot)
             print("compositionEditing=passed")
             try verifyShiftModeSwitch(root: temporaryRoot)
             print("shiftModeSwitch=passed")
+            try verifyRimeShortcutRouting(root: temporaryRoot)
+            print("rimeShortcutRouting=passed")
             try verifyFrontendCommit(root: temporaryRoot)
             print("frontendCommit=passed")
             try verifyInputClientFlow(root: temporaryRoot.appendingPathComponent("client", isDirectory: true))
@@ -42,45 +44,55 @@ enum M3SmokeTest {
         }
     }
 
-    private static func verifyShortcutPassthrough() throws {
-        for flags: NSEvent.ModifierFlags in [.command, .control, .option] {
-            let event = try requireEvent(character: "n", keyCode: UInt16(kVK_ANSI_N), flags: flags)
-            guard RimeKeyMapper.map(event) == nil else {
-                throw RimeBridgeError.smokeAssertion("A system shortcut was not passed through.")
-            }
+    private static func verifyShortcutMapping() throws {
+        let command = try requireEvent(
+            character: "n",
+            keyCode: UInt16(kVK_ANSI_N),
+            flags: .command
+        )
+        guard RimeKeyMapper.map(command) == nil else {
+            throw RimeBridgeError.smokeAssertion("A Command shortcut was not passed through.")
+        }
+
+        let control = try requireEvent(
+            character: "j",
+            keyCode: UInt16(kVK_ANSI_J),
+            flags: .control
+        )
+        guard RimeKeyMapper.map(control)?.modifierMask == RimeKeyMapper.ModifierMask.control else {
+            throw RimeBridgeError.smokeAssertion("A Control shortcut was not routed to Rime.")
+        }
+
+        let option = try requireEvent(
+            character: "n",
+            keyCode: UInt16(kVK_ANSI_N),
+            flags: .option
+        )
+        guard RimeKeyMapper.map(option)?.modifierMask == RimeKeyMapper.ModifierMask.option else {
+            throw RimeBridgeError.smokeAssertion("An Option key was not offered to Rime.")
         }
     }
 
-    private static func verifyShiftTapRecognition() throws {
-        var tracker = ShiftTapTracker()
-        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .shift),
-            tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: [])
+    private static func verifyModifierMapping() throws {
+        let press = RimeKeyMapper.mapModifierChange(
+            keyCode: UInt16(kVK_Shift),
+            modifierFlags: .shift,
+            changedFlags: .shift
+        )
+        let release = RimeKeyMapper.mapModifierChange(
+            keyCode: 0,
+            modifierFlags: [],
+            changedFlags: .shift
+        )
+        guard press == RimeMappedKey(
+            keyCode: 0xFFE1,
+            modifierMask: RimeKeyMapper.ModifierMask.shift
+        ), release == RimeMappedKey(
+            keyCode: 0xFFE1,
+            modifierMask: RimeKeyMapper.ModifierMask.release
+        )
         else {
-            throw RimeBridgeError.smokeAssertion("A left Shift tap was not recognized exactly once.")
-        }
-
-        guard !tracker.update(keyCode: UInt16(kVK_RightShift), modifierFlags: .shift),
-            tracker.update(keyCode: UInt16(kVK_RightShift), modifierFlags: [])
-        else {
-            throw RimeBridgeError.smokeAssertion("A right Shift tap was not recognized exactly once.")
-        }
-
-        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .shift) else {
-            throw RimeBridgeError.smokeAssertion("Shift toggled on key-down.")
-        }
-        tracker.noteKeyDown()
-        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: []) else {
-            throw RimeBridgeError.smokeAssertion("Shift-modified typing triggered a mode switch.")
-        }
-
-        guard !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .shift),
-            !tracker.update(
-                keyCode: UInt16(kVK_Command),
-                modifierFlags: [.shift, .command]
-            ),
-            !tracker.update(keyCode: UInt16(kVK_Shift), modifierFlags: .command)
-        else {
-            throw RimeBridgeError.smokeAssertion("A system shortcut triggered a mode switch.")
+            throw RimeBridgeError.smokeAssertion("Shift press/release mapping is incorrect.")
         }
     }
 
@@ -111,9 +123,10 @@ enum M3SmokeTest {
         guard session.simulate(sequence: "ni") else {
             throw RimeBridgeError.smokeAssertion("Could not prepare a composition for Shift.")
         }
-        let switched = try RimeInputModeSwitcher.toggle(in: session)
-        guard switched.snapshot.status.isASCIIMode, switched.codeToCommit == "ni",
-            switched.snapshot.composition == nil
+        try tapModifier(UInt16(kVK_Shift), flag: .shift, in: session)
+        let switched = try session.readSnapshot()
+        guard switched.status.isASCIIMode, switched.commitText == "ni",
+            switched.composition == nil
         else {
             throw RimeBridgeError.smokeAssertion("Shift did not commit the code and enter English mode.")
         }
@@ -124,9 +137,55 @@ enum M3SmokeTest {
         guard english.commitText == nil, english.composition == nil else {
             throw RimeBridgeError.smokeAssertion("English mode unexpectedly composed ASCII text.")
         }
-        let restored = try RimeInputModeSwitcher.toggle(in: session)
-        guard !restored.snapshot.status.isASCIIMode, restored.codeToCommit == nil else {
+        try tapModifier(UInt16(kVK_Shift), flag: .shift, in: session)
+        let restored = try session.readSnapshot()
+        guard !restored.status.isASCIIMode, restored.commitText == nil else {
             throw RimeBridgeError.smokeAssertion("A second Shift tap did not restore Chinese mode.")
+        }
+
+        try tapModifier(UInt16(kVK_RightShift), flag: .shift, in: session)
+        guard try session.readSnapshot().status.isASCIIMode == false else {
+            throw RimeBridgeError.smokeAssertion("Right Shift should be a no-op like rime-origin.")
+        }
+    }
+
+    private static func verifyRimeShortcutRouting(root: URL) throws {
+        let session = try makeSession(
+            root: root.appendingPathComponent("shortcuts", isDirectory: true),
+            schemaIdentifier: "flypy"
+        )
+        let punctuationBefore = session.option("ascii_punct")
+        try routeShortcut(
+            character: ".",
+            keyCode: UInt16(kVK_ANSI_Period),
+            flags: .control,
+            in: session
+        )
+        guard let punctuationBefore,
+            session.option("ascii_punct") == !punctuationBefore
+        else {
+            throw RimeBridgeError.smokeAssertion("Control+. did not toggle Chinese/English punctuation.")
+        }
+
+        let simplificationBefore = session.option("simplification")
+        try routeShortcut(
+            character: "j",
+            keyCode: UInt16(kVK_ANSI_J),
+            flags: .control,
+            in: session
+        )
+        guard let simplificationBefore,
+            session.option("simplification") == !simplificationBefore
+        else {
+            throw RimeBridgeError.smokeAssertion("Control+j did not toggle character conversion.")
+        }
+
+        let fullShapeBefore = session.option("full_shape")
+        try routeShortcut(character: " ", keyCode: UInt16(kVK_Space), flags: .shift, in: session)
+        guard let fullShapeBefore,
+            session.option("full_shape") == !fullShapeBefore
+        else {
+            throw RimeBridgeError.smokeAssertion("Shift+Space did not toggle full-width mode.")
         }
     }
 
@@ -196,25 +255,66 @@ enum M3SmokeTest {
         }
     }
 
-    private static func makeSession(root: URL) throws -> RimeSession {
+    private static func makeSession(
+        root: URL,
+        schemaIdentifier: String = "luna_pinyin"
+    ) throws -> RimeSession {
         let paths = try RimeServicePaths.applicationDefaults()
         let service = try RimeService(paths: .temporary(root: root, sharedData: paths.sharedData))
         try service.deploy(fullCheck: true)
         let session = try service.makeSession()
-        guard session.selectSchema(identifier: "luna_pinyin") else {
-            throw RimeBridgeError.smokeAssertion("M3 could not select its full pinyin fixture")
+        guard session.selectSchema(identifier: schemaIdentifier) else {
+            throw RimeBridgeError.smokeAssertion("M3 could not select schema \(schemaIdentifier)")
         }
         return session
     }
 
-    private static func process(character: String, keyCode: UInt16, in session: RimeSession) throws {
-        let event = try requireEvent(character: character, keyCode: keyCode)
+    private static func process(
+        character: String,
+        keyCode: UInt16,
+        flags: NSEvent.ModifierFlags = [],
+        in session: RimeSession
+    ) throws {
+        let event = try requireEvent(character: character, keyCode: keyCode, flags: flags)
         guard let mapped = RimeKeyMapper.map(event) else {
             throw RimeBridgeError.smokeAssertion("A test key could not be mapped.")
         }
         guard session.process(keyCode: mapped.keyCode, modifierMask: mapped.modifierMask) else {
             throw RimeBridgeError.smokeAssertion("librime rejected a mapped test key.")
         }
+    }
+
+    private static func tapModifier(
+        _ keyCode: UInt16,
+        flag: NSEvent.ModifierFlags,
+        in session: RimeSession
+    ) throws {
+        guard let press = RimeKeyMapper.mapModifierChange(
+            keyCode: keyCode,
+            modifierFlags: flag,
+            changedFlags: flag
+        ), let release = RimeKeyMapper.mapModifierChange(
+            keyCode: keyCode,
+            modifierFlags: [],
+            changedFlags: flag
+        ) else {
+            throw RimeBridgeError.smokeAssertion("A modifier event could not be mapped.")
+        }
+        _ = session.process(keyCode: press.keyCode, modifierMask: press.modifierMask)
+        _ = session.process(keyCode: release.keyCode, modifierMask: release.modifierMask)
+    }
+
+    private static func routeShortcut(
+        character: String,
+        keyCode: UInt16,
+        flags: NSEvent.ModifierFlags,
+        in session: RimeSession
+    ) throws {
+        let event = try requireEvent(character: character, keyCode: keyCode, flags: flags)
+        guard let mapped = RimeKeyMapper.map(event) else {
+            throw RimeBridgeError.smokeAssertion("A Rime shortcut could not be mapped.")
+        }
+        _ = session.process(keyCode: mapped.keyCode, modifierMask: mapped.modifierMask)
     }
 
     private static func requireEvent(

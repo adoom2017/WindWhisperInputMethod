@@ -50,7 +50,7 @@
 ./Scripts/test-m7.sh Release
 ```
 
-`test-rime-bridge.sh` 会在 `/private/tmp` 创建隔离数据目录，验证应用内嵌运行库、签名、动态依赖、部署、候选和提交闭环，然后清理该测试目录。`test-m3.sh` 进一步验证按键映射、快捷键透传、单按 Shift 中英文切换、Shift 组合键防误触、组合编辑以及生产 `IMKTextInput` 更新路径。`test-m4.sh` 覆盖候选模型、鼠标命中、非激活面板约束、多显示器定位、边界翻转，以及真实 librime 高亮、翻页和语义选择。`test-m5.sh` 覆盖主题降级、横向布局、长文本压缩、macOS 26 原生玻璃与旧系统材质回退配置，以及浅色/深色和普通/无障碍组合的离屏视觉快照。`test-m6.sh` 验证 6 套拼音输入方案固定语料、小鹤形码逐键缩小候选、独立辅码注释、缺失方案保护、用户词典/覆盖文件升级保护，以及两类辅码词典的可复现生成。`test-m7.sh` 验证设置持久化、损坏值回退、多 session 同步、组合提交保护、真实繁简转换、横竖排布局、完整菜单、脱敏诊断和恢复默认值。需要从官方发布重新恢复锁定依赖时执行：
+`test-rime-bridge.sh` 会在 `/private/tmp` 创建隔离数据目录，验证应用内嵌运行库、签名、动态依赖、部署、候选和提交闭环，然后清理该测试目录。`test-m3.sh` 进一步验证按键映射、快捷键透传、单按 Shift 中英文切换、Shift 组合键防误触、组合编辑以及生产 `IMKTextInput` 更新路径。`test-m4.sh` 覆盖候选模型、鼠标命中、非激活面板约束、多显示器定位、边界翻转，以及真实 librime 高亮、翻页和语义选择。`test-m5.sh` 覆盖主题降级、横向布局、长文本压缩、macOS 26 原生玻璃与旧系统材质回退配置，以及浅色/深色和普通/无障碍组合的离屏视觉快照。`test-m6.sh` 验证 6 套拼音输入方案固定语料、小鹤形码逐键缩小候选、`ubu → 是不是`、`hdui → 还是`、四码自动提交不退化、独立辅码注释、缺失方案保护、用户词典/覆盖文件升级保护，以及两类辅码词典的可复现生成。`test-m7.sh` 验证设置持久化、损坏值回退、多 session 同步、组合提交保护、真实繁简转换、横竖排布局、完整菜单、脱敏诊断和恢复默认值。需要从官方发布重新恢复锁定依赖时执行：
 
 ```bash
 ./Scripts/fetch-librime.sh
@@ -111,7 +111,7 @@ RimeInputMethod/
 
 - 产品显示名：风语
 - 内部工程名：`RimeInputMethod`（为保持安装、输入源注册和用户数据兼容而保留）
-- 开发 Bundle ID：`com.shendongchun.inputmethod.rime.dev`
+- Bundle ID：`com.shendongchun.inputmethod.rime.dev`
 - 简体输入模式 ID：`com.shendongchun.inputmethod.rime.dev.Hans`
 - 最低版本：macOS 13
 - Release 架构：arm64 + x86_64
@@ -120,16 +120,17 @@ RimeInputMethod/
 
 ## 输入方案与辅码
 
-- 默认：小鹤双拼（音形辅码）。先输入两键音码，再按需追加一至两位形码；例如“你”的完整码为 `nirx`，输入 `ni` 后可继续输入 `r`、`x` 逐步缩小候选。
-- 简码与短语：复用原小鹤文本码表，支持单键、双键和三键简码，例如 `k → 可以`、`aj → 按键`、`hvy → 呼之欲出`。
-- 四字词：支持四键自动上屏，例如 `ahqi → 爱恨情仇`。四键单字音形码与四字词共用原码表候选顺序。
+- 默认：小鹤双拼（音形辅码）。主词典直接复用 `rime-origin/build` 的三个预编译文件，不再根据公开词表推导。例如 `ni → 你`、`nir → 倪`、`nirx → 你`（自动上屏），行为与原始码表一致。
+- 简码、短语与候选顺序：全部以原始 bin 为准；固定回归包括 `w → 我/位`、`d → 的/打`、`u → 是/时`、`ubu → 是不是`、`hdui → 还是`、`biru → 比如`。
+- 四字词：直接使用原始主词典及 `top/sys/user/full` 的层级，例如 `ahqi` 首选“昂起”，`sys` 中“爱恨情仇”为后续候选。
+- 词库层级：`top` 用于置顶词，`sys` 包含符号编码与二重简码，`user` 用于日常用户词，`full` 补全全码字；四者都由 Rime 独立加载，不再重复合并进主词典。
 - 纯音码：菜单中保留“小鹤双拼（纯音码）”，例如“你好”输入 `nihc`。
 - 设置入口：切换到“风语”后点击菜单栏输入法图标，即可在风语菜单中切换方案、全角、简繁、候选排列和主题；设置会立即同步到所有会话并在重启后恢复。
 - 其他方案：风语全拼、自然码、微软、智能 ABC 和仓颉五代均可直接从“输入方案”子菜单选择。
 - 通用辅码：在其他拼音方案中可先输入 `;`，再输入完整拼音和可选的仓颉首码，例如 `;zuok` 定位“左”。它与小鹤音形四码互不干扰。
-- 中英文：单独轻按一次左 Shift 或右 Shift 切换。已有编码时按 Shift 会先按 `commit_code` 规则提交编码再切到英文；用 Shift 输入大写字母或参与快捷键不会触发切换。
-- 用户词典和 `.custom.yaml` 保存在 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`，更新应用和重新部署不会覆盖这些文件。
-- `/Users/shendongchun/Documents/rime-origin` 中的文本 schema/码表已复制并由当前 librime 重新生成；不会直接加载原 `build/*.bin` 或用户数据库，也不依赖该目录持续存在。
+- 中英文：遵循原配置：左 Shift 为 `commit_code`，右 Shift、Caps Lock 不执行切换；Control/Option 快捷键交给 Rime 处理。
+- 用户词典和 `.custom.yaml` 继续保存在 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime`；Bundle 身份迁移、更新应用和重新部署都不会覆盖这些文件。
+- `/Users/shendongchun/Documents/rime-origin/build` 中的 `flypy.table.bin`、`flypy.prism.bin`、`flypy.reverse.bin` 已逐字节纳入应用，并在部署后强制恢复，避免 librime 重新生成改变候选行为。
 - 数据来源、固定提交、许可证和修改见 `Resources/Rime/DATA_LOCK.json`、`docs/RIME_DATA.md` 与 `LICENSES/`。
 
 ## 设置与维护
@@ -144,7 +145,6 @@ RimeInputMethod/
 
 - 主应用图标：`Resources/Assets/FengYuIconMaster.png`
 - macOS App Icon 资源：`Resources/Assets.xcassets/AppIcon.appiconset`
-- 输入法菜单图标：`Resources/FengYuInputModeIcon.pdf`（22×16pt 黑底、镂空白字输入源徽标）
-- `Ctrl+Space` 切换器图标：`Resources/FengYuInputSwitcherIcon-v1.pdf`（独立版本名用于刷新系统图标缓存）
+- 输入源图标：菜单、`Control + Space` 切换器和 palette 统一使用 `Resources/FengYuInputSwitcherIcon-v1.pdf`（22×16pt 黑底白字）。统一资源标识可避免部分宿主在 macOS 光标输入源 HUD 中切换不同图标对象时触发系统兼容问题。
 
 “风语”使用原创的风带与对话气泡组合标识，不使用 Rime/鼠须管图标或其视觉元素。
