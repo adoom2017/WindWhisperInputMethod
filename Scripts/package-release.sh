@@ -68,10 +68,6 @@ release_app="$staging_root/windwhisper.app"
 /usr/bin/ditto "$built_app" "$release_app"
 
 if [[ "$mode" != "local" ]]; then
-    while IFS= read -r -d '' code_file; do
-        /usr/bin/codesign \
-            --force --options runtime --timestamp --sign "$identity" "$code_file"
-    done < <(/usr/bin/find "$release_app/Contents/Frameworks" -type f -print0)
     /usr/bin/codesign \
         --force --options runtime --timestamp --sign "$identity" \
         "$release_app/Contents/MacOS/windwhisper"
@@ -95,7 +91,6 @@ fi
 /bin/cp "$project_root/docs/KNOWN_ISSUES.md" "$staging_root/KNOWN_ISSUES.md"
 
 executable_sha="$(/usr/bin/shasum -a 256 "$release_app/Contents/MacOS/windwhisper" | /usr/bin/awk '{print $1}')"
-librime_sha="$(/usr/bin/shasum -a 256 "$release_app/Contents/Frameworks/librime.1.dylib" | /usr/bin/awk '{print $1}')"
 data_lock_sha="$(/usr/bin/shasum -a 256 "$project_root/Resources/Rime/DATA_LOCK.json" | /usr/bin/awk '{print $1}')"
 manifest="$staging_root/VERSION_MANIFEST.json"
 /usr/bin/plutil -create xml1 "$manifest"
@@ -105,9 +100,8 @@ manifest="$staging_root/VERSION_MANIFEST.json"
 /usr/bin/plutil -insert build -string "$build_number" "$manifest"
 /usr/bin/plutil -insert architectures -json '["arm64","x86_64"]' "$manifest"
 /usr/bin/plutil -insert signingMode -string "$mode" "$manifest"
-/usr/bin/plutil -insert librimeVersion -string 1.16.0 "$manifest"
+/usr/bin/plutil -insert inputEngineVersion -string native-1.0 "$manifest"
 /usr/bin/plutil -insert executableSHA256 -string "$executable_sha" "$manifest"
-/usr/bin/plutil -insert librimeSHA256 -string "$librime_sha" "$manifest"
 /usr/bin/plutil -insert dataLockSHA256 -string "$data_lock_sha" "$manifest"
 /usr/bin/plutil -convert json "$manifest"
 

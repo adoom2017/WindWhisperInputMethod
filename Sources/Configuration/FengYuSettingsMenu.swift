@@ -168,10 +168,6 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         case .flypy: #selector(RimeInputController.fengYuSelectFlypySchemaCommand(_:))
         case .flypyPhonetic: #selector(RimeInputController.fengYuSelectFlypyPhoneticSchemaCommand(_:))
         case .fullPinyin: #selector(RimeInputController.fengYuSelectFullPinyinSchemaCommand(_:))
-        case .natural: #selector(RimeInputController.fengYuSelectNaturalSchemaCommand(_:))
-        case .microsoft: #selector(RimeInputController.fengYuSelectMicrosoftSchemaCommand(_:))
-        case .abc: #selector(RimeInputController.fengYuSelectABCSchemaCommand(_:))
-        case .cangjie: #selector(RimeInputController.fengYuSelectCangjieSchemaCommand(_:))
         }
     }
 

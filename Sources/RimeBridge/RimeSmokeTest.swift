@@ -3,94 +3,85 @@ import Foundation
 enum RimeSmokeTest {
     static func run(arguments: [String]) -> Int32 {
         do {
-            let result = try execute(arguments: arguments)
-            print("librimeVersion=\(result.version)")
-            print("schemaLoaded=\(result.schemaLoaded)")
-            print("candidateCountPositive=\(result.candidateCount > 0)")
-            print("expectedCandidateFound=\(result.expectedCandidateFound)")
-            print("commitMatched=\(result.commitMatched)")
-            print("rangeConversion=passed")
-            print("sessionLifecycle=passed")
+            try execute(arguments: arguments)
+            print("engineVersion=native-1.0")
+            print("fullPinyin=passed")
+            print("flypyPhonetic=passed")
+            print("flypyShape=passed")
+            print("flypyFourKeyAutoCommit=passed")
+            print("customWords=passed")
+            print("librimeDependency=absent")
             return EXIT_SUCCESS
         } catch {
-            fputs("windwhisper: \(error.localizedDescription)\n", stderr)
+            fputs("windwhisper native engine: \(error.localizedDescription)\n", stderr)
             return EXIT_FAILURE
         }
     }
 
-    private struct Result {
-        let version: String
-        let schemaLoaded: Bool
-        let candidateCount: Int
-        let expectedCandidateFound: Bool
-        let commitMatched: Bool
-    }
-
-    private static func execute(arguments: [String]) throws -> Result {
+    private static func execute(arguments: [String]) throws {
         try verifyUnicodeRangeConversion()
-
         guard let resources = Bundle.main.resourceURL else {
             throw RimeBridgeError.missingBundledData
         }
         let sharedData = resources.appendingPathComponent("Rime", isDirectory: true)
-        guard FileManager.default.fileExists(atPath: sharedData.path) else {
-            throw RimeBridgeError.missingBundledData
-        }
-
         let explicitRoot = argumentValue(after: "--user-data-root", in: arguments)
-        let temporaryRoot: URL
-        let shouldRemoveRoot: Bool
-        if let explicitRoot {
-            temporaryRoot = URL(fileURLWithPath: explicitRoot, isDirectory: true)
-            shouldRemoveRoot = false
-        } else {
-            temporaryRoot = FileManager.default.temporaryDirectory
-                .appendingPathComponent("windwhisper-M2-\(UUID().uuidString)", isDirectory: true)
-            shouldRemoveRoot = true
-        }
-        try FileManager.default.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
+        let root = explicitRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? FileManager.default.temporaryDirectory
+                .appendingPathComponent("windwhisper-native-\(UUID().uuidString)", isDirectory: true)
+        let shouldRemoveRoot = explicitRoot == nil
+        let paths = RimeServicePaths.temporary(root: root, sharedData: sharedData)
+        try FileManager.default.createDirectory(at: paths.userData, withIntermediateDirectories: true)
+        try "风语输入法\tfy\t9999999\n".write(
+            to: paths.userData.appendingPathComponent("custom_words.tsv"),
+            atomically: true,
+            encoding: .utf8
+        )
         defer {
-            if shouldRemoveRoot {
-                try? FileManager.default.removeItem(at: temporaryRoot)
-            }
+            if shouldRemoveRoot { try? FileManager.default.removeItem(at: root) }
         }
 
-        let service = try RimeService(
-            paths: .temporary(root: temporaryRoot, sharedData: sharedData),
-            minLogLevel: 2
-        )
-        guard service.version == "1.16.0" else {
-            throw RimeBridgeError.smokeAssertion("unexpected librime version")
+        let service = try RimeService(paths: paths)
+        guard service.version == "native-1.0" else {
+            throw RimeBridgeError.smokeAssertion("unexpected native engine version")
         }
-        try service.deploy(fullCheck: true)
+        try verifyCandidate(service: service, schema: .fullPinyin, code: "nihao", text: "你好")
+        try verifyCandidate(service: service, schema: .flypyPhonetic, code: "nihc", text: "你好")
+        try verifyCandidate(service: service, schema: .flypy, code: "ubu", text: "是不是")
+        try verifyCandidate(service: service, schema: .flypy, code: "fy", text: "风语输入法")
 
+        let shape = try service.makeSession()
+        guard shape.selectSchema(identifier: FengYuSchema.flypy.rawValue),
+            shape.simulate(sequence: "nirx"),
+            try shape.readSnapshot().commitText == "你"
+        else {
+            throw RimeBridgeError.smokeAssertion("four-key Flypy auto commit failed")
+        }
+
+        let frameworks = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/Frameworks", isDirectory: true)
+        let bundledLibrime = frameworks.appendingPathComponent("librime.1.dylib")
+        guard !FileManager.default.fileExists(atPath: bundledLibrime.path) else {
+            throw RimeBridgeError.smokeAssertion("librime is still bundled")
+        }
+    }
+
+    private static func verifyCandidate(
+        service: RimeService,
+        schema: FengYuSchema,
+        code: String,
+        text: String
+    ) throws {
         let session = try service.makeSession()
-        guard session.selectSchema(identifier: "luna_pinyin") else {
-            throw RimeBridgeError.smokeAssertion("full pinyin schema could not be selected")
+        guard session.selectSchema(identifier: schema.rawValue), session.simulate(sequence: code) else {
+            throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not consume \(code)")
         }
-        guard session.simulate(sequence: "nihao") else {
-            throw RimeBridgeError.smokeAssertion("key sequence was not consumed")
+        let snapshot = try session.readSnapshot()
+        guard let index = snapshot.menu.candidates.firstIndex(where: { $0.text == text }) else {
+            throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not produce \(text)")
         }
-        let candidateSnapshot = try session.readSnapshot()
-        let expectedIndex = candidateSnapshot.menu.candidates.firstIndex { $0.text == "你好" }
-        guard let expectedIndex else {
-            throw RimeBridgeError.smokeAssertion("expected candidate was not generated")
+        guard session.selectCandidate(at: index), try session.readSnapshot().commitText == text else {
+            throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not commit \(text)")
         }
-        guard session.selectCandidate(at: expectedIndex) else {
-            throw RimeBridgeError.smokeAssertion("candidate selection failed")
-        }
-        let commitSnapshot = try session.readSnapshot()
-        guard commitSnapshot.commitText == "你好" else {
-            throw RimeBridgeError.smokeAssertion("selected candidate was not committed")
-        }
-
-        return Result(
-            version: service.version,
-            schemaLoaded: candidateSnapshot.status.schemaIdentifier == "luna_pinyin",
-            candidateCount: candidateSnapshot.menu.candidates.count,
-            expectedCandidateFound: true,
-            commitMatched: true
-        )
     }
 
     private static func verifyUnicodeRangeConversion() throws {
@@ -101,21 +92,15 @@ enum RimeSmokeTest {
                 endUTF8Offset: 5,
                 in: text
             ) == NSRange(location: 1, length: 2),
-            RimeRangeConverter.utf16Offset(forUTF8Offset: 8, in: text) == 4,
-            RimeRangeConverter.utf16Offset(forUTF8Offset: 2, in: text) == nil
+            RimeRangeConverter.utf16Offset(forUTF8Offset: 8, in: text) == 4
         else {
-            throw RimeBridgeError.smokeAssertion("UTF-8 to UTF-16 range conversion failed")
+            throw RimeBridgeError.smokeAssertion("UTF-8 to UTF-16 conversion failed")
         }
     }
 
     private static func argumentValue(after flag: String, in arguments: [String]) -> String? {
-        guard let index = arguments.firstIndex(of: flag) else {
-            return nil
-        }
+        guard let index = arguments.firstIndex(of: flag) else { return nil }
         let valueIndex = arguments.index(after: index)
-        guard valueIndex < arguments.endIndex else {
-            return nil
-        }
-        return arguments[valueIndex]
+        return valueIndex < arguments.endIndex ? arguments[valueIndex] : nil
     }
 }

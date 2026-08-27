@@ -462,7 +462,7 @@ enum M6SmokeTest {
             let service = try RimeService(paths: brokenPaths, minLogLevel: 2)
             try service.deploy(fullCheck: true)
         } catch RimeBridgeError.bridge(let code, _)
-            where code == Int32(RB_RESULT_DEPLOYMENT_FAILED.rawValue)
+            where code == -7
         {
             failureDetected = true
         }

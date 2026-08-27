@@ -74,14 +74,6 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
             FengYuSettingsMenuController.shared.selectSchema(.flypyPhonetic)
         case #selector(fengYuSelectFullPinyinSchemaCommand(_:)):
             FengYuSettingsMenuController.shared.selectSchema(.fullPinyin)
-        case #selector(fengYuSelectNaturalSchemaCommand(_:)):
-            FengYuSettingsMenuController.shared.selectSchema(.natural)
-        case #selector(fengYuSelectMicrosoftSchemaCommand(_:)):
-            FengYuSettingsMenuController.shared.selectSchema(.microsoft)
-        case #selector(fengYuSelectABCSchemaCommand(_:)):
-            FengYuSettingsMenuController.shared.selectSchema(.abc)
-        case #selector(fengYuSelectCangjieSchemaCommand(_:)):
-            FengYuSettingsMenuController.shared.selectSchema(.cangjie)
         case #selector(fengYuToggleFullWidthCommand(_:)):
             FengYuSettingsMenuController.shared.toggleFullWidth()
         case #selector(fengYuToggleSimplifiedChineseCommand(_:)):
@@ -481,22 +473,6 @@ extension RimeInputController {
 
     @objc func fengYuSelectFullPinyinSchemaCommand(_ command: Any) {
         FengYuSettingsMenuController.shared.selectSchema(.fullPinyin)
-    }
-
-    @objc func fengYuSelectNaturalSchemaCommand(_ command: Any) {
-        FengYuSettingsMenuController.shared.selectSchema(.natural)
-    }
-
-    @objc func fengYuSelectMicrosoftSchemaCommand(_ command: Any) {
-        FengYuSettingsMenuController.shared.selectSchema(.microsoft)
-    }
-
-    @objc func fengYuSelectABCSchemaCommand(_ command: Any) {
-        FengYuSettingsMenuController.shared.selectSchema(.abc)
-    }
-
-    @objc func fengYuSelectCangjieSchemaCommand(_ command: Any) {
-        FengYuSettingsMenuController.shared.selectSchema(.cangjie)
     }
 
     @objc func fengYuToggleFullWidthCommand(_ command: Any) {

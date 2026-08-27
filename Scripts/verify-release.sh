@@ -40,11 +40,10 @@ fi
 
 application_path="$release_root/windwhisper.app"
 executable="$application_path/Contents/MacOS/windwhisper"
-library="$application_path/Contents/Frameworks/librime.1.dylib"
 manifest="$release_root/VERSION_MANIFEST.json"
 
 for required in \
-    "$application_path" "$executable" "$library" "$manifest" \
+    "$application_path" "$executable" "$manifest" \
     "$release_root/LICENSES/THIRD_PARTY_NOTICES.md" \
     "$release_root/INSTALL.md" "$release_root/RELEASE_NOTES.md" \
     "$release_root/KNOWN_ISSUES.md"; do
@@ -63,30 +62,25 @@ build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$application_path/
 [[ "$(/usr/bin/plutil -extract signingMode raw "$manifest")" == "$mode" ]] \
     || fail "manifest signing mode does not match verification mode"
 executable_sha="$(/usr/bin/shasum -a 256 "$executable" | /usr/bin/awk '{print $1}')"
-librime_sha="$(/usr/bin/shasum -a 256 "$library" | /usr/bin/awk '{print $1}')"
 [[ "$(/usr/bin/plutil -extract executableSHA256 raw "$manifest")" == "$executable_sha" ]] \
     || fail "manifest executable checksum does not match"
-[[ "$(/usr/bin/plutil -extract librimeSHA256 raw "$manifest")" == "$librime_sha" ]] \
-    || fail "manifest librime checksum does not match"
+[[ "$(/usr/bin/plutil -extract inputEngineVersion raw "$manifest")" == "native-1.0" ]] \
+    || fail "manifest native input-engine version does not match"
 
-for binary in "$executable" "$library"; do
+for binary in "$executable"; do
     architectures="$(/usr/bin/lipo -archs "$binary")"
     [[ "$architectures" == *arm64* && "$architectures" == *x86_64* ]] \
         || fail "universal architectures are missing from $binary"
 done
-if /usr/bin/otool -L "$executable" "$library" \
-    | /usr/bin/grep -Eq '/opt/homebrew|/usr/local/(Cellar|opt)'; then
-    fail "release contains a package-manager runtime dependency"
+if [[ -e "$application_path/Contents/Frameworks/librime.1.dylib" ]] \
+    || /usr/bin/otool -L "$executable" \
+    | /usr/bin/grep -Eq 'librime|/opt/homebrew|/usr/local/(Cellar|opt)'; then
+    fail "release contains librime or a package-manager runtime dependency"
 fi
 if /usr/bin/find "$application_path" -type f \( -name '*.swift' -o -name '*.c' -o -name '*.h' \) \
     | /usr/bin/grep -q .; then
     fail "release bundle contains project source files"
 fi
-for removed_prebuilt in flypy.table.bin flypy.prism.bin flypy.reverse.bin; do
-    [[ ! -e "$application_path/Contents/Resources/Rime/build/$removed_prebuilt" ]] \
-        || fail "release unexpectedly contains $removed_prebuilt"
-done
-
 /usr/bin/codesign --verify --deep --strict --verbose=2 "$application_path"
 signature_details="$(/usr/bin/codesign -dvv "$application_path" 2>&1)"
 if [[ "$mode" == "local" ]]; then

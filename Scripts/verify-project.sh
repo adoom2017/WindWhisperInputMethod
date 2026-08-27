@@ -84,61 +84,24 @@ if grep -Eq 'Rime\.icns|Resources/InputModeIcon\.pdf' \
     exit 65
 fi
 
-library="$project_root/Vendor/librime/lib/librime.1.dylib"
-expected_library_sha256="922aad7de56473dd13e25836b0eecfa3698e07506154f418cf27e1f5e268e8b3"
-if [[ ! -f "$library" ]]; then
-    echo "Pinned librime runtime is missing; run Scripts/fetch-librime.sh." >&2
-    exit 66
-fi
-
-actual_library_sha256="$(shasum -a 256 "$library" | awk '{print $1}')"
-if [[ "$actual_library_sha256" != "$expected_library_sha256" ]]; then
-    echo "Pinned librime runtime checksum mismatch." >&2
-    exit 65
-fi
-
-architectures="$(lipo -archs "$library")"
-if [[ "$architectures" != *arm64* || "$architectures" != *x86_64* ]]; then
-    echo "Pinned librime runtime must contain arm64 and x86_64." >&2
-    exit 65
-fi
-
-if otool -L "$library" | grep -Eq '/opt/homebrew|/usr/local/(Cellar|opt)'; then
-    echo "Pinned librime runtime contains a package-manager dependency." >&2
-    exit 65
-fi
-
 for required_file in \
-    "$project_root/Vendor/librime/LOCK.json" \
-    "$project_root/Vendor/librime/include/rime_api.h" \
     "$project_root/Resources/Rime/default.yaml" \
     "$project_root/Resources/Rime/luna_pinyin.schema.yaml" \
     "$project_root/Resources/Rime/luna_pinyin.dict.yaml" \
     "$project_root/Resources/Rime/flypy.schema.yaml" \
     "$project_root/Resources/Rime/flypy.dict.yaml" \
     "$project_root/Resources/Rime/flypydz.dict.yaml" \
-    "$project_root/Sources/RimeBridge/M8SmokeTest.swift" \
-    "$project_root/Scripts/test-m8.sh" \
-    "$project_root/Scripts/test-m9.sh" \
-    "$project_root/Scripts/package-release.sh" \
-    "$project_root/Scripts/verify-release.sh" \
-    "$project_root/Scripts/lib/install-transaction.sh" \
-    "$project_root/docs/M8_VALIDATION.md" \
-    "$project_root/docs/M9_VALIDATION.md" \
-    "$project_root/docs/RELEASE_INSTALL.md" \
-    "$project_root/docs/RELEASE_NOTES.md" \
-    "$project_root/docs/KNOWN_ISSUES.md" \
-    "$project_root/LICENSES/librime-BSD-3-Clause.txt" \
-    "$project_root/LICENSES/rime-data-LGPL-3.0.txt"; do
+    "$project_root/Sources/RimeBridge/RimeSmokeTest.swift" \
+    "$project_root/Sources/RimeBridge/RimeService.swift"; do
     if [[ ! -f "$required_file" ]]; then
         echo "Required M2 dependency file is missing: $required_file" >&2
         exit 66
     fi
 done
 
-if ! grep -q 'M8SmokeTest.swift in Sources' \
+if grep -Eq 'RimeBridge\.c in Sources|librime\.1\.dylib in (Frameworks|Embed Libraries)|SWIFT_OBJC_BRIDGING_HEADER|Vendor/librime' \
     "$project_root/WindWhisperInputMethod.xcodeproj/project.pbxproj"; then
-    echo "M8 smoke test is not included in the application target." >&2
+    echo "The application target must not link or embed librime." >&2
     exit 65
 fi
 
@@ -175,15 +138,5 @@ verify_sha256 \
 verify_sha256 \
     "$project_root/Resources/Rime/flypy.schema.yaml" \
     "6f5d341405cf46df29feb7ce287231185abe5f7e76de61dc97172e6ecc2050aa"
-
-for removed_prebuilt in \
-    "$project_root/Resources/Rime/build/flypy.table.bin" \
-    "$project_root/Resources/Rime/build/flypy.prism.bin" \
-    "$project_root/Resources/Rime/build/flypy.reverse.bin"; do
-    if [[ -e "$removed_prebuilt" ]]; then
-        echo "Flypy prebuilt data must be generated at deployment time: $removed_prebuilt" >&2
-        exit 65
-    fi
-done
 
 echo "Project metadata verified."

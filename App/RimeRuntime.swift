@@ -40,11 +40,11 @@ final class RimeRuntime: @unchecked Sendable {
             let service = try RimeService(paths: .applicationDefaults())
             try service.deploy(fullCheck: false)
             self.service = service
-            logger.notice("librime service is ready")
+            logger.notice("native input engine is ready")
             return true
         } catch {
             startupErrorDescription = error.localizedDescription
-            logger.error("librime startup failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("native input engine startup failed: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
@@ -108,6 +108,6 @@ final class RimeRuntime: @unchecked Sendable {
         stateLock.lock()
         service = nil
         stateLock.unlock()
-        logger.notice("librime service stopped")
+        logger.notice("native input engine stopped")
     }
 }

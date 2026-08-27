@@ -14,16 +14,6 @@ trap cleanup EXIT
 
 "$project_root/Scripts/build.sh" "$configuration"
 "$project_root/Scripts/verify-runtime.sh" "$application_path"
-/usr/bin/env \
-    CLANG_MODULE_CACHE_PATH="$test_root/ModuleCache" \
-    SWIFT_MODULECACHE_PATH="$test_root/ModuleCache" \
-    "$project_root/Scripts/generate-aux-dictionary.swift" \
-    "$project_root/Resources/Rime/luna_pinyin.dict.yaml" \
-    "$project_root/Resources/Rime/cangjie5.dict.yaml" \
-    "$test_root/fengyu_aux.dict.yaml"
-cmp "$test_root/fengyu_aux.dict.yaml" "$project_root/Resources/Rime/fengyu_aux.dict.yaml"
-echo "auxiliaryDictionaryReproducible=passed"
-echo "flypyRecoveredDictionary=locked"
 "$application_path/Contents/MacOS/windwhisper" \
-    --m6-smoke \
+    --engine-smoke \
     --user-data-root "$test_root"

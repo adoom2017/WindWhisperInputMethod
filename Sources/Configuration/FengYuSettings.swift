@@ -4,20 +4,12 @@ enum FengYuSchema: String, CaseIterable, Sendable {
     case flypy = "flypy"
     case flypyPhonetic = "double_pinyin_flypy"
     case fullPinyin = "luna_pinyin"
-    case natural = "double_pinyin"
-    case microsoft = "double_pinyin_mspy"
-    case abc = "double_pinyin_abc"
-    case cangjie = "cangjie5"
 
     var displayName: String {
         switch self {
         case .flypy: "小鹤双拼（音形辅码）"
         case .flypyPhonetic: "小鹤双拼（纯音码）"
         case .fullPinyin: "风语全拼"
-        case .natural: "自然码双拼"
-        case .microsoft: "微软双拼"
-        case .abc: "智能 ABC 双拼"
-        case .cangjie: "仓颉五代"
         }
     }
 }

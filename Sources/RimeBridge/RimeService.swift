@@ -13,8 +13,8 @@ enum RimeBridgeError: Error, LocalizedError {
             "The bundled input-engine data directory is missing."
         case .invalidCString:
             "An input-engine path could not be represented as UTF-8."
-        case .bridge(let code, _):
-            "Input engine error \(code)."
+        case .bridge(let code, let message):
+            "Input engine error \(code): \(message)"
         case .invalidUTF8Offset:
             "The input engine returned an invalid composition offset."
         case .smokeAssertion(let message):
@@ -40,245 +40,257 @@ struct RimeServicePaths: Sendable {
             throw RimeBridgeError.missingBundledData
         }
 
-        // Keep the existing local dictionary, deployment and log directories when
-        // the bundle identity changes to repair a corrupted macOS input-source record.
         let identifier = InputSourceMetadata.persistentDataIdentifier
         let library = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library", isDirectory: true)
-        let applicationSupport =
-            library
+        let root = library
             .appendingPathComponent("Application Support", isDirectory: true)
-        let userData =
-            applicationSupport
             .appendingPathComponent(identifier, isDirectory: true)
-            .appendingPathComponent("Data", isDirectory: true)
-        let legacyUserData = InputSourceMetadata.legacyPersistentDataIdentifiers.map { identifier in
-            applicationSupport
-                .appendingPathComponent(identifier, isDirectory: true)
-                .appendingPathComponent("Rime", isDirectory: true)
-        }
+        let userData = root.appendingPathComponent("User", isDirectory: true)
         return Self(
             sharedData: sharedData,
             userData: userData,
-            prebuiltData: sharedData.appendingPathComponent("build", isDirectory: true),
-            staging: userData.appendingPathComponent("build", isDirectory: true),
-            logs:
-                library
-                .appendingPathComponent("Logs", isDirectory: true)
+            prebuiltData: sharedData,
+            staging: root.appendingPathComponent("Runtime", isDirectory: true),
+            logs: library.appendingPathComponent("Logs", isDirectory: true)
                 .appendingPathComponent(identifier, isDirectory: true),
-            legacyUserData: legacyUserData
+            legacyUserData: []
         )
     }
 
-    static func temporary(
-        root: URL,
-        sharedData: URL,
-        legacyUserData: [URL] = []
-    ) -> Self {
-        let userData = root.appendingPathComponent("user", isDirectory: true)
+    static func temporary(root: URL, sharedData: URL, legacyUserData: [URL] = []) -> Self {
+        let userData = root.appendingPathComponent("User", isDirectory: true)
         return Self(
             sharedData: sharedData,
             userData: userData,
-            prebuiltData: sharedData.appendingPathComponent("build", isDirectory: true),
-            staging: userData.appendingPathComponent("build", isDirectory: true),
-            logs: root.appendingPathComponent("logs", isDirectory: true),
+            prebuiltData: sharedData,
+            staging: root.appendingPathComponent("Runtime", isDirectory: true),
+            logs: root.appendingPathComponent("Logs", isDirectory: true),
             legacyUserData: legacyUserData
         )
     }
 }
 
-private final class CStringStorage {
-    private(set) var values: [UnsafeMutablePointer<CChar>]
-
-    init(_ strings: [String]) throws {
-        values = try strings.map { string in
-            guard let value = strdup(string) else {
-                throw RimeBridgeError.invalidCString
-            }
-            return value
-        }
-    }
-
-    deinit {
-        for value in values {
-            free(value)
-        }
-    }
+private struct NativeDictionaryEntry: Sendable {
+    let text: String
+    let code: String
+    let weight: Int
+    let order: Int
 }
 
-final class RimeService: @unchecked Sendable {
-    private var handle: RBServiceRef?
-    private let engineLock = NSRecursiveLock()
+private final class NativeDictionary: @unchecked Sendable {
+    private let shapeEntries: [NativeDictionaryEntry]
+    private let pinyinEntries: [NativeDictionaryEntry]
+    private let flypyPhoneticEntries: [NativeDictionaryEntry]
 
-    let paths: RimeServicePaths
-    let version: String
-
-    init(paths: RimeServicePaths, minLogLevel: Int32 = 2) throws {
-        self.paths = paths
-        let fileManager = FileManager.default
-        try Self.migrateLegacyUserDataIfNeeded(at: paths, using: fileManager)
-        try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: paths.staging, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
-        try Self.seedBundledFlypyUserTables(at: paths, using: fileManager)
-
-        let distributionVersion = Self.bundleVersion()
-        let strings = try CStringStorage([
-            paths.sharedData.path,
-            paths.userData.path,
-            paths.prebuiltData.path,
-            paths.staging.path,
-            paths.logs.path,
-            "windwhisper",
-            "windwhisper",
-            distributionVersion,
-            "windwhisper.input_method",
-        ])
-        var configuration = RBServiceConfiguration(
-            shared_data_dir: UnsafePointer(strings.values[0]),
-            user_data_dir: UnsafePointer(strings.values[1]),
-            prebuilt_data_dir: UnsafePointer(strings.values[2]),
-            staging_dir: UnsafePointer(strings.values[3]),
-            log_dir: UnsafePointer(strings.values[4]),
-            distribution_name: UnsafePointer(strings.values[5]),
-            distribution_code_name: UnsafePointer(strings.values[6]),
-            distribution_version: UnsafePointer(strings.values[7]),
-            app_name: UnsafePointer(strings.values[8]),
-            min_log_level: minLogLevel
-        )
-
-        var createdHandle: RBServiceRef?
-        try Self.check(rb_service_create(&configuration, &createdHandle, nil))
-        guard let createdHandle else {
-            throw RimeBridgeError.bridge(code: -1, message: "Missing service handle.")
-        }
-        handle = createdHandle
-        version = rb_service_version(createdHandle).map(String.init(cString:)) ?? "unknown"
-    }
-
-    private static func bundleVersion(bundle: Bundle = .main) -> String {
-        bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
-    }
-
-    private static func migrateLegacyUserDataIfNeeded(
-        at paths: RimeServicePaths,
-        using fileManager: FileManager
-    ) throws {
-        guard !fileManager.fileExists(atPath: paths.userData.path) else {
-            return
-        }
-        guard let source = paths.legacyUserData.first(where: {
-            fileManager.fileExists(atPath: $0.path)
-        }) else {
-            return
+    init(sharedData: URL, userData: URL) throws {
+        let flypyURL = sharedData.appendingPathComponent("flypy.dict.yaml")
+        let pinyinURL = sharedData.appendingPathComponent("luna_pinyin.dict.yaml")
+        let essayURL = sharedData.appendingPathComponent("essay.txt")
+        guard FileManager.default.fileExists(atPath: flypyURL.path),
+            FileManager.default.fileExists(atPath: pinyinURL.path),
+            FileManager.default.fileExists(atPath: essayURL.path)
+        else {
+            throw RimeBridgeError.missingBundledData
         }
 
-        try fileManager.createDirectory(
-            at: paths.userData.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try fileManager.copyItem(at: source, to: paths.userData)
-    }
-
-    deinit {
-        withEngineLock {
-            if let handle {
-                rb_service_destroy(handle)
-            }
-        }
-    }
-
-    func deploy(fullCheck: Bool) throws {
-        guard let handle else {
-            throw RimeBridgeError.bridge(code: -1, message: "Service is not active.")
-        }
-        try withEngineLock {
-            try Self.withBridgeError { error in
-                rb_service_deploy(handle, fullCheck ? 1 : 0, error)
-            }
-        }
-    }
-
-    private static func seedBundledFlypyUserTables(
-        at paths: RimeServicePaths,
-        using fileManager: FileManager
-    ) throws {
+        var shape = try Self.readCodedEntries(at: flypyURL, baseWeight: 2_000_000)
         for name in ["flypy_top", "flypy_sys", "flypy_user", "flypy_full", "flypy_ok"] {
-            let fileName = "\(name).txt"
-            let source = paths.sharedData.appendingPathComponent(fileName)
-            let destination = paths.userData.appendingPathComponent(fileName)
-            guard fileManager.fileExists(atPath: source.path),
-                !fileManager.fileExists(atPath: destination.path)
-            else {
-                continue
+            let bundled = sharedData.appendingPathComponent("\(name).txt")
+            if FileManager.default.fileExists(atPath: bundled.path) {
+                shape.append(contentsOf: try Self.readCodedEntries(at: bundled, baseWeight: 1_000_000))
             }
-            try fileManager.copyItem(at: source, to: destination)
         }
-    }
+        let customURL = userData.appendingPathComponent("custom_words.tsv")
+        if FileManager.default.fileExists(atPath: customURL.path) {
+            shape.insert(contentsOf: try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000), at: 0)
+        }
+        shapeEntries = Self.sortedForPrefixSearch(shape)
 
-    func makeSession() throws -> RimeSession {
-        guard let handle else {
-            throw RimeBridgeError.bridge(code: -1, message: "Service is not active.")
-        }
-        return try withEngineLock {
-            var session: RBSessionRef = 0
-            try Self.withBridgeError { error in
-                rb_session_create(handle, &session, error)
+        let characterRows = try Self.readCodedEntries(at: pinyinURL, baseWeight: 500_000)
+        var primaryPinyin = [Character: String]()
+        for entry in characterRows where entry.text.count == 1 {
+            guard let character = entry.text.first else { continue }
+            if primaryPinyin[character] == nil {
+                primaryPinyin[character] = entry.code
             }
-            return RimeSession(service: self, serviceHandle: handle, sessionHandle: session)
         }
-    }
 
-    func diagnostics() -> RimeBridgeDiagnostics? {
-        guard let handle else {
-            return nil
+        var shapeRank = [String: Int]()
+        for (index, entry) in shape.enumerated() where shapeRank[entry.text] == nil {
+            shapeRank[entry.text] = max(0, 1_000_000 - index)
         }
-        return withEngineLock {
-            var bridgeDiagnostics = RBBridgeDiagnostics()
-            guard rb_bridge_read_diagnostics(handle, &bridgeDiagnostics) != 0 else {
-                return nil
-            }
-            return RimeBridgeDiagnostics(
-                activeSessionCount: Int(bridgeDiagnostics.active_session_count),
-                snapshotAllocationCount: Int(bridgeDiagnostics.snapshot_allocation_count),
-                residentMemoryBytes: bridgeDiagnostics.resident_memory_bytes
+        var pinyin = characterRows.map { entry in
+            NativeDictionaryEntry(
+                text: entry.text,
+                code: Self.normalizedPinyin(entry.code),
+                weight: shapeRank[entry.text] ?? entry.weight,
+                order: entry.order
             )
         }
-    }
-
-    fileprivate func withEngineLock<Result>(_ operation: () throws -> Result) rethrows -> Result {
-        engineLock.lock()
-        defer { engineLock.unlock() }
-        return try operation()
-    }
-
-    fileprivate static func check(_ result: RBResult) throws {
-        guard result != RB_RESULT_OK else {
-            return
+        var flypyPhonetic = characterRows.compactMap { entry -> NativeDictionaryEntry? in
+            guard let code = Self.flypySyllable(entry.code) else { return nil }
+            return NativeDictionaryEntry(
+                text: entry.text,
+                code: code,
+                weight: shapeRank[entry.text] ?? entry.weight,
+                order: entry.order
+            )
         }
-        throw RimeBridgeError.bridge(
-            code: Int32(result.rawValue),
-            message: "Unspecified bridge failure."
-        )
+
+        let essay = try String(contentsOf: essayURL, encoding: .utf8)
+        var order = pinyin.count
+        for line in essay.split(whereSeparator: \.isNewline) {
+            if line.isEmpty || line.first == "#" { continue }
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count >= 2, let weight = Int(fields[1]) else { continue }
+            let text = String(fields[0])
+            guard text.count > 1 else { continue }
+            var code = ""
+            var flypyCode = ""
+            var complete = true
+            for character in text {
+                guard let syllable = primaryPinyin[character],
+                    let encodedSyllable = Self.flypySyllable(syllable)
+                else {
+                    complete = false
+                    break
+                }
+                code += syllable
+                flypyCode += encodedSyllable
+            }
+            guard complete else { continue }
+            pinyin.append(NativeDictionaryEntry(text: text, code: code, weight: weight, order: order))
+            flypyPhonetic.append(NativeDictionaryEntry(
+                text: text,
+                code: flypyCode,
+                weight: weight,
+                order: order
+            ))
+            order += 1
+        }
+
+        pinyinEntries = Self.sortedForPrefixSearch(pinyin)
+        flypyPhoneticEntries = Self.sortedForPrefixSearch(flypyPhonetic)
     }
 
-    fileprivate static func withBridgeError(
-        _ operation: (UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>) -> RBResult
-    ) throws {
-        var messagePointer: UnsafeMutablePointer<CChar>?
-        let result = operation(&messagePointer)
-        defer {
-            if let messagePointer {
-                rb_error_message_free(messagePointer)
+    func candidates(for code: String, schema: FengYuSchema, limit: Int = 100) -> [String] {
+        let entries: [NativeDictionaryEntry]
+        switch schema {
+        case .flypy:
+            entries = shapeEntries
+        case .flypyPhonetic:
+            entries = flypyPhoneticEntries
+        case .fullPinyin:
+            entries = pinyinEntries
+        }
+        guard !code.isEmpty else { return [] }
+
+        let normalized = schema == .fullPinyin ? Self.normalizedPinyin(code) : code.lowercased()
+        let start = Self.lowerBound(in: entries, prefix: normalized)
+        var matches = [NativeDictionaryEntry]()
+        var index = start
+        while index < entries.count, entries[index].code.hasPrefix(normalized) {
+            matches.append(entries[index])
+            index += 1
+            if matches.count >= 20_000 { break }
+        }
+        matches.sort {
+            let lhsExact = $0.code == normalized
+            let rhsExact = $1.code == normalized
+            if lhsExact != rhsExact { return lhsExact }
+            if $0.weight != $1.weight { return $0.weight > $1.weight }
+            return $0.order < $1.order
+        }
+        var seen = Set<String>()
+        var result = [String]()
+        for entry in matches where seen.insert(entry.text).inserted {
+            result.append(entry.text)
+            if result.count == limit { break }
+        }
+        return result
+    }
+
+    private static func readCodedEntries(at url: URL, baseWeight: Int) throws -> [NativeDictionaryEntry] {
+        let contents = try String(contentsOf: url, encoding: .utf8)
+        var entries = [NativeDictionaryEntry]()
+        for line in contents.split(whereSeparator: \.isNewline) {
+            if line.isEmpty || line.first == "#" || line.first == "-" { continue }
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count >= 2 else { continue }
+            let text = String(fields[0])
+            let code = String(fields[1]).lowercased()
+            guard !text.isEmpty, !code.isEmpty,
+                code.allSatisfy({ $0.isASCII && ($0.isLetter || $0 == "'") })
+            else { continue }
+            let explicitWeight = fields.count > 2 ? Int(fields[2]) : nil
+            entries.append(NativeDictionaryEntry(
+                text: text,
+                code: code,
+                weight: explicitWeight ?? max(0, baseWeight - entries.count),
+                order: entries.count
+            ))
+        }
+        return entries
+    }
+
+    private static func sortedForPrefixSearch(_ entries: [NativeDictionaryEntry]) -> [NativeDictionaryEntry] {
+        entries.sorted {
+            if $0.code != $1.code { return $0.code < $1.code }
+            if $0.weight != $1.weight { return $0.weight > $1.weight }
+            return $0.order < $1.order
+        }
+    }
+
+    private static func lowerBound(in entries: [NativeDictionaryEntry], prefix: String) -> Int {
+        var lower = 0
+        var upper = entries.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if entries[middle].code < prefix {
+                lower = middle + 1
+            } else {
+                upper = middle
             }
         }
-        guard result != RB_RESULT_OK else {
-            return
+        return lower
+    }
+
+    private static func normalizedPinyin(_ value: String) -> String {
+        value.lowercased().filter { $0.isLetter }
+    }
+
+    private static func flypySyllable(_ rawValue: String) -> String? {
+        let value = rawValue.lowercased().replacingOccurrences(of: "ü", with: "v")
+        let zeroInitial: [String: String] = [
+            "a": "aa", "ai": "ai", "an": "an", "ang": "ah", "ao": "ao",
+            "e": "ee", "ei": "ei", "en": "en", "eng": "eg", "er": "er",
+            "o": "oo", "ou": "ou",
+        ]
+        if let code = zeroInitial[value] { return code }
+
+        let initial: String
+        let final: String
+        if value.hasPrefix("zh") || value.hasPrefix("ch") || value.hasPrefix("sh") {
+            initial = String(value.prefix(2))
+            final = String(value.dropFirst(2))
+        } else {
+            guard let first = value.first else { return nil }
+            initial = String(first)
+            final = String(value.dropFirst())
         }
-        let message =
-            messagePointer.map { String(cString: UnsafePointer($0)) }
-            ?? "Unspecified bridge failure."
-        throw RimeBridgeError.bridge(code: Int32(result.rawValue), message: message)
+        let initialKey: [String: String] = ["zh": "v", "ch": "i", "sh": "u"]
+        let finalKey: [String: String] = [
+            "a": "a", "o": "o", "e": "e", "i": "i", "u": "u", "v": "v",
+            "iu": "q", "ei": "w", "uan": "r", "ue": "t", "ve": "t",
+            "un": "y", "uo": "o", "ie": "p", "iong": "s", "ong": "s",
+            "ing": "k", "uai": "k", "ai": "d", "en": "f", "eng": "g",
+            "iang": "l", "uang": "l", "ang": "h", "ian": "m", "an": "j",
+            "ou": "z", "ua": "x", "ia": "x", "iao": "n", "ao": "c",
+            "ui": "v", "in": "b",
+        ]
+        guard let second = finalKey[final] else { return nil }
+        return (initialKey[initial] ?? initial) + second
     }
 }
 
@@ -288,162 +300,343 @@ struct RimeBridgeDiagnostics: Equatable, Sendable {
     let residentMemoryBytes: UInt64
 }
 
-final class RimeSession: @unchecked Sendable {
-    private let service: RimeService
-    private let serviceHandle: RBServiceRef
-    private var sessionHandle: RBSessionRef
+final class RimeService: @unchecked Sendable {
+    let paths: RimeServicePaths
+    let version = "native-1.0"
+    fileprivate let dictionary: NativeDictionary
+    private let lock = NSLock()
+    private var activeSessions = 0
 
-    fileprivate init(
-        service: RimeService,
-        serviceHandle: RBServiceRef,
-        sessionHandle: RBSessionRef
-    ) {
+    init(paths: RimeServicePaths, minLogLevel: Int32 = 2) throws {
+        self.paths = paths
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: paths.staging, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
+        let customWords = paths.userData.appendingPathComponent("custom_words.tsv")
+        if !fileManager.fileExists(atPath: customWords.path) {
+            try "# 词条<Tab>编码<Tab>可选权重\n".write(to: customWords, atomically: true, encoding: .utf8)
+        }
+        dictionary = try NativeDictionary(sharedData: paths.sharedData, userData: paths.userData)
+        _ = minLogLevel
+    }
+
+    func deploy(fullCheck: Bool) throws {
+        _ = fullCheck
+    }
+
+    func makeSession() throws -> RimeSession {
+        lock.lock()
+        activeSessions += 1
+        lock.unlock()
+        return RimeSession(service: self)
+    }
+
+    fileprivate func sessionDidClose() {
+        lock.lock()
+        activeSessions = max(0, activeSessions - 1)
+        lock.unlock()
+    }
+
+    func diagnostics() -> RimeBridgeDiagnostics? {
+        lock.lock()
+        let count = activeSessions
+        lock.unlock()
+        return RimeBridgeDiagnostics(
+            activeSessionCount: count,
+            snapshotAllocationCount: 0,
+            residentMemoryBytes: 0
+        )
+    }
+}
+
+final class RimeSession: @unchecked Sendable {
+    private enum Key {
+        static let backspace: Int32 = 0xFF08
+        static let tab: Int32 = 0xFF09
+        static let `return`: Int32 = 0xFF0D
+        static let escape: Int32 = 0xFF1B
+        static let left: Int32 = 0xFF51
+        static let up: Int32 = 0xFF52
+        static let right: Int32 = 0xFF53
+        static let down: Int32 = 0xFF54
+        static let pageUp: Int32 = 0xFF55
+        static let pageDown: Int32 = 0xFF56
+        static let shiftLeft: Int32 = 0xFFE1
+        static let shiftRight: Int32 = 0xFFE2
+    }
+
+    private let service: RimeService
+    private let lock = NSRecursiveLock()
+    private var schema: FengYuSchema = .flypy
+    private var buffer = ""
+    private var candidates = [String]()
+    private var highlightedIndex = 0
+    private var pageNumber = 0
+    private var pendingCommit: String?
+    private var options: [String: Bool] = [
+        "ascii_mode": false,
+        "full_shape": false,
+        "simplification": true,
+        "zh_simp": true,
+        "zh_trad": false,
+        "ascii_punct": false,
+    ]
+    private var leftShiftPending = false
+    private let pageSize = 5
+
+    fileprivate init(service: RimeService) {
         self.service = service
-        self.serviceHandle = serviceHandle
-        self.sessionHandle = sessionHandle
     }
 
     deinit {
-        service.withEngineLock {
-            if sessionHandle != 0 {
-                rb_session_destroy(serviceHandle, sessionHandle)
-            }
-        }
+        service.sessionDidClose()
     }
 
     @discardableResult
     func process(keyCode: Int32, modifierMask: Int32 = 0) -> Bool {
-        service.withEngineLock {
-            rb_session_process_key(serviceHandle, sessionHandle, keyCode, modifierMask) != 0
+        lock.lock()
+        defer { lock.unlock() }
+        pendingCommit = nil
+
+        if keyCode == Key.shiftLeft {
+            if modifierMask & RimeKeyMapper.ModifierMask.release != 0 {
+                defer { leftShiftPending = false }
+                guard leftShiftPending else { return false }
+                if !buffer.isEmpty { commitSelectedCandidate() }
+                options["ascii_mode", default: false].toggle()
+                return true
+            }
+            leftShiftPending = true
+            return false
         }
+        if keyCode == Key.shiftRight { return false }
+        if keyCode != Key.shiftLeft { leftShiftPending = false }
+
+        if handleOptionShortcut(keyCode: keyCode, modifierMask: modifierMask) { return true }
+        if modifierMask & (RimeKeyMapper.ModifierMask.control | RimeKeyMapper.ModifierMask.option) != 0 {
+            return false
+        }
+        if options["ascii_mode"] == true { return false }
+
+        switch keyCode {
+        case Key.backspace:
+            guard !buffer.isEmpty else { return false }
+            buffer.removeLast()
+            updateCandidates()
+            return true
+        case Key.escape, Key.tab:
+            guard !buffer.isEmpty else { return false }
+            clearComposition()
+            return true
+        case Key.return:
+            guard !buffer.isEmpty else { return false }
+            pendingCommit = buffer
+            clearComposition(keepingCommit: true)
+            return true
+        case Key.left, Key.up:
+            guard !candidates.isEmpty else { return false }
+            highlightedIndex = max(0, highlightedIndex - 1)
+            pageNumber = highlightedIndex / pageSize
+            return true
+        case Key.right, Key.down:
+            guard !candidates.isEmpty else { return false }
+            highlightedIndex = min(candidates.count - 1, highlightedIndex + 1)
+            pageNumber = highlightedIndex / pageSize
+            return true
+        case Key.pageUp:
+            guard pageNumber > 0 else { return false }
+            pageNumber -= 1
+            highlightedIndex = pageNumber * pageSize
+            return true
+        case Key.pageDown:
+            guard (pageNumber + 1) * pageSize < candidates.count else { return false }
+            pageNumber += 1
+            highlightedIndex = pageNumber * pageSize
+            return true
+        case 0x20:
+            guard !buffer.isEmpty else { return false }
+            commitSelectedCandidate()
+            return true
+        default:
+            break
+        }
+
+        if keyCode >= 0x31, keyCode <= 0x39, !buffer.isEmpty {
+            return selectCandidate(at: Int(keyCode - 0x31))
+        }
+        if let scalar = UnicodeScalar(UInt32(bitPattern: keyCode)) {
+            let character = Character(scalar)
+            if character.isASCII, character.isLetter {
+                guard modifierMask & RimeKeyMapper.ModifierMask.shift == 0 else { return false }
+                buffer.append(Character(String(character).lowercased()))
+                updateCandidates()
+                if schema == .flypy, buffer.count >= 4, !candidates.isEmpty {
+                    commitSelectedCandidate()
+                }
+                return true
+            }
+            if character == "'", schema == .fullPinyin {
+                buffer.append(character)
+                updateCandidates()
+                return true
+            }
+            if let punctuation = punctuation(for: character) {
+                if !buffer.isEmpty { commitSelectedCandidate(suffix: punctuation) }
+                else { pendingCommit = punctuation }
+                return true
+            }
+        }
+        return false
     }
 
     @discardableResult
     func simulate(sequence: String) -> Bool {
-        service.withEngineLock {
-            sequence.withCString {
-                rb_session_simulate_key_sequence(serviceHandle, sessionHandle, $0) != 0
-            }
+        var consumed = false
+        for scalar in sequence.unicodeScalars {
+            consumed = process(keyCode: Int32(bitPattern: scalar.value)) || consumed
         }
+        return consumed
     }
 
     @discardableResult
     func commitComposition() -> Bool {
-        service.withEngineLock {
-            rb_session_commit_composition(serviceHandle, sessionHandle) != 0
-        }
+        lock.lock()
+        defer { lock.unlock() }
+        guard !buffer.isEmpty else { return false }
+        commitSelectedCandidate()
+        return true
     }
 
     func clearComposition() {
-        service.withEngineLock {
-            rb_session_clear_composition(serviceHandle, sessionHandle)
-        }
+        lock.lock()
+        clearComposition(keepingCommit: false)
+        lock.unlock()
     }
 
     @discardableResult
     func selectSchema(identifier: String) -> Bool {
-        service.withEngineLock {
-            identifier.withCString {
-                rb_session_select_schema(serviceHandle, sessionHandle, $0) != 0
-            }
-        }
+        lock.lock()
+        defer { lock.unlock() }
+        guard let selected = FengYuSchema(rawValue: identifier) else { return false }
+        schema = selected
+        clearComposition(keepingCommit: false)
+        return true
     }
 
     @discardableResult
     func setOption(_ name: String, enabled: Bool) -> Bool {
-        service.withEngineLock {
-            name.withCString {
-                rb_session_set_option(serviceHandle, sessionHandle, $0, enabled ? 1 : 0) != 0
-            }
-        }
+        lock.lock()
+        defer { lock.unlock() }
+        guard options[name] != nil else { return false }
+        options[name] = enabled
+        return true
     }
 
     func option(_ name: String) -> Bool? {
-        service.withEngineLock {
-            var value: Int32 = 0
-            let available = name.withCString {
-                rb_session_get_option(serviceHandle, sessionHandle, $0, &value) != 0
-            }
-            return available ? value != 0 : nil
-        }
+        lock.lock()
+        defer { lock.unlock() }
+        return options[name]
     }
 
     @discardableResult
     func selectCandidate(at index: Int) -> Bool {
-        guard index >= 0 else {
-            return false
-        }
-        return service.withEngineLock {
-            rb_session_select_candidate(serviceHandle, sessionHandle, index) != 0
-        }
+        lock.lock()
+        defer { lock.unlock() }
+        let absoluteIndex = pageNumber * pageSize + index
+        guard candidates.indices.contains(absoluteIndex) else { return false }
+        highlightedIndex = absoluteIndex
+        commitSelectedCandidate()
+        return true
     }
 
     func readSnapshot() throws -> RimeSnapshot {
-        try service.withEngineLock {
-            var bridgeSnapshot = RBSnapshot()
-            rb_snapshot_init(&bridgeSnapshot)
-            defer { rb_snapshot_clear(&bridgeSnapshot) }
-
-            try RimeService.withBridgeError { error in
-                rb_session_read_snapshot(serviceHandle, sessionHandle, &bridgeSnapshot, error)
-            }
-
-            let preedit = bridgeSnapshot.preedit.map { String(cString: UnsafePointer($0)) } ?? ""
-            let composition: RimeCompositionSnapshot?
-            if preedit.isEmpty {
-                composition = nil
-            } else {
-                guard
-                    let range = RimeRangeConverter.utf16Range(
-                        startUTF8Offset: Int(bridgeSnapshot.selection_start),
-                        endUTF8Offset: Int(bridgeSnapshot.selection_end),
-                        in: preedit
-                    ),
-                    let cursor = RimeRangeConverter.utf16Offset(
-                        forUTF8Offset: Int(bridgeSnapshot.cursor_pos),
-                        in: preedit
-                    )
-                else {
-                    throw RimeBridgeError.invalidUTF8Offset
-                }
-                composition = RimeCompositionSnapshot(
-                    text: preedit,
-                    selectionRange: range,
-                    cursorPosition: cursor
-                )
-            }
-
-            let candidates: [RimeCandidateSnapshot]
-            if let pointer = bridgeSnapshot.candidates {
-                candidates = (0..<Int(truncatingIfNeeded: bridgeSnapshot.candidate_count)).map { index in
-                    let candidate = pointer[index]
-                    return RimeCandidateSnapshot(
-                        text: candidate.text.map { String(cString: UnsafePointer($0)) } ?? "",
-                        comment: candidate.comment.map { String(cString: UnsafePointer($0)) }
-                    )
-                }
-            } else {
-                candidates = []
-            }
-
-            return RimeSnapshot(
-                commitText: bridgeSnapshot.commit_text.map { String(cString: UnsafePointer($0)) },
-                composition: composition,
-                menu: RimeMenuSnapshot(
-                    pageSize: Int(bridgeSnapshot.page_size),
-                    pageNumber: Int(bridgeSnapshot.page_number),
-                    isLastPage: bridgeSnapshot.is_last_page != 0,
-                    highlightedIndex: Int(bridgeSnapshot.highlighted_candidate_index),
-                    candidates: candidates
-                ),
-                status: RimeStatusSnapshot(
-                    schemaIdentifier: bridgeSnapshot.schema_id.map { String(cString: UnsafePointer($0)) },
-                    schemaName: bridgeSnapshot.schema_name.map { String(cString: UnsafePointer($0)) },
-                    isComposing: bridgeSnapshot.is_composing != 0,
-                    isASCIIMode: bridgeSnapshot.is_ascii_mode != 0,
-                    isDisabled: bridgeSnapshot.is_disabled != 0
-                )
+        lock.lock()
+        defer { lock.unlock() }
+        let commit = pendingCommit
+        pendingCommit = nil
+        let pageStart = pageNumber * pageSize
+        let pageEnd = min(pageStart + pageSize, candidates.count)
+        let pageCandidates = pageStart < pageEnd ? Array(candidates[pageStart..<pageEnd]) : []
+        let composition = buffer.isEmpty ? nil : RimeCompositionSnapshot(
+            text: buffer,
+            selectionRange: NSRange(location: buffer.utf16.count, length: 0),
+            cursorPosition: buffer.utf16.count
+        )
+        return RimeSnapshot(
+            commitText: commit,
+            composition: composition,
+            menu: RimeMenuSnapshot(
+                pageSize: pageSize,
+                pageNumber: pageNumber,
+                isLastPage: pageEnd >= candidates.count,
+                highlightedIndex: max(0, highlightedIndex - pageStart),
+                candidates: pageCandidates.map { RimeCandidateSnapshot(text: $0, comment: nil) }
+            ),
+            status: RimeStatusSnapshot(
+                schemaIdentifier: schema.rawValue,
+                schemaName: schema.displayName,
+                isComposing: !buffer.isEmpty,
+                isASCIIMode: options["ascii_mode"] == true,
+                isDisabled: false
             )
+        )
+    }
+
+    private func updateCandidates() {
+        candidates = service.dictionary.candidates(for: buffer, schema: schema)
+        highlightedIndex = 0
+        pageNumber = 0
+    }
+
+    private func commitSelectedCandidate(suffix: String = "") {
+        let text = candidates.indices.contains(highlightedIndex) ? candidates[highlightedIndex] : buffer
+        pendingCommit = text + suffix
+        clearComposition(keepingCommit: true)
+    }
+
+    private func clearComposition(keepingCommit: Bool) {
+        buffer = ""
+        candidates = []
+        highlightedIndex = 0
+        pageNumber = 0
+        if !keepingCommit { pendingCommit = nil }
+    }
+
+    private func handleOptionShortcut(keyCode: Int32, modifierMask: Int32) -> Bool {
+        let control = modifierMask & RimeKeyMapper.ModifierMask.control != 0
+        let shift = modifierMask & RimeKeyMapper.ModifierMask.shift != 0
+        if control, keyCode == 106 {
+            options["simplification", default: true].toggle()
+            options["zh_simp"] = options["simplification"]
+            options["zh_trad"] = !(options["simplification"] ?? true)
+            return true
         }
+        if control, keyCode == 46 {
+            options["ascii_punct", default: false].toggle()
+            return true
+        }
+        if shift, keyCode == 0x20 {
+            options["full_shape", default: false].toggle()
+            return true
+        }
+        return false
+    }
+
+    private func punctuation(for character: Character) -> String? {
+        let ascii = String(character)
+        if options["ascii_punct"] == true { return ascii }
+        let mapping: [Character: String] = [
+            ",": "，", ".": "。", "/": "、", "?": "？", ";": "；", ":": "：",
+            "!": "！", "(": "（", ")": "）", "[": "【", "]": "】",
+        ]
+        if let mapped = mapping[character] { return mapped }
+        if options["full_shape"] == true, let scalar = character.unicodeScalars.first,
+            scalar.value >= 0x21, scalar.value <= 0x7E,
+            let fullWidth = UnicodeScalar(scalar.value + 0xFEE0)
+        {
+            return String(fullWidth)
+        }
+        return nil
     }
 }

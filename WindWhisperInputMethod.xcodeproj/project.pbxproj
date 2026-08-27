@@ -16,12 +16,9 @@
 		A10000000000000000000007 /* WindWhisperInputIcon-v1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */; };
 		A10000000000000000000008 /* zh_CN.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* zh_CN.lproj */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Assets.xcassets */; };
-		A1000000000000000000000A /* RimeBridge.c in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* RimeBridge.c */; };
 		A1000000000000000000000B /* RimeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* RimeModels.swift */; };
 		A1000000000000000000000C /* RimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* RimeService.swift */; };
 		A1000000000000000000000D /* RimeSmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* RimeSmokeTest.swift */; };
-		A1000000000000000000000E /* librime.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* librime.1.dylib */; };
-		A1000000000000000000000F /* librime.1.dylib in Embed Libraries */ = {isa = PBXBuildFile; fileRef = A20000000000000000000012 /* librime.1.dylib */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 		A10000000000000000000010 /* Rime in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* Rime */; };
 		A10000000000000000000011 /* RimeRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* RimeRuntime.swift */; };
 		A10000000000000000000012 /* RimeKeyMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* RimeKeyMapper.swift */; };
@@ -34,27 +31,11 @@
 		A1000000000000000000001A /* CandidateWindowTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001E /* CandidateWindowTheme.swift */; };
 		A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000001F /* CandidateWindowLayout.swift */; };
 		A1000000000000000000001C /* M5SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000020 /* M5SmokeTest.swift */; };
-		A1000000000000000000001D /* M6SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000021 /* M6SmokeTest.swift */; };
 		A1000000000000000000001E /* FengYuSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000022 /* FengYuSettings.swift */; };
 		A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* FengYuSettingsMenu.swift */; };
 		A10000000000000000000020 /* M7SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* M7SmokeTest.swift */; };
 		A10000000000000000000021 /* InputModeIndicatorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* InputModeIndicatorController.swift */; };
-		A10000000000000000000022 /* M8SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* M8SmokeTest.swift */; };
 /* End PBXBuildFile section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		A71000000000000000000001 /* Embed Libraries */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				A1000000000000000000000F /* librime.1.dylib in Embed Libraries */,
-			);
-			name = "Embed Libraries";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Main.swift; sourceTree = "<group>"; };
@@ -101,7 +82,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A1000000000000000000000E /* librime.1.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -200,8 +180,6 @@
 				A2000000000000000000000F /* RimeModels.swift */,
 				A20000000000000000000010 /* RimeService.swift */,
 				A20000000000000000000011 /* RimeSmokeTest.swift */,
-				A20000000000000000000021 /* M6SmokeTest.swift */,
-				A20000000000000000000026 /* M8SmokeTest.swift */,
 			);
 			path = RimeBridge;
 			sourceTree = "<group>";
@@ -265,7 +243,6 @@
 				A60000000000000000000001 /* Sources */,
 				A30000000000000000000001 /* Frameworks */,
 				A70000000000000000000001 /* Resources */,
-				A71000000000000000000001 /* Embed Libraries */,
 			);
 			buildRules = (
 			);
@@ -338,7 +315,6 @@
 				A10000000000000000000004 /* InputSourceMetadata.swift in Sources */,
 				A10000000000000000000005 /* MaintenanceCommand.swift in Sources */,
 				A10000000000000000000006 /* InputSourceManager.swift in Sources */,
-				A1000000000000000000000A /* RimeBridge.c in Sources */,
 				A1000000000000000000000B /* RimeModels.swift in Sources */,
 				A1000000000000000000000C /* RimeService.swift in Sources */,
 				A1000000000000000000000D /* RimeSmokeTest.swift in Sources */,
@@ -351,12 +327,10 @@
 				A1000000000000000000001A /* CandidateWindowTheme.swift in Sources */,
 				A1000000000000000000001B /* CandidateWindowLayout.swift in Sources */,
 				A1000000000000000000001C /* M5SmokeTest.swift in Sources */,
-				A1000000000000000000001D /* M6SmokeTest.swift in Sources */,
 				A1000000000000000000001E /* FengYuSettings.swift in Sources */,
 				A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */,
 				A10000000000000000000020 /* M7SmokeTest.swift in Sources */,
 				A10000000000000000000021 /* InputModeIndicatorController.swift in Sources */,
-				A10000000000000000000022 /* M8SmokeTest.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -415,8 +389,6 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				GENERATE_PKGINFO_FILE = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/include";
-				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/lib";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -426,7 +398,6 @@
 				PRODUCT_MODULE_NAME = windwhisper;
 				PRODUCT_NAME = windwhisper;
 				SKIP_INSTALL = NO;
-				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RimeBridge/RimeBridge-Bridging-Header.h";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 			};
 			name = Debug;
@@ -443,8 +414,6 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				GENERATE_PKGINFO_FILE = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
-				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/include";
-				LIBRARY_SEARCH_PATHS = "$(PROJECT_DIR)/Vendor/librime/lib";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -454,7 +423,6 @@
 				PRODUCT_MODULE_NAME = windwhisper;
 				PRODUCT_NAME = windwhisper;
 				SKIP_INSTALL = NO;
-				SWIFT_OBJC_BRIDGING_HEADER = "Sources/RimeBridge/RimeBridge-Bridging-Header.h";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 			};
 			name = Release;
