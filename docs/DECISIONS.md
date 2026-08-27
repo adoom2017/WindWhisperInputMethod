@@ -34,7 +34,7 @@
 
 - 日期：2026-08-24
 - 状态：已由 ADR-014 替代
-- 选择：工作名 `RimeInputMethod`，Bundle ID `com.shendongchun.RimeInputMethod`，首个输入模式 ID `com.shendongchun.RimeInputMethod.Hans`。
+- 选择：工程名 `WindWhisperInputMethod`；当前产品 Bundle ID 与输入模式 ID 采用 `com.shendongchun.inputmethod.windwhisper.local` 命名空间。
 - 理由：与用户现有 `com.shendongchun.*` 工程命名惯例一致，并保持输入源命名空间稳定。
 
 ### ADR-007：最低系统与架构
@@ -56,8 +56,8 @@
 - 日期：2026-08-24
 - 状态：已接受
 - 背景：旧标识曾以不完整的 controller/资源元数据注册，可能留下无效缓存；开发目录中的同 ID `.app` 副本也会污染 TIS/LaunchServices。
-- 选择：开发 Bundle ID 使用全新且含独立 `inputmethod` 段的 `com.shendongchun.inputmethod.rime.dev`，模式 ID 为其 `.Hans` 子项；controller 使用真实 Swift 运行时类名 `RimeInputMethod.RimeInputController`；本机安装采用 ad-hoc 本地签名，不上传构建包。
-- 安装：只保留 `~/Library/Input Methods/RimeInputMethod.app` 一份；按父输入法、子输入模式顺序启用并刷新当前登录会话，不要求注销或重启。
+- 选择：开发 Bundle ID 使用全新且含独立 `inputmethod` 段的命名空间；controller 使用当前 Swift 模块中的 `RimeInputController`；本机安装采用 ad-hoc 本地签名，不上传构建包。
+- 安装：只保留 `~/Library/Input Methods/windwhisper.app` 一份；安装器同时清理早期工程名留下的兼容路径，按父输入法、子输入模式顺序启用并刷新当前登录会话，不要求注销或重启。
 - 后果：开发安装不需要 Apple 公证凭据；Developer ID、公证与 Gatekeeper 验证留到 M9 分发阶段。
 
 ### ADR-015：锁定官方 librime 1.16.0 universal 产物
@@ -159,11 +159,11 @@
 
 - 日期：2026-08-25
 - 状态：已接受
-- 数据：默认方案为用户现有的 `flypy` 小鹤音形，主词典直接复用 `rime-origin/build` 的三个预编译 bin；其数据格式已由 arm64 librime 1.16 验证兼容。纯音码方案继续保留在菜单中。
-- 辅码：候选与完整码完全以原始 bin 为准；例如 `ni → 你`、`nir → 倪`、`nirx → 你`。原 `;`＋全拼＋仓颉首码仍作为其他拼音方案的通用辅助入口。
+- 数据：默认方案为用户现有的 `flypy` 小鹤音形。主词典已从 `rime-origin/build` 的预编译数据穷举恢复为 `flypy.dict.yaml`，由 librime 在部署时生成运行 bin；纯音码方案继续保留在菜单中。
+- 辅码：候选与完整码以恢复词典为准；例如 `ni → 你`、`nir → 倪`、`nirx → 你`。原 `;`＋全拼＋仓颉首码仍作为其他拼音方案的通用辅助入口。
 - 切换：InputMethodKit controller 将 modifier 按下和释放事件转交 Rime；原配置定义左 Shift 为 `commit_code`，右 Shift、Control、Caps Lock 为 `noop`。Control/Option 普通快捷键不再被前端吞掉。
 - 许可：用户提供的小鹤数据未附明确再分发许可，锁文件标记为 `local-use-only`；不影响当前本机安装，但公开发布前必须补齐授权或改为本机导入。
-- 验证：M3 覆盖 modifier 映射、左右 Shift 原配置语义和 Rime 快捷键；M6 覆盖原始 bin 的固定语料、三个 bin 逐字节安装、纯音码回归及用户数据保护。
+- 验证：M3 覆盖 modifier 映射、左右 Shift 原配置语义和 Rime 快捷键；M6 覆盖恢复词典的固定语料、部署编译、纯音码回归及用户数据保护。恢复词典重新编译后的全编码候选映射与原始 bin 一致。
 
 ### ADR-026：不向 macOS 声明 Caps Lock 语言切换能力
 

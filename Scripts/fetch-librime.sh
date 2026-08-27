@@ -8,7 +8,7 @@ commit="a251145d3aafa33871824a40bbec04c966bd8b56"
 archive_name="rime-a251145-macOS-universal.tar.bz2"
 archive_sha256="e4c9a8767a456f2550f1242921b7656c6e6be088c89a921274bd5d4404f58b99"
 archive_url="https://github.com/rime/librime/releases/download/$version/$archive_name"
-temporary_root="$(mktemp -d /private/tmp/RimeInputMethod-librime.XXXXXX)"
+temporary_root="$(mktemp -d /private/tmp/WindWhisperInputMethod-librime.XXXXXX)"
 
 cleanup() {
     rm -rf "$temporary_root"

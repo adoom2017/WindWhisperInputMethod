@@ -29,8 +29,8 @@ context.beginPDFPage(nil)
 // Draw a black rounded input-source badge and punch the glyph out of its alpha
 // mask. It therefore reads as black-on-white normally and remains legible when
 // macOS tints the badge for a selected menu row.
-let font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, 32, nil)
-let characters: [UniChar] = Array("w".utf16)
+let font = CTFontCreateWithName("PingFangSC-Semibold" as CFString, 32, nil)
+let characters: [UniChar] = Array("风".utf16)
 var glyphs = [CGGlyph](repeating: 0, count: characters.count)
 guard CTFontGetGlyphsForCharacters(font, characters, &glyphs, characters.count),
       let glyph = glyphs.first,

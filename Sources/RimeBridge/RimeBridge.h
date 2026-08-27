@@ -1,5 +1,5 @@
-#ifndef RIME_INPUT_METHOD_BRIDGE_H
-#define RIME_INPUT_METHOD_BRIDGE_H
+#ifndef WIND_WHISPER_INPUT_METHOD_RIME_BRIDGE_H
+#define WIND_WHISPER_INPUT_METHOD_RIME_BRIDGE_H
 
 #include <stddef.h>
 #include <stdint.h>

@@ -23,7 +23,7 @@ trap cleanup EXIT
     "$test_root/fengyu_aux.dict.yaml"
 cmp "$test_root/fengyu_aux.dict.yaml" "$project_root/Resources/Rime/fengyu_aux.dict.yaml"
 echo "auxiliaryDictionaryReproducible=passed"
-echo "flypyOriginPrebuiltData=locked"
+echo "flypyRecoveredDictionary=locked"
 "$application_path/Contents/MacOS/windwhisper" \
     --m6-smoke \
     --user-data-root "$test_root"

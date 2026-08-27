@@ -18,7 +18,7 @@
                BlueprintIdentifier = "A50000000000000000000001"
                BuildableName = "windwhisper.app"
                BlueprintName = "windwhisper"
-               ReferencedContainer = "container:RimeInputMethod.xcodeproj">
+               ReferencedContainer = "container:WindWhisperInputMethod.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -45,7 +45,7 @@
             BlueprintIdentifier = "A50000000000000000000001"
             BuildableName = "windwhisper.app"
             BlueprintName = "windwhisper"
-            ReferencedContainer = "container:RimeInputMethod.xcodeproj">
+            ReferencedContainer = "container:WindWhisperInputMethod.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -61,7 +61,7 @@
             BlueprintIdentifier = "A50000000000000000000001"
             BuildableName = "windwhisper.app"
             BlueprintName = "windwhisper"
-            ReferencedContainer = "container:RimeInputMethod.xcodeproj">
+            ReferencedContainer = "container:WindWhisperInputMethod.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

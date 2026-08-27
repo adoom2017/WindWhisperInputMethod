@@ -27,7 +27,7 @@ enum M6SmokeTest {
             print("schemaCorpusPassed=\(result.schemeCount)")
             print("defaultSchema=flypy")
             print("flypyAuxiliaryCode=passed")
-            print("flypyOriginPrebuiltData=passed")
+            print("flypyRecoveredDictionary=passed")
             print("flypyPrimaryShortcutOrder=passed")
             print("flypyShortCodes=passed")
             print("flypyCompatibilityPhrases=passed")
@@ -87,7 +87,7 @@ enum M6SmokeTest {
         do {
             let service = try RimeService(paths: paths, minLogLevel: 2)
             try service.deploy(fullCheck: true)
-            try verifyFlypyPrebuiltDataInstalled(paths: paths)
+            try verifyFlypyDictionaryCompiled(paths: paths)
 
             let defaultSession = try service.makeSession()
             let defaultSnapshot = try defaultSession.readSnapshot()
@@ -345,9 +345,7 @@ enum M6SmokeTest {
 
     private static func validateBundledData(at sharedData: URL) throws {
         let required = schemes.map { "\($0.identifier).schema.yaml" } + [
-            "build/flypy.table.bin",
-            "build/flypy.prism.bin",
-            "build/flypy.reverse.bin",
+            "flypy.dict.yaml",
             "flypydz.schema.yaml",
             "flypydz.dict.yaml",
             "fengyu_aux.schema.yaml",
@@ -371,16 +369,22 @@ enum M6SmokeTest {
         }
     }
 
-    private static func verifyFlypyPrebuiltDataInstalled(paths: RimeServicePaths) throws {
+    private static func verifyFlypyDictionaryCompiled(paths: RimeServicePaths) throws {
         for fileName in ["flypy.table.bin", "flypy.prism.bin", "flypy.reverse.bin"] {
             let bundled = paths.prebuiltData.appendingPathComponent(fileName)
             let installed = paths.staging.appendingPathComponent(fileName)
-            guard FileManager.default.contentsEqual(
-                atPath: bundled.path,
-                andPath: installed.path
-            ) else {
+            guard !FileManager.default.fileExists(atPath: bundled.path) else {
                 throw RimeBridgeError.smokeAssertion(
-                    "rime-origin prebuilt table was not installed exactly: \(fileName)"
+                    "Flypy prebuilt data is still bundled: \(fileName)"
+                )
+            }
+            guard FileManager.default.fileExists(atPath: installed.path),
+                let attributes = try? FileManager.default.attributesOfItem(atPath: installed.path),
+                let size = attributes[.size] as? NSNumber,
+                size.intValue > 0
+            else {
+                throw RimeBridgeError.smokeAssertion(
+                    "Flypy dictionary source did not compile: \(fileName)"
                 )
             }
         }

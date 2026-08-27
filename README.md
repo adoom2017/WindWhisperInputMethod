@@ -64,29 +64,75 @@ Release 构建固定生成 arm64 + x86_64 通用产物。构建结果位于：
 build/DerivedData/Build/Products/<Configuration>/windwhisper.app
 ```
 
-本机开发安装不需要 Apple 公证凭据。每次验证只需：
+## 安装与重新安装
+
+本机开发安装不需要 Apple 公证凭据。以下命令都应在仓库根目录执行；如果当前终端不在仓库中，先进入项目目录：
+
+```bash
+cd /path/to/WindWhisperInputMethod
+```
+
+### 首次安装
+
+1. 检查工程资源并构建 Debug 版本：
+
+   ```bash
+   ./Scripts/verify-project.sh
+   ./Scripts/build.sh Debug
+   ```
+
+2. 安装当前构建：
+
+   ```bash
+   ./Scripts/install-user.sh Debug
+   ```
+
+3. 如果终端提示需要 macOS 授权，打开“系统设置 > 键盘 > 文本输入 > 编辑”，点击添加输入法，在简体中文输入法中添加“风语”（系统部分界面可能显示为 `windwhisper`）。授权期间安装器会保留原输入法，不会让当前输入源失效。
+4. 通过菜单栏输入法菜单或 `Control + Space` 切换到“风语”。菜单栏应显示黑底白色“风”字图标，输入中文并确认候选窗可以正常显示。
+
+安装脚本会完成本地签名、用户级原子替换、输入源注册与启用，并刷新当前登录会话中的输入法菜单、切换器和光标输入源提示。成功后不需要注销或重启，脚本会尽量恢复安装前选中的输入法。安装位置固定为：
+
+```text
+~/Library/Input Methods/windwhisper.app
+```
+
+安装器会拒绝同 Bundle ID 的系统级重复副本。如果提示 `/Library/Input Methods` 中存在 `windwhisper` 或旧版副本，应先确认并移除系统级重复安装，只保留上述用户级安装。
+
+### 更新代码或图标后重新安装
+
+重新安装不需要先卸载。每次修改代码、Rime 资源或图标后，重新构建并运行安装脚本即可：
 
 ```bash
 ./Scripts/build.sh Debug
 ./Scripts/install-user.sh Debug
 ```
 
-脚本会完成本地签名、用户级原子替换、注册、启用和当前登录会话刷新。成功后不会注销，并恢复安装前选中的输入法。卸载使用：
+安装器会原子替换已有的 `windwhisper.app`，重新签名和注册输入源，并主动刷新 macOS 的图标缓存相关进程。安装完成后先切换到其他输入法，再切回“风语”，然后重新打开输入法菜单或 `Control + Space` 切换器确认新图标。
+
+若菜单中仍显示旧图标，按以下顺序处理：
+
+1. 再执行一次 `./Scripts/build.sh Debug` 和 `./Scripts/install-user.sh Debug`，确认安装的是刚生成的构建。
+2. 打开“系统设置 > 键盘 > 文本输入 > 编辑”，确认只存在一个“风语”或 `windwhisper` 输入源，没有旧 Bundle ID 对应的重复项。
+3. 切换到其他输入法后再切回“风语”，重新打开菜单栏输入法菜单和 `Control + Space` 切换器。
+
+通常无需注销；安装脚本已经刷新 `TextInputMenuAgent`、`TextInputSwitcher`、`CursorUIViewService` 和 InputMethodKit 会话。Debug 构建只包含 arm64，不会启动 Rosetta 或触发 Intel App 兼容提示；需要验证通用构建时，将上述两条命令中的 `Debug` 改为 `Release`。
+
+### 卸载
+
+只有需要彻底移除当前用户安装时才执行：
 
 ```bash
 ./Scripts/uninstall-user.sh
 ```
 
-卸载脚本不会直接删除应用，而是验证 Bundle ID 后移动到废纸篓。
-
-安装固定使用 `~/Library/Input Methods/windwhisper.app`，并拒绝同 Bundle ID 的系统级重复副本。首次从旧身份升级时，macOS 会要求在“系统设置 > 键盘 > 文本输入 > 编辑”中授权一次；授权完成前安装器会保留并恢复旧输入法，不会让当前输入源失效。Debug 只包含 arm64，不会启动 Rosetta 或触发 Intel App 兼容提示；通用 Release 产物仍保留给后续分发验证。
+卸载脚本会验证 Bundle ID，把应用移动到废纸篓并刷新输入法服务，不会直接永久删除应用。正常更新或图标变更后不要先卸载，使用上一节的重新安装流程即可。
 
 ## 工程目录
 
 工程已按规划分层；未进入当前里程碑的目录仍保留占位文件：
 
 ```text
-RimeInputMethod/
+WindWhisperInputMethod/
 ├── App/                    # InputMethodKit 进程入口与生命周期（M1 已实现）
 ├── Sources/
 │   ├── InputController/    # M3—M5 按键映射、IMK 会话、文本与候选协调
@@ -111,7 +157,7 @@ RimeInputMethod/
 
 - 中文显示名：风语
 - 英文名、构建目标与应用包：`windwhisper`
-- Xcode 工程容器：`RimeInputMethod.xcodeproj`（只作为源码工程文件名保留）
+- Xcode 工程容器：`WindWhisperInputMethod.xcodeproj`
 - Bundle ID：`com.shendongchun.inputmethod.windwhisper.local`
 - 简体输入模式 ID：`com.shendongchun.inputmethod.windwhisper.local.Hans`
 - 最低版本：macOS 13
@@ -122,7 +168,7 @@ RimeInputMethod/
 ## 输入方案与辅码
 
 - 默认：小鹤双拼（音形辅码）。主词典直接复用 `rime-origin/build` 的三个预编译文件，不再根据公开词表推导。例如 `ni → 你`、`nir → 倪`、`nirx → 你`（自动上屏），行为与原始码表一致。
-- 简码、短语与候选顺序：全部以原始 bin 为准；固定回归包括 `w → 我/位`、`d → 的/打`、`u → 是/时`、`ubu → 是不是`、`hdui → 还是`、`biru → 比如`。
+- 简码、短语与候选顺序：主词典以恢复后的 `flypy.dict.yaml` 为准，外围层继续使用原文本表；固定回归包括 `w → 我/位`、`d → 的/打`、`u → 是/时`、`ubu → 是不是`、`hdui → 还是`、`biru → 比如`。
 - 四字词：直接使用原始主词典及 `top/sys/user/full` 的层级，例如 `ahqi` 首选“昂起”，`sys` 中“爱恨情仇”为后续候选。
 - 词库层级：`top` 用于置顶词，`sys` 包含符号编码与二重简码，`user` 用于日常用户词，`full` 补全全码字；四者都由 Rime 独立加载，不再重复合并进主词典。
 - 纯音码：菜单中保留“小鹤双拼（纯音码）”，例如“你好”输入 `nihc`。
@@ -131,7 +177,7 @@ RimeInputMethod/
 - 通用辅码：在其他拼音方案中可先输入 `;`，再输入完整拼音和可选的仓颉首码，例如 `;zuok` 定位“左”。它与小鹤音形四码互不干扰。
 - 中英文：遵循原配置：左 Shift 为 `commit_code`，右 Shift、Caps Lock 不执行切换；Control/Option 快捷键交给 Rime 处理。
 - 用户词典和 `.custom.yaml` 保存在 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/Data`。首次运行时若新目录尚不存在，会从旧目录 `~/Library/Application Support/com.shendongchun.inputmethod.rime.dev/Rime` 完整复制；旧目录保留不删，已有新目录也绝不会被迁移覆盖。
-- `/Users/shendongchun/Documents/rime-origin/build` 中的 `flypy.table.bin`、`flypy.prism.bin`、`flypy.reverse.bin` 已逐字节纳入应用，并在部署后强制恢复，避免 librime 重新生成改变候选行为。
+- 小鹤主词典已从原始预编译数据恢复为 `flypy.dict.yaml`；应用不再携带三个主词典 bin，由 librime 在首次部署和重新部署时本机生成。
 - 数据来源、固定提交、许可证和修改见 `Resources/Rime/DATA_LOCK.json`、`docs/RIME_DATA.md` 与 `LICENSES/`。
 
 ## 添加自定义词

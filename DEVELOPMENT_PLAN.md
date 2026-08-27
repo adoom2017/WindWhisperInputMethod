@@ -159,7 +159,7 @@ librime Engine
 ## 8. 工程目录蓝图
 
 ```text
-RimeInputMethod/
+WindWhisperInputMethod/
 ├── README.md
 ├── DEVELOPMENT_PLAN.md
 ├── LICENSES/                         # M1 创建第三方许可证清单
@@ -316,7 +316,7 @@ RimeInputMethod/
 
 已完成：默认“小鹤双拼（音形辅码）”，内置纯音码小鹤、风语全拼、自然码、微软和智能 ABC 并保留仓颉兼容方案；小鹤主词典直接复用并锁定 `rime-origin/build` 的三个预编译 bin，候选与顺序以原配置为准。通用辅码仍可用 `;` 独立触发，按“完整拼音＋仓颉首码”生成 28,250 条索引。
 
-自动化：`Scripts/test-m6.sh Debug|Release` 覆盖 6 套拼音方案固定语料、小鹤原始 bin 的简码/词组/候选顺序、三个 bin 的逐字节安装、通用辅码、纯双拼回归、缺失方案拦截、用户 `.custom.yaml`/用户词典升级保护及数据锁。详细记录见 `docs/M6_VALIDATION.md`。
+自动化：`Scripts/test-m6.sh Debug|Release` 覆盖 6 套拼音方案固定语料、小鹤恢复词典的简码/词组/候选顺序、从 YAML 生成部署 bin、通用辅码、纯双拼回归、缺失方案拦截、用户 `.custom.yaml`/用户词典升级保护及数据锁。详细记录见 `docs/M6_VALIDATION.md`。
 
 ### M7：设置、状态与诊断（已完成）
 

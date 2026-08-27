@@ -9,9 +9,6 @@ xcuserdata/
 Vendor/Build/
 Resources/Rime/build/*
 !Resources/Rime/build/
-!Resources/Rime/build/flypy.table.bin
-!Resources/Rime/build/flypy.prism.bin
-!Resources/Rime/build/flypy.reverse.bin
 *.userdb/
 
 # Logs and local configuration
@@ -25,3 +22,4 @@ dist/
 *.dmg
 *.pkg
 *.zip
+.codex/

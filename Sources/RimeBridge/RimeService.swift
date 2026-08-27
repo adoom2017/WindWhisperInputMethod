@@ -120,7 +120,6 @@ final class RimeService: @unchecked Sendable {
         try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.staging, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
-        try Self.installBundledFlypyPrebuiltData(at: paths, using: fileManager)
         try Self.seedBundledFlypyUserTables(at: paths, using: fileManager)
 
         let strings = try CStringStorage([
@@ -192,10 +191,6 @@ final class RimeService: @unchecked Sendable {
             try Self.withBridgeError { error in
                 rb_service_deploy(handle, fullCheck ? 1 : 0, error)
             }
-            try Self.installBundledFlypyPrebuiltData(
-                at: paths,
-                using: FileManager.default
-            )
         }
     }
 
@@ -213,41 +208,6 @@ final class RimeService: @unchecked Sendable {
                 continue
             }
             try fileManager.copyItem(at: source, to: destination)
-        }
-    }
-
-    private static func installBundledFlypyPrebuiltData(
-        at paths: RimeServicePaths,
-        using fileManager: FileManager
-    ) throws {
-        guard paths.prebuiltData.standardizedFileURL != paths.staging.standardizedFileURL else {
-            return
-        }
-
-        for fileName in ["flypy.table.bin", "flypy.prism.bin", "flypy.reverse.bin"] {
-            let source = paths.prebuiltData.appendingPathComponent(fileName)
-            let destination = paths.staging.appendingPathComponent(fileName)
-            guard fileManager.fileExists(atPath: source.path) else {
-                throw RimeBridgeError.missingBundledData
-            }
-            if fileManager.fileExists(atPath: destination.path),
-                fileManager.contentsEqual(atPath: source.path, andPath: destination.path)
-            {
-                continue
-            }
-
-            let temporary = paths.staging.appendingPathComponent(".\(fileName).fengyu-new")
-            try? fileManager.removeItem(at: temporary)
-            do {
-                try fileManager.copyItem(at: source, to: temporary)
-                if fileManager.fileExists(atPath: destination.path) {
-                    try fileManager.removeItem(at: destination)
-                }
-                try fileManager.moveItem(at: temporary, to: destination)
-            } catch {
-                try? fileManager.removeItem(at: temporary)
-                throw error
-            }
         }
     }
 

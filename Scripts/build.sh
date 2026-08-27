@@ -19,7 +19,7 @@ destination="generic/platform=macOS"
 if [[ "$configuration" == "Debug" ]]; then
     destination="platform=macOS,arch=arm64"
     xcodebuild \
-        -project "$project_root/RimeInputMethod.xcodeproj" \
+        -project "$project_root/WindWhisperInputMethod.xcodeproj" \
         -scheme windwhisper \
         -configuration "$configuration" \
         -destination "$destination" \
@@ -30,7 +30,7 @@ if [[ "$configuration" == "Debug" ]]; then
         build
 else
     xcodebuild \
-        -project "$project_root/RimeInputMethod.xcodeproj" \
+        -project "$project_root/WindWhisperInputMethod.xcodeproj" \
         -scheme windwhisper \
         -configuration "$configuration" \
         -destination "$destination" \

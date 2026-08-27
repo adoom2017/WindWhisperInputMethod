@@ -36,7 +36,7 @@ if grep -Eq "$legacy_mode_id|$older_mode_id|$transitional_mode_id" "$info_plist"
     exit 65
 fi
 
-if ! grep -q "PRODUCT_BUNDLE_IDENTIFIER = $expected_bundle_id;" "$project_root/RimeInputMethod.xcodeproj/project.pbxproj"; then
+if ! grep -q "PRODUCT_BUNDLE_IDENTIFIER = $expected_bundle_id;" "$project_root/WindWhisperInputMethod.xcodeproj/project.pbxproj"; then
     echo "Project bundle ID does not match Info.plist input mode namespace." >&2
     exit 65
 fi
@@ -79,7 +79,7 @@ if [[ "$english_mode_name" != "$expected_display_name" ]]; then
 fi
 
 if grep -Eq 'Rime\.icns|Resources/InputModeIcon\.pdf' \
-    "$info_plist" "$project_root/RimeInputMethod.xcodeproj/project.pbxproj"; then
+    "$info_plist" "$project_root/WindWhisperInputMethod.xcodeproj/project.pbxproj"; then
     echo "Legacy Rime icon reference is still present." >&2
     exit 65
 fi
@@ -115,9 +115,7 @@ for required_file in \
     "$project_root/Resources/Rime/luna_pinyin.schema.yaml" \
     "$project_root/Resources/Rime/luna_pinyin.dict.yaml" \
     "$project_root/Resources/Rime/flypy.schema.yaml" \
-    "$project_root/Resources/Rime/build/flypy.table.bin" \
-    "$project_root/Resources/Rime/build/flypy.prism.bin" \
-    "$project_root/Resources/Rime/build/flypy.reverse.bin" \
+    "$project_root/Resources/Rime/flypy.dict.yaml" \
     "$project_root/Resources/Rime/flypydz.dict.yaml" \
     "$project_root/LICENSES/librime-BSD-3-Clause.txt" \
     "$project_root/LICENSES/rime-data-LGPL-3.0.txt"; do
@@ -155,13 +153,20 @@ verify_sha256 \
     "$project_root/LICENSES/OpenCC-Apache-2.0.txt" \
     "b534e465949558eec2597b04f5092b5e161236a68dfbfd04d547592ac3964308"
 verify_sha256 \
+    "$project_root/Resources/Rime/flypy.dict.yaml" \
+    "ea284029473466e10ee752748626f19c579da3d3a868250d61f3b457bacfa5d6"
+verify_sha256 \
+    "$project_root/Resources/Rime/flypy.schema.yaml" \
+    "6f5d341405cf46df29feb7ce287231185abe5f7e76de61dc97172e6ecc2050aa"
+
+for removed_prebuilt in \
     "$project_root/Resources/Rime/build/flypy.table.bin" \
-    "66d7151fe0dbcf2b1f40e0431b158bf630e2f0743ac1ceb45c7aceb17fd64eb7"
-verify_sha256 \
     "$project_root/Resources/Rime/build/flypy.prism.bin" \
-    "7ebbff4c8d6d199e03cd4a16229b41a27b930d5eafb58b19855a2fa937d4d7a0"
-verify_sha256 \
-    "$project_root/Resources/Rime/build/flypy.reverse.bin" \
-    "2d06614b32a22dbf2cbb26f8799231d5628b0131e8e6e0be6314d688706fb4f5"
+    "$project_root/Resources/Rime/build/flypy.reverse.bin"; do
+    if [[ -e "$removed_prebuilt" ]]; then
+        echo "Flypy prebuilt data must be generated at deployment time: $removed_prebuilt" >&2
+        exit 65
+    fi
+done
 
 echo "Project metadata verified."

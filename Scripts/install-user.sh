@@ -9,6 +9,7 @@ install_directory="$HOME/Library/Input Methods"
 installed_app="$install_directory/windwhisper.app"
 installing_app="$install_directory/windwhisper.installing"
 previous_app="$install_directory/windwhisper.previous"
+# Keep removing the pre-WindWhisper app name during upgrades.
 legacy_primary_app="$install_directory/RimeInputMethod.app"
 legacy_failed_app="$install_directory/FengYuInputMethod.app"
 system_app="/Library/Input Methods/windwhisper.app"
@@ -84,6 +85,7 @@ fi
 
 /bin/mkdir -p "$install_directory"
 /usr/bin/pkill -x windwhisper 2>/dev/null || true
+# Stop a process left by installations made before the project rename.
 /usr/bin/pkill -x RimeInputMethod 2>/dev/null || true
 "$lsregister" -u "$source_app" 2>/dev/null || true
 "$lsregister" -u "$installed_app" 2>/dev/null || true
