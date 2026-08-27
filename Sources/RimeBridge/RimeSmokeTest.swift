@@ -9,6 +9,7 @@ enum RimeSmokeTest {
             print("flypyPhonetic=passed")
             print("flypyShape=passed")
             print("flypyFourKeyAutoCommit=passed")
+            print("flypyFourKeyMultipleCandidates=passed")
             print("customWords=passed")
             print("librimeDependency=absent")
             return EXIT_SUCCESS
@@ -48,6 +49,12 @@ enum RimeSmokeTest {
         try verifyCandidate(service: service, schema: .flypyPhonetic, code: "nihc", text: "你好")
         try verifyCandidate(service: service, schema: .flypy, code: "ubu", text: "是不是")
         try verifyFirstCandidate(service: service, schema: .flypy, code: "iys", text: "纯")
+        try verifyOrderedCandidates(
+            service: service,
+            schema: .flypy,
+            code: "ufme",
+            expected: ["什么", "𬳽"]
+        )
         try verifyCandidate(service: service, schema: .flypy, code: "fy", text: "风语输入法")
 
         let shape = try service.makeSession()
@@ -98,6 +105,27 @@ enum RimeSmokeTest {
         let snapshot = try session.readSnapshot()
         guard snapshot.menu.candidates.first?.text == text else {
             throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not prioritize \(text) for \(code)")
+        }
+    }
+
+    private static func verifyOrderedCandidates(
+        service: RimeService,
+        schema: FengYuSchema,
+        code: String,
+        expected: [String]
+    ) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: schema.rawValue), session.simulate(sequence: code) else {
+            throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not consume \(code)")
+        }
+        let snapshot = try session.readSnapshot()
+        let actual = snapshot.menu.candidates.prefix(expected.count).map(\.text)
+        guard snapshot.commitText == nil, snapshot.composition?.text == code,
+            Array(actual) == expected
+        else {
+            throw RimeBridgeError.smokeAssertion(
+                "\(schema.displayName) candidate order for \(code) was \(actual)"
+            )
         }
     }
 

@@ -196,9 +196,11 @@ private final class NativeDictionary: @unchecked Sendable {
             if matches.count >= 20_000 { break }
         }
         matches.sort {
-            let lhsSingleCharacter = $0.text.count == 1
-            let rhsSingleCharacter = $1.text.count == 1
-            if lhsSingleCharacter != rhsSingleCharacter { return lhsSingleCharacter }
+            if schema == .flypy, normalized.count < 4 {
+                let lhsSingleCharacter = $0.text.count == 1
+                let rhsSingleCharacter = $1.text.count == 1
+                if lhsSingleCharacter != rhsSingleCharacter { return lhsSingleCharacter }
+            }
             let lhsExact = $0.code == normalized
             let rhsExact = $1.code == normalized
             if lhsExact != rhsExact { return lhsExact }
@@ -474,7 +476,7 @@ final class RimeSession: @unchecked Sendable {
                 guard modifierMask & RimeKeyMapper.ModifierMask.shift == 0 else { return false }
                 buffer.append(Character(String(character).lowercased()))
                 updateCandidates()
-                if schema == .flypy, buffer.count >= 4, !candidates.isEmpty {
+                if schema == .flypy, buffer.count >= 4, candidates.count == 1 {
                     commitSelectedCandidate()
                 }
                 return true
