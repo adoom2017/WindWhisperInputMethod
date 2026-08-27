@@ -122,6 +122,7 @@ final class RimeService: @unchecked Sendable {
         try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
         try Self.seedBundledFlypyUserTables(at: paths, using: fileManager)
 
+        let distributionVersion = Self.bundleVersion()
         let strings = try CStringStorage([
             paths.sharedData.path,
             paths.userData.path,
@@ -130,7 +131,7 @@ final class RimeService: @unchecked Sendable {
             paths.logs.path,
             "windwhisper",
             "windwhisper",
-            "0.2.0",
+            distributionVersion,
             "windwhisper.input_method",
         ])
         var configuration = RBServiceConfiguration(
@@ -153,6 +154,10 @@ final class RimeService: @unchecked Sendable {
         }
         handle = createdHandle
         version = rb_service_version(createdHandle).map(String.init(cString:)) ?? "unknown"
+    }
+
+    private static func bundleVersion(bundle: Bundle = .main) -> String {
+        bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
     }
 
     private static func migrateLegacyUserDataIfNeeded(
@@ -224,6 +229,23 @@ final class RimeService: @unchecked Sendable {
         }
     }
 
+    func diagnostics() -> RimeBridgeDiagnostics? {
+        guard let handle else {
+            return nil
+        }
+        return withEngineLock {
+            var bridgeDiagnostics = RBBridgeDiagnostics()
+            guard rb_bridge_read_diagnostics(handle, &bridgeDiagnostics) != 0 else {
+                return nil
+            }
+            return RimeBridgeDiagnostics(
+                activeSessionCount: Int(bridgeDiagnostics.active_session_count),
+                snapshotAllocationCount: Int(bridgeDiagnostics.snapshot_allocation_count),
+                residentMemoryBytes: bridgeDiagnostics.resident_memory_bytes
+            )
+        }
+    }
+
     fileprivate func withEngineLock<Result>(_ operation: () throws -> Result) rethrows -> Result {
         engineLock.lock()
         defer { engineLock.unlock() }
@@ -258,6 +280,12 @@ final class RimeService: @unchecked Sendable {
             ?? "Unspecified bridge failure."
         throw RimeBridgeError.bridge(code: Int32(result.rawValue), message: message)
     }
+}
+
+struct RimeBridgeDiagnostics: Equatable, Sendable {
+    let activeSessionCount: Int
+    let snapshotAllocationCount: Int
+    let residentMemoryBytes: UInt64
 }
 
 final class RimeSession: @unchecked Sendable {

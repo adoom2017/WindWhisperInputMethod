@@ -39,7 +39,7 @@
 - 中英文：验证原配置的左 Shift `commit_code`、右 Shift/Caps Lock `noop`，以及 Control/Option 快捷键进入 Rime。
 - 异常：资源缺失、配置损坏、部署失败、磁盘只读、session 失效。
 
-## M3—M7 自动化与人工门禁
+## M3—M9 自动化与人工门禁
 
 - `Scripts/test-m3.sh Debug|Release` 覆盖按键映射、Command 透传、Control/Option 交给 Rime、左右 Shift 原配置语义、Backspace、Escape、`nihao + Space` 提交“你好”，以及生产 `RimeClientUpdater` 对 `IMKTextInput` 的 marked/commit 调用。
 - `xcodebuild analyze` 必须无诊断失败；Release 主程序和 librime 必须同时包含 arm64、x86_64。
@@ -51,6 +51,10 @@
 - `Scripts/test-m6.sh Debug|Release` 覆盖六套拼音方案、小鹤恢复词典的简码/词组/候选顺序、部署生成三个 bin、`top/sys/user/full` 层级、通用辅码、用户覆盖/词典保护、部署失败和数据锁。
 - `Scripts/test-m7.sh Debug|Release` 覆盖设置持久化、非法值回退、多 session 同步、设置前组合提交、OpenCC 繁简转换、横竖排布局、输入法菜单完整性、InputMethodKit 命令路由、诊断脱敏和恢复默认值。
 - M7 人工门禁按 `docs/M7_VALIDATION.md` 执行，重点确认系统输入法菜单可见、修改后当前应用与新应用一致、后台重新部署可恢复输入，以及菜单操作不显示或记录输入内容。
+- `Scripts/test-m8.sh Release [seconds]` 覆盖 UTF-8/UTF-16 边界、Command 透传、单次 commit、候选异步更新失效、session 生命周期、C 快照分配余额，并记录引擎初始化、部署、按键和候选布局延迟与 RSS 变化。
+- M8 的一小时参数为 `Scripts/test-m8.sh Release 3600`；跨应用、最低系统、Intel、多屏和 Secure Input 仍按 `docs/M8_VALIDATION.md` 人工矩阵执行。
+- `Scripts/test-m9.sh` 在隔离目录覆盖升级提交、全新安装回滚、完整升级回滚、两个中间失败回滚和路径冲突拒绝，生成 local 通用 ZIP，再从 ZIP 解包核验 Bundle ID、版本、架构、依赖、签名、许可证和 SHA-256 清单。
+- `Scripts/package-release.sh signed|notarized` 分别要求 Developer ID 和 notarytool profile；notarized 审计额外执行 stapler 与 Gatekeeper。没有发布凭据时必须失败，不能静默降级为 local。
 
 ## 性能记录
 
@@ -63,7 +67,7 @@
 - 空闲/持续输入 CPU 与内存。
 - 一小时压力测试后的 session、窗口和内存状态。
 
-具体阈值以 `DEVELOPMENT_PLAN.md` 的建议为起点，在首个可测版本后确认。
+当前确认阈值：普通按键到快照和候选纯布局完成的 Release P95 < 16 ms。首次本机基线见 `docs/M8_VALIDATION.md`；一小时与跨系统结果仍须按发布候选逐次记录。
 
 ## 发布阻断缺陷
 

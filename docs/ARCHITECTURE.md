@@ -97,6 +97,20 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - 横排与竖排是两个纯布局策略，共享同一候选模型、绘制、点击和翻页动作；主题只固定系统/浅色/深色 appearance，不绕过系统降低透明度、增强对比度和减少动态效果。
 - 脱敏诊断只输出版本、架构、设置值、引擎就绪状态及目录是否存在；不接收输入快照，也不输出完整 Home 路径或 librime 原始错误正文。
 
+## M8 性能与可靠性
+
+- `CandidateWindowUpdateGate` 为每个异步候选窗展示或隐藏任务分配单调代次；新任务会使旧任务失效，避免快速切换 client 后旧候选窗重新出现或旧隐藏任务遮掉新候选。
+- `RimeBridge` 只暴露计数型诊断：活跃 session、桥接快照分配和进程 RSS。诊断不包含按键、组合、候选或提交内容，并复用 service 锁保持一致性。
+- M8 smoke 在隔离 user data 中测量 engine 初始化、全量/增量部署、`process_key + snapshot + 纯布局` 的 P50/P95/P99，并按可配置时长反复创建/销毁 session。
+- 快照分配由 C 层在深复制和 `rb_snapshot_clear` 两端配对计数；任何测试结束后的非零余额都直接阻断阶段验收。
+
+## M9 发布与安装事务
+
+- `Scripts/lib/install-transaction.sh` 是用户级安装的原子替换边界，明确区分 source、installing、installed 和 previous 四个路径；完整失败和两个中间失败状态都能恢复旧应用与新构建。
+- `package-release.sh` 先构建固定版本/构建号的 universal Release，再按 local、Developer ID signed 或 notarized 模式处理签名。正式模式按 Frameworks、主程序、app 的顺序启用 Hardened Runtime 和可信时间戳。
+- 发布目录包含 app、许可证、安装/回滚/卸载说明、发布说明、已知问题和 JSON 版本清单；外层 ZIP 另有 SHA-256。
+- `verify-release.sh` 从最终 ZIP 重新解包检查 Bundle ID、版本、arm64/x86_64、动态依赖、清单校验值、源码泄漏、签名链、Hardened Runtime，并在 notarized 模式执行 stapler 与 Gatekeeper。
+
 ## 错误降级
 
 - 引擎不可用：输入事件透传，隐藏候选窗，展示不含输入内容的诊断状态。

@@ -3,6 +3,7 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
+source "$project_root/Scripts/lib/install-transaction.sh"
 configuration="${1:-Debug}"
 source_app="$project_root/build/DerivedData/Build/Products/$configuration/windwhisper.app"
 install_directory="$HOME/Library/Input Methods"
@@ -90,21 +91,17 @@ fi
 "$lsregister" -u "$source_app" 2>/dev/null || true
 "$lsregister" -u "$installed_app" 2>/dev/null || true
 
-/bin/mv "$source_app" "$installing_app"
 restore_previous_install() {
     trap - ERR
     if [[ -n "${original_input_source:-}" && -x "${installed_binary:-}" ]]; then
         "$installed_binary" --select-input-source-id "$original_input_source" >/dev/null 2>&1 || true
     fi
     "$lsregister" -u "$installed_app" 2>/dev/null || true
-    /bin/mkdir -p "$(/usr/bin/dirname "$source_app")"
-    if [[ -e "$installed_app" ]]; then
-        /bin/mv "$installed_app" "$source_app"
-    elif [[ -e "$installing_app" ]]; then
-        /bin/mv "$installing_app" "$source_app"
+    if ! windwhisper_rollback_install_transaction \
+        "$source_app" "$installed_app" "$installing_app" "$previous_app"; then
+        echo "windwhisper: automatic install rollback failed" >&2
     fi
-    if [[ -e "$previous_app" ]]; then
-        /bin/mv "$previous_app" "$installed_app"
+    if [[ -e "$installed_app" ]]; then
         "$lsregister" -f "$installed_app" 2>/dev/null || true
     fi
     [[ ! -e "$legacy_primary_app" ]] || "$lsregister" -f "$legacy_primary_app" 2>/dev/null || true
@@ -112,10 +109,8 @@ restore_previous_install() {
 }
 trap restore_previous_install ERR
 
-if [[ -e "$installed_app" ]]; then
-    /bin/mv "$installed_app" "$previous_app"
-fi
-/bin/mv "$installing_app" "$installed_app"
+windwhisper_begin_install_transaction \
+    "$source_app" "$installed_app" "$installing_app" "$previous_app"
 
 installed_binary="$installed_app/Contents/MacOS/windwhisper"
 "$lsregister" -f "$installed_app"
@@ -240,9 +235,7 @@ else
     echo "The installed legacy input method was kept active until windwhisper is authorized."
 fi
 
-if [[ -e "$previous_app" ]]; then
-    /bin/rm -rf "$previous_app"
-fi
+windwhisper_commit_install_transaction "$previous_app"
 trap - ERR
 
 echo "$input_source_status"

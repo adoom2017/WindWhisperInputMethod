@@ -1,5 +1,6 @@
 #include "RimeBridge.h"
 
+#include <mach/mach.h>
 #include <stdlib.h>
 #include <stdatomic.h>
 #include <string.h>
@@ -10,9 +11,11 @@ struct RBService {
   RimeApi *api;
   int initialized;
   atomic_int deployment_state;
+  atomic_size_t active_session_count;
 };
 
 static RBServiceRef active_service = NULL;
+static atomic_size_t snapshot_allocation_count = 0;
 
 static char *rb_copy_string(const char *source) {
   if (source == NULL) {
@@ -25,6 +28,30 @@ static char *rb_copy_string(const char *source) {
   }
   memcpy(copy, source, length + 1);
   return copy;
+}
+
+static char *rb_snapshot_copy_string(const char *source) {
+  char *copy = rb_copy_string(source);
+  if (copy != NULL) {
+    atomic_fetch_add(&snapshot_allocation_count, 1);
+  }
+  return copy;
+}
+
+static void *rb_snapshot_calloc(size_t count, size_t size) {
+  void *allocation = calloc(count, size);
+  if (allocation != NULL) {
+    atomic_fetch_add(&snapshot_allocation_count, 1);
+  }
+  return allocation;
+}
+
+static void rb_snapshot_free(void *allocation) {
+  if (allocation == NULL) {
+    return;
+  }
+  free(allocation);
+  atomic_fetch_sub(&snapshot_allocation_count, 1);
 }
 
 static RBResult rb_fail(RBResult result,
@@ -110,6 +137,7 @@ RBResult rb_service_create(const RBServiceConfiguration *configuration,
 
   instance->api = api;
   atomic_init(&instance->deployment_state, 0);
+  atomic_init(&instance->active_session_count, 0);
   api->setup(&traits);
   if (RIME_API_AVAILABLE(api, set_notification_handler)) {
     api->set_notification_handler(rb_notification_handler, instance);
@@ -129,6 +157,7 @@ void rb_service_destroy(RBServiceRef service) {
   if (RIME_API_AVAILABLE(service->api, cleanup_all_sessions)) {
     service->api->cleanup_all_sessions();
   }
+  atomic_store(&service->active_session_count, 0);
   if (RIME_API_AVAILABLE(service->api, set_notification_handler)) {
     service->api->set_notification_handler(NULL, NULL);
   }
@@ -199,12 +228,17 @@ RBResult rb_session_create(RBServiceRef service,
                    error_message);
   }
   *session = (RBSessionRef)session_id;
+  atomic_fetch_add(&service->active_session_count, 1);
   return RB_RESULT_OK;
 }
 
 void rb_session_destroy(RBServiceRef service, RBSessionRef session) {
   if (rb_service_is_valid(service) && session != 0) {
     service->api->destroy_session((RimeSessionId)session);
+    size_t count = atomic_load(&service->active_session_count);
+    if (count > 0) {
+      atomic_fetch_sub(&service->active_session_count, 1);
+    }
   }
 }
 
@@ -320,16 +354,16 @@ void rb_snapshot_clear(RBSnapshot *snapshot) {
   if (snapshot == NULL) {
     return;
   }
-  free(snapshot->commit_text);
-  free(snapshot->preedit);
-  free(snapshot->schema_id);
-  free(snapshot->schema_name);
+  rb_snapshot_free(snapshot->commit_text);
+  rb_snapshot_free(snapshot->preedit);
+  rb_snapshot_free(snapshot->schema_id);
+  rb_snapshot_free(snapshot->schema_name);
   if (snapshot->candidates != NULL) {
     for (size_t index = 0; index < snapshot->candidate_count; ++index) {
-      free(snapshot->candidates[index].text);
-      free(snapshot->candidates[index].comment);
+      rb_snapshot_free(snapshot->candidates[index].text);
+      rb_snapshot_free(snapshot->candidates[index].comment);
     }
-    free(snapshot->candidates);
+    rb_snapshot_free(snapshot->candidates);
   }
   memset(snapshot, 0, sizeof(*snapshot));
 }
@@ -338,7 +372,7 @@ static RBResult rb_copy_context(RBSnapshot *snapshot,
                                 const RimeContext *context,
                                 char **error_message) {
   if (context->composition.preedit != NULL) {
-    snapshot->preedit = rb_copy_string(context->composition.preedit);
+    snapshot->preedit = rb_snapshot_copy_string(context->composition.preedit);
     if (snapshot->preedit == NULL) {
       return rb_fail(RB_RESULT_OUT_OF_MEMORY,
                      "Unable to copy the composition snapshot.",
@@ -358,8 +392,8 @@ static RBResult rb_copy_context(RBSnapshot *snapshot,
     return RB_RESULT_OK;
   }
   snapshot->candidate_count = (size_t)context->menu.num_candidates;
-  snapshot->candidates = (RBCandidate *)calloc(snapshot->candidate_count,
-                                               sizeof(RBCandidate));
+  snapshot->candidates = (RBCandidate *)rb_snapshot_calloc(
+      snapshot->candidate_count, sizeof(RBCandidate));
   if (snapshot->candidates == NULL) {
     return rb_fail(RB_RESULT_OUT_OF_MEMORY,
                    "Unable to allocate the candidate snapshot.",
@@ -367,8 +401,9 @@ static RBResult rb_copy_context(RBSnapshot *snapshot,
   }
   for (size_t index = 0; index < snapshot->candidate_count; ++index) {
     const RimeCandidate *source = &context->menu.candidates[index];
-    snapshot->candidates[index].text = rb_copy_string(source->text);
-    snapshot->candidates[index].comment = rb_copy_string(source->comment);
+    snapshot->candidates[index].text = rb_snapshot_copy_string(source->text);
+    snapshot->candidates[index].comment =
+        rb_snapshot_copy_string(source->comment);
     if ((source->text != NULL && snapshot->candidates[index].text == NULL) ||
         (source->comment != NULL &&
          snapshot->candidates[index].comment == NULL)) {
@@ -383,8 +418,8 @@ static RBResult rb_copy_context(RBSnapshot *snapshot,
 static RBResult rb_copy_status(RBSnapshot *snapshot,
                                const RimeStatus *status,
                                char **error_message) {
-  snapshot->schema_id = rb_copy_string(status->schema_id);
-  snapshot->schema_name = rb_copy_string(status->schema_name);
+  snapshot->schema_id = rb_snapshot_copy_string(status->schema_id);
+  snapshot->schema_name = rb_snapshot_copy_string(status->schema_name);
   if ((status->schema_id != NULL && snapshot->schema_id == NULL) ||
       (status->schema_name != NULL && snapshot->schema_name == NULL)) {
     return rb_fail(RB_RESULT_OUT_OF_MEMORY,
@@ -416,7 +451,7 @@ RBResult rb_session_read_snapshot(RBServiceRef service,
   if (RIME_API_AVAILABLE(service->api, get_commit) &&
       service->api->get_commit((RimeSessionId)session, &commit)) {
     int had_commit_text = commit.text != NULL;
-    snapshot->commit_text = rb_copy_string(commit.text);
+    snapshot->commit_text = rb_snapshot_copy_string(commit.text);
     service->api->free_commit(&commit);
     if (had_commit_text && snapshot->commit_text == NULL) {
       rb_snapshot_clear(snapshot);
@@ -449,6 +484,27 @@ RBResult rb_session_read_snapshot(RBServiceRef service,
   }
 
   return RB_RESULT_OK;
+}
+
+int rb_bridge_read_diagnostics(RBServiceRef service,
+                               RBBridgeDiagnostics *diagnostics) {
+  if (!rb_service_is_valid(service) || diagnostics == NULL) {
+    return 0;
+  }
+
+  mach_task_basic_info_data_t task_info_data;
+  mach_msg_type_number_t task_info_count = MACH_TASK_BASIC_INFO_COUNT;
+  kern_return_t task_result = task_info(
+      mach_task_self(), MACH_TASK_BASIC_INFO,
+      (task_info_t)&task_info_data, &task_info_count);
+
+  diagnostics->active_session_count =
+      atomic_load(&service->active_session_count);
+  diagnostics->snapshot_allocation_count =
+      atomic_load(&snapshot_allocation_count);
+  diagnostics->resident_memory_bytes =
+      task_result == KERN_SUCCESS ? task_info_data.resident_size : 0;
+  return 1;
 }
 
 void rb_error_message_free(char *error_message) {

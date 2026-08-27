@@ -63,6 +63,12 @@ typedef struct RBSnapshot {
   int is_disabled;
 } RBSnapshot;
 
+typedef struct RBBridgeDiagnostics {
+  size_t active_session_count;
+  size_t snapshot_allocation_count;
+  uint64_t resident_memory_bytes;
+} RBBridgeDiagnostics;
+
 RBResult rb_service_create(const RBServiceConfiguration *configuration,
                            RBServiceRef _Nullable *_Nonnull service,
                            char *_Nullable *_Nullable error_message);
@@ -106,6 +112,9 @@ RBResult rb_session_read_snapshot(RBServiceRef service,
                                   RBSessionRef session,
                                   RBSnapshot *snapshot,
                                   char *_Nullable *_Nullable error_message);
+
+int rb_bridge_read_diagnostics(RBServiceRef service,
+                               RBBridgeDiagnostics *diagnostics);
 
 void rb_error_message_free(char *error_message);
 

@@ -196,9 +196,27 @@
 - 数据：正式 user data 改为 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/Data`。仅当目标不存在时从旧目录复制，源目录保留，已有目标不覆盖；偏好设置同样只迁移新 suite 中缺失的 key。
 - 安装：先并存注册新应用并检查授权；新输入源启用成功后才禁用和归档旧应用。授权尚未完成时保留旧应用，并恢复安装前选中的旧输入源。
 
-## 待用户确认
+### ADR-030：M8 以可重复热路径测量和资源余额作为自动门禁
 
-- ADR-013：正式发布签名、notarization 与分发渠道。
+- 日期：2026-08-27
+- 状态：已接受
+- 选择：在真实 librime session 上测量按键处理、快照复制和候选纯布局的合并延迟，Release P95 固定低于 16 ms；桥接层只增加不含输入内容的 session/快照分配/RSS 计数。
+- 可靠性：候选窗异步任务使用代次失效，后续输入或隐藏动作会阻止旧任务重新显示；Unicode 覆盖 ASCII、Emoji、组合字符和扩展汉字的 UTF-8/UTF-16 边界。
+- 验证：`Scripts/test-m8.sh Release [seconds]`。当前 10 秒 Release 基线按键 P95 0.090 ms、候选布局 P95 0.077 ms，session 和快照余额归零。
+
+### ADR-031：M9 采用用户级 ZIP 与显式发布模式
+
+- 日期：2026-08-27
+- 状态：已接受（本地候选已验证，正式凭据待验证）
+- 安装范围：首版发布包延续当前用户 `~/Library/Input Methods` 安装，不写系统级 `/Library/Input Methods`；升级使用 source/installing/installed/previous 原子事务并保留用户数据。
+- 发布模式：`local` 仅作本机 ad-hoc 候选；`signed` 要求 Developer ID Application；`notarized` 进一步要求 notarytool keychain profile，并执行提交、staple 和 Gatekeeper 门禁。
+- 产物：通用 ZIP 包含应用、第三方许可证、安装与卸载说明、发布说明、已知问题及 JSON 版本/校验清单；发布审计拒绝开发机包管理器依赖、架构缺失、版本不一致和不匹配签名。
+- 限制：当前钥匙串无有效签名身份，正式签名、公证与干净机器验收不能在本次本机自动化中宣称通过。
+
+## 待外部条件完成
+
+- 导入 Developer ID Application 证书并创建 Apple notarization keychain profile。
+- 在 macOS 13、Intel、干净用户账户/机器及完整应用矩阵执行发布验收。
 
 
 ## 决策模板

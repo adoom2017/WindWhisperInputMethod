@@ -14,6 +14,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     private var lastModifierFlags: NSEvent.ModifierFlags = []
     private var didLogSessionError = false
     private var settingsObservers = [NSObjectProtocol]()
+    private let candidateWindowUpdateGate = CandidateWindowUpdateGate()
     private lazy var candidateWindow = CandidateWindowCoordinator { [weak self] action in
         self?.handleCandidateWindowAction(action)
     }
@@ -374,8 +375,11 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         anchorRect: NSRect,
         clientWindowLevel: CGWindowLevel
     ) {
+        let updateToken = candidateWindowUpdateGate.beginUpdate()
         let operation: () -> Void = { [weak self] in
-            guard let self else { return }
+            guard let self, self.candidateWindowUpdateGate.isCurrent(updateToken) else {
+                return
+            }
             self.candidateWindow.update(
                 menu: menu,
                 anchorRect: anchorRect,
@@ -390,8 +394,11 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
     }
 
     private func hideCandidateWindow() {
+        let updateToken = candidateWindowUpdateGate.invalidate()
         let operation: () -> Void = { [weak self] in
-            guard let self else { return }
+            guard let self, self.candidateWindowUpdateGate.isCurrent(updateToken) else {
+                return
+            }
             self.candidateWindow.hide()
         }
         if Thread.isMainThread {
@@ -433,6 +440,33 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         } else {
             DispatchQueue.main.async(execute: operation)
         }
+    }
+}
+
+final class CandidateWindowUpdateGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var generation: UInt64 = 0
+
+    func beginUpdate() -> UInt64 {
+        lock.lock()
+        generation &+= 1
+        let token = generation
+        lock.unlock()
+        return token
+    }
+
+    func invalidate() -> UInt64 {
+        lock.lock()
+        generation &+= 1
+        let token = generation
+        lock.unlock()
+        return token
+    }
+
+    func isCurrent(_ token: UInt64) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return token == generation
     }
 }
 

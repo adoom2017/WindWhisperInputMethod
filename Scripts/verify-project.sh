@@ -117,6 +117,17 @@ for required_file in \
     "$project_root/Resources/Rime/flypy.schema.yaml" \
     "$project_root/Resources/Rime/flypy.dict.yaml" \
     "$project_root/Resources/Rime/flypydz.dict.yaml" \
+    "$project_root/Sources/RimeBridge/M8SmokeTest.swift" \
+    "$project_root/Scripts/test-m8.sh" \
+    "$project_root/Scripts/test-m9.sh" \
+    "$project_root/Scripts/package-release.sh" \
+    "$project_root/Scripts/verify-release.sh" \
+    "$project_root/Scripts/lib/install-transaction.sh" \
+    "$project_root/docs/M8_VALIDATION.md" \
+    "$project_root/docs/M9_VALIDATION.md" \
+    "$project_root/docs/RELEASE_INSTALL.md" \
+    "$project_root/docs/RELEASE_NOTES.md" \
+    "$project_root/docs/KNOWN_ISSUES.md" \
     "$project_root/LICENSES/librime-BSD-3-Clause.txt" \
     "$project_root/LICENSES/rime-data-LGPL-3.0.txt"; do
     if [[ ! -f "$required_file" ]]; then
@@ -124,6 +135,12 @@ for required_file in \
         exit 66
     fi
 done
+
+if ! grep -q 'M8SmokeTest.swift in Sources' \
+    "$project_root/WindWhisperInputMethod.xcodeproj/project.pbxproj"; then
+    echo "M8 smoke test is not included in the application target." >&2
+    exit 65
+fi
 
 verify_sha256() {
     local file="$1"

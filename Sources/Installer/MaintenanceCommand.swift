@@ -75,6 +75,10 @@ enum MaintenanceCommand {
             return MainActor.assumeIsolated {
                 M7SmokeTest.run(arguments: arguments)
             }
+        case "--m8-smoke":
+            return MainActor.assumeIsolated {
+                M8SmokeTest.run(arguments: arguments)
+            }
         case "--m5-preview":
             return MainActor.assumeIsolated {
                 M5SmokeTest.preview()
@@ -183,6 +187,7 @@ enum MaintenanceCommand {
               --mode-indicator-preview Show the English mode indicator visual preview
               --m6-smoke               Run the M6 schemas, auxiliary code, and upgrade test
               --m7-smoke               Run the M7 settings, synchronization, and diagnostics test
+              --m8-smoke               Run the M8 performance and reliability test
               --help                   Show this help
             """
         )
