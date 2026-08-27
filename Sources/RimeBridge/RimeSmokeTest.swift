@@ -47,6 +47,7 @@ enum RimeSmokeTest {
         try verifyCandidate(service: service, schema: .fullPinyin, code: "nihao", text: "你好")
         try verifyCandidate(service: service, schema: .flypyPhonetic, code: "nihc", text: "你好")
         try verifyCandidate(service: service, schema: .flypy, code: "ubu", text: "是不是")
+        try verifyFirstCandidate(service: service, schema: .flypy, code: "iys", text: "纯")
         try verifyCandidate(service: service, schema: .flypy, code: "fy", text: "风语输入法")
 
         let shape = try service.makeSession()
@@ -81,6 +82,22 @@ enum RimeSmokeTest {
         }
         guard session.selectCandidate(at: index), try session.readSnapshot().commitText == text else {
             throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not commit \(text)")
+        }
+    }
+
+    private static func verifyFirstCandidate(
+        service: RimeService,
+        schema: FengYuSchema,
+        code: String,
+        text: String
+    ) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: schema.rawValue), session.simulate(sequence: code) else {
+            throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not consume \(code)")
+        }
+        let snapshot = try session.readSnapshot()
+        guard snapshot.menu.candidates.first?.text == text else {
+            throw RimeBridgeError.smokeAssertion("\(schema.displayName) did not prioritize \(text) for \(code)")
         }
     }
 
