@@ -5,15 +5,15 @@
 
 ## 已交付
 
-- 进程级 `RimeRuntime`，负责正式用户数据目录中的初始化和快速部署。
-- 每个 InputMethodKit controller 独立 Rime session，以及服务级串行化引擎访问。
-- macOS 按键到 Rime key symbol/mask 的映射。
-- Command 快捷键透传给应用；Control/Option 和 modifier 按下/释放映射给 Rime。左 Shift 遵循原配置 `commit_code`，右 Shift 与 Caps Lock 为 `noop`。
+- 进程级 `NativeRuntime`，负责正式用户数据目录中的初始化和快速部署。
+- 每个 InputMethodKit controller 独立 input engine session，以及服务级串行化引擎访问。
+- macOS 按键到 input engine key symbol/mask 的映射。
+- Command 快捷键透传给应用；Control/Option 和 modifier 按下/释放映射给 input engine。左 Shift 遵循原配置 `commit_code`，右 Shift 与 Caps Lock 为 `noop`。
 - 左 Shift 真正改变 `ascii_mode` 后，在插入点附近显示 48×48 的“中/英”非激活玻璃指示器；内层强调色徽章保持字形居中，0.1 秒淡入、0.8 秒停留、0.12 秒淡出；降低透明度时使用实色底，减少动态效果时取消动画，辅助功能标签仍使用完整的“中文/英文”。
-- 中文模式下 `Shift+数字/标点` 使用 macOS 已解析的上档字符传给 librime，例如 `Shift+1` 提交 `！`；Control/Option 快捷键仍使用忽略修饰键的基础字符。
+- 中文模式下 `Shift+数字/标点` 使用 macOS 已解析的上档字符传给 input-engine，例如 `Shift+1` 提交 `！`；Control/Option 快捷键仍使用忽略修饰键的基础字符。
 - marked text、光标范围、commit、Backspace、Escape、Space、Return 与停用提交。
 - 可重复执行的 `--m3-smoke` 和 `Scripts/test-m3.sh`。
-- 本机安装签名顺序修复：先嵌入 librime，再主程序，最后 app bundle。
+- 本机安装签名顺序修复：先嵌入 input-engine，再主程序，最后 app bundle。
 
 ## 自动化结果
 
@@ -26,12 +26,12 @@ modifierMapping=passed
 inputModeIndicatorTransition=passed
 compositionEditing=passed
 shiftModeSwitch=passed
-rimeShortcutRouting=passed
+shortcutRouting=passed
 frontendCommit=passed
 inputClientFlow=passed
 ```
 
-M2 回归项也全部通过：librime 版本、schema、候选、提交、UTF-8/UTF-16 范围转换和 session 生命周期。`xcodebuild analyze` 成功，项目元数据、运行时依赖、架构和签名检查成功。
+M2 回归项也全部通过：input-engine 版本、schema、候选、提交、UTF-8/UTF-16 范围转换和 session 生命周期。`xcodebuild analyze` 成功，项目元数据、运行时依赖、架构和签名检查成功。
 
 当前 Debug 构建安装目标为 `~/Library/Input Methods/windwhisper.app`。安装过程使用本地签名和当前会话热刷新，不涉及注销、重启、Apple 公证或构建上传；新 Bundle 身份首次启用需要 macOS 人工授权。
 

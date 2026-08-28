@@ -3,7 +3,7 @@
 enum FengYuDiagnostics {
     static func render(
         settings: FengYuSettingsSnapshot,
-        runtime: RimeRuntimeDiagnosticStatus,
+        runtime: NativeRuntimeDiagnosticStatus,
         bundle: Bundle = .main
     ) -> String {
         let bundleIdentifier = bundle.bundleIdentifier ?? InputSourceMetadata.bundleIdentifier
@@ -79,14 +79,14 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
 
         let fullWidth = actionItem(
             title: "全角字符",
-            action: #selector(RimeInputController.fengYuToggleFullWidthCommand(_:)),
+            action: #selector(WindWhisperInputController.fengYuToggleFullWidthCommand(_:)),
             state: settings.usesFullWidth
         )
         menu.addItem(fullWidth)
 
         let simplified = actionItem(
             title: "简体中文",
-            action: #selector(RimeInputController.fengYuToggleSimplifiedChineseCommand(_:)),
+            action: #selector(WindWhisperInputController.fengYuToggleSimplifiedChineseCommand(_:)),
             state: settings.usesSimplifiedChinese
         )
         menu.addItem(simplified)
@@ -112,22 +112,22 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         menu.addItem(.separator())
         let redeploy = actionItem(
             title: isRedeploying ? "正在重新部署…" : "重新部署输入引擎",
-            action: #selector(RimeInputController.fengYuRedeployCommand(_:))
+            action: #selector(WindWhisperInputController.fengYuRedeployCommand(_:))
         )
         redeploy.isEnabled = !isRedeploying
         menu.addItem(redeploy)
         menu.addItem(actionItem(
             title: "打开用户目录",
-            action: #selector(RimeInputController.fengYuOpenUserDirectoryCommand(_:))
+            action: #selector(WindWhisperInputController.fengYuOpenUserDirectoryCommand(_:))
         ))
         menu.addItem(actionItem(
             title: "查看脱敏诊断…",
-            action: #selector(RimeInputController.fengYuShowDiagnosticsCommand(_:))
+            action: #selector(WindWhisperInputController.fengYuShowDiagnosticsCommand(_:))
         ))
         menu.addItem(.separator())
         menu.addItem(actionItem(
             title: "恢复默认设置…",
-            action: #selector(RimeInputController.fengYuResetSettingsCommand(_:))
+            action: #selector(WindWhisperInputController.fengYuResetSettingsCommand(_:))
         ))
     }
 
@@ -165,24 +165,24 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
 
     private func schemaAction(for schema: FengYuSchema) -> Selector {
         switch schema {
-        case .flypy: #selector(RimeInputController.fengYuSelectFlypySchemaCommand(_:))
-        case .flypyPhonetic: #selector(RimeInputController.fengYuSelectFlypyPhoneticSchemaCommand(_:))
-        case .fullPinyin: #selector(RimeInputController.fengYuSelectFullPinyinSchemaCommand(_:))
+        case .flypy: #selector(WindWhisperInputController.fengYuSelectFlypySchemaCommand(_:))
+        case .flypyPhonetic: #selector(WindWhisperInputController.fengYuSelectFlypyPhoneticSchemaCommand(_:))
+        case .fullPinyin: #selector(WindWhisperInputController.fengYuSelectFullPinyinSchemaCommand(_:))
         }
     }
 
     private func orientationAction(for orientation: CandidateOrientation) -> Selector {
         switch orientation {
-        case .horizontal: #selector(RimeInputController.fengYuSelectHorizontalOrientationCommand(_:))
-        case .vertical: #selector(RimeInputController.fengYuSelectVerticalOrientationCommand(_:))
+        case .horizontal: #selector(WindWhisperInputController.fengYuSelectHorizontalOrientationCommand(_:))
+        case .vertical: #selector(WindWhisperInputController.fengYuSelectVerticalOrientationCommand(_:))
         }
     }
 
     private func colorSchemeAction(for colorScheme: CandidateColorScheme) -> Selector {
         switch colorScheme {
-        case .system: #selector(RimeInputController.fengYuSelectSystemColorSchemeCommand(_:))
-        case .light: #selector(RimeInputController.fengYuSelectLightColorSchemeCommand(_:))
-        case .dark: #selector(RimeInputController.fengYuSelectDarkColorSchemeCommand(_:))
+        case .system: #selector(WindWhisperInputController.fengYuSelectSystemColorSchemeCommand(_:))
+        case .light: #selector(WindWhisperInputController.fengYuSelectLightColorSchemeCommand(_:))
+        case .dark: #selector(WindWhisperInputController.fengYuSelectDarkColorSchemeCommand(_:))
         }
     }
 
@@ -222,7 +222,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let errorMessage: String?
             do {
-                try RimeRuntime.shared.redeploy(fullCheck: true)
+                try NativeRuntime.shared.redeploy(fullCheck: true)
                 errorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
@@ -250,7 +250,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
 
     func openUserDirectory() {
         do {
-            let url = try RimeServicePaths.applicationDefaults().userData
+            let url = try InputServicePaths.applicationDefaults().userData
             try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
             guard NSWorkspace.shared.open(url) else {
                 showMessage(
@@ -272,7 +272,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
     func showDiagnostics() {
         let text = FengYuDiagnostics.render(
             settings: store.snapshot,
-            runtime: RimeRuntime.shared.diagnosticStatus()
+            runtime: NativeRuntime.shared.diagnosticStatus()
         )
         let alert = NSAlert()
         alert.messageText = "风语脱敏诊断"

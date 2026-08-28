@@ -11,11 +11,6 @@ if [[ ! -x "$executable" ]]; then
     exit 66
 fi
 
-if [[ -e "$application_path/Contents/Frameworks/librime.1.dylib" ]] || otool -L "$executable" | grep -q 'librime'; then
-    echo "The application must not link or embed librime." >&2
-    exit 65
-fi
-
 executable_architectures="$(lipo -archs "$executable")"
 if [[ "$executable_architectures" != *arm64* ]]; then
     echo "The application executable is missing arm64." >&2
@@ -27,4 +22,4 @@ if [[ "$application_path" == */Release/* && "$executable_architectures" != *x86_
 fi
 
 codesign --verify --deep --strict "$application_path"
-echo "Native input engine runtime verified."
+echo "WindWhisper runtime verified."

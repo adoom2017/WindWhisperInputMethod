@@ -53,9 +53,9 @@ enum M8SmokeTest {
         try verifyShortcutPassthrough()
 
         guard let resources = Bundle.main.resourceURL else {
-            throw RimeBridgeError.missingBundledData
+            throw InputEngineError.missingBundledData
         }
-        let sharedData = resources.appendingPathComponent("Rime", isDirectory: true)
+        let sharedData = resources
         let explicitRoot = argumentValue(after: "--user-data-root", in: arguments)
         let root = explicitRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? FileManager.default.temporaryDirectory
@@ -72,9 +72,9 @@ enum M8SmokeTest {
             }
         }
 
-        var service: RimeService!
+        var service: InputService!
         let initialization = try measure {
-            service = try RimeService(
+            service = try InputService(
                 paths: .temporary(root: root, sharedData: sharedData),
                 minLogLevel: 2
             )
@@ -89,17 +89,17 @@ enum M8SmokeTest {
         let afterStress = try requireDiagnostics(service)
 
         guard afterStress.activeSessionCount == 0 else {
-            throw RimeBridgeError.smokeAssertion(
+            throw InputEngineError.smokeAssertion(
                 "session churn left \(afterStress.activeSessionCount) active sessions"
             )
         }
         guard afterStress.snapshotAllocationCount == 0 else {
-            throw RimeBridgeError.smokeAssertion(
-                "snapshot churn left \(afterStress.snapshotAllocationCount) bridge allocations"
+            throw InputEngineError.smokeAssertion(
+                "snapshot churn left \(afterStress.snapshotAllocationCount) runtime allocations"
             )
         }
         guard performance.key.p95 < 16 else {
-            throw RimeBridgeError.smokeAssertion(
+            throw InputEngineError.smokeAssertion(
                 "ordinary key P95 was \(format(performance.key.p95)) ms (limit 16 ms)"
             )
         }
@@ -124,27 +124,27 @@ enum M8SmokeTest {
             ("𠀀A", 4, 2),
         ]
         for (text, utf8Offset, expectedUTF16Offset) in fixtures {
-            guard RimeRangeConverter.utf16Offset(
+            guard RangeConverter.utf16Offset(
                 forUTF8Offset: utf8Offset,
                 in: text
             ) == expectedUTF16Offset else {
-                throw RimeBridgeError.smokeAssertion("Unicode range fixture failed")
+                throw InputEngineError.smokeAssertion("Unicode range fixture failed")
             }
         }
         guard
-            RimeRangeConverter.utf16Range(
+            RangeConverter.utf16Range(
                 startUTF8Offset: 1,
                 endUTF8Offset: 5,
                 in: "a😀中"
             ) == NSRange(location: 1, length: 2),
-            RimeRangeConverter.utf16Offset(forUTF8Offset: 2, in: "a😀中") == nil,
-            RimeRangeConverter.utf16Range(
+            RangeConverter.utf16Offset(forUTF8Offset: 2, in: "a😀中") == nil,
+            RangeConverter.utf16Range(
                 startUTF8Offset: 5,
                 endUTF8Offset: 1,
                 in: "a😀中"
             ) == nil
         else {
-            throw RimeBridgeError.smokeAssertion("invalid Unicode boundaries were accepted")
+            throw InputEngineError.smokeAssertion("invalid Unicode boundaries were accepted")
         }
     }
 
@@ -153,15 +153,15 @@ enum M8SmokeTest {
         let first = gate.beginUpdate()
         let second = gate.beginUpdate()
         guard !gate.isCurrent(first), gate.isCurrent(second) else {
-            throw RimeBridgeError.smokeAssertion("a stale candidate update remained current")
+            throw InputEngineError.smokeAssertion("a stale candidate update remained current")
         }
         let hide = gate.invalidate()
         guard !gate.isCurrent(second), gate.isCurrent(hide) else {
-            throw RimeBridgeError.smokeAssertion("candidate hide did not invalidate pending UI work")
+            throw InputEngineError.smokeAssertion("candidate hide did not invalidate pending UI work")
         }
         let third = gate.beginUpdate()
         guard !gate.isCurrent(hide), gate.isCurrent(third) else {
-            throw RimeBridgeError.smokeAssertion("a stale hide superseded a newer candidate update")
+            throw InputEngineError.smokeAssertion("a stale hide superseded a newer candidate update")
         }
     }
 
@@ -177,41 +177,41 @@ enum M8SmokeTest {
             charactersIgnoringModifiers: "c",
             isARepeat: false,
             keyCode: 8
-        ), RimeKeyMapper.map(commandEvent) == nil else {
-            throw RimeBridgeError.smokeAssertion("Command shortcut was consumed")
+        ), KeyMapper.map(commandEvent) == nil else {
+            throw InputEngineError.smokeAssertion("Command shortcut was consumed")
         }
     }
 
-    private static func verifySingleCommitDelivery(service: RimeService) throws {
+    private static func verifySingleCommitDelivery(service: InputService) throws {
         let session = try service.makeSession()
-        guard session.selectSchema(identifier: "luna_pinyin"),
+        guard session.selectSchema(identifier: FengYuSchema.fullPinyin.rawValue),
             session.simulate(sequence: "nihao ")
         else {
-            throw RimeBridgeError.smokeAssertion("commit fixture was not consumed")
+            throw InputEngineError.smokeAssertion("commit fixture was not consumed")
         }
         let client = M3InputClientDouble()
-        _ = RimeClientUpdater.apply(
+        _ = ClientUpdater.apply(
             try session.readSnapshot(),
             to: client,
             hadMarkedText: false
         )
-        _ = RimeClientUpdater.apply(
+        _ = ClientUpdater.apply(
             try session.readSnapshot(),
             to: client,
             hadMarkedText: false
         )
         guard client.committedText == "你好" else {
-            throw RimeBridgeError.smokeAssertion("one engine commit was not delivered exactly once")
+            throw InputEngineError.smokeAssertion("one engine commit was not delivered exactly once")
         }
     }
 
     @MainActor
     private static func measureInputPath(
-        service: RimeService
+        service: InputService
     ) throws -> (key: Percentiles, layout: Percentiles) {
         let session = try service.makeSession()
-        guard session.selectSchema(identifier: "flypy") else {
-            throw RimeBridgeError.smokeAssertion("performance schema could not be selected")
+        guard session.selectSchema(identifier: FengYuSchema.flypy.rawValue) else {
+            throw InputEngineError.smokeAssertion("performance schema could not be selected")
         }
         let theme = CandidateWindowTheme.system(
             environment: CandidateAccessibilityEnvironment(
@@ -234,7 +234,7 @@ enum M8SmokeTest {
             let keyCode: Int32 = index.isMultiple(of: 2) ? 0x6E : 0x69
             let started = DispatchTime.now().uptimeNanoseconds
             guard session.process(keyCode: keyCode) else {
-                throw RimeBridgeError.smokeAssertion("performance key was not consumed")
+                throw InputEngineError.smokeAssertion("performance key was not consumed")
             }
             let snapshot = try session.readSnapshot()
             let layoutStarted = DispatchTime.now().uptimeNanoseconds
@@ -252,16 +252,16 @@ enum M8SmokeTest {
         return (percentiles(keySamples), percentiles(layoutSamples))
     }
 
-    private static func stressSessions(service: RimeService, seconds: Double) throws -> Int {
+    private static func stressSessions(service: InputService, seconds: Double) throws -> Int {
         let deadline = Date().addingTimeInterval(seconds)
         var iterations = 0
         while Date() < deadline {
             try autoreleasepool {
                 let session = try service.makeSession()
-                guard session.selectSchema(identifier: "flypy"),
+                guard session.selectSchema(identifier: FengYuSchema.flypy.rawValue),
                     session.simulate(sequence: "nihc")
                 else {
-                    throw RimeBridgeError.smokeAssertion("stress input was not consumed")
+                    throw InputEngineError.smokeAssertion("stress input was not consumed")
                 }
                 for _ in 0..<8 {
                     _ = try session.readSnapshot()
@@ -273,9 +273,9 @@ enum M8SmokeTest {
         return iterations
     }
 
-    private static func requireDiagnostics(_ service: RimeService) throws -> RimeBridgeDiagnostics {
+    private static func requireDiagnostics(_ service: InputService) throws -> InputEngineDiagnostics {
         guard let diagnostics = service.diagnostics() else {
-            throw RimeBridgeError.smokeAssertion("bridge diagnostics were unavailable")
+            throw InputEngineError.smokeAssertion("runtime diagnostics were unavailable")
         }
         return diagnostics
     }

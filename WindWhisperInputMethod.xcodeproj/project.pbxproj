@@ -9,19 +9,19 @@
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* Main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000001 /* Main.swift */; };
 		A10000000000000000000002 /* ApplicationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000002 /* ApplicationDelegate.swift */; };
-		A10000000000000000000003 /* RimeInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* RimeInputController.swift */; };
+		A10000000000000000000003 /* WindWhisperInputController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000003 /* WindWhisperInputController.swift */; };
 		A10000000000000000000004 /* InputSourceMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* InputSourceMetadata.swift */; };
 		A10000000000000000000005 /* MaintenanceCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000005 /* MaintenanceCommand.swift */; };
 		A10000000000000000000006 /* InputSourceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000008 /* InputSourceManager.swift */; };
 		A10000000000000000000007 /* WindWhisperInputIcon-v1.pdf in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */; };
 		A10000000000000000000008 /* zh_CN.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000A /* zh_CN.lproj */; };
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Assets.xcassets */; };
-		A1000000000000000000000B /* RimeModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* RimeModels.swift */; };
-		A1000000000000000000000C /* RimeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* RimeService.swift */; };
-		A1000000000000000000000D /* RimeSmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* RimeSmokeTest.swift */; };
-		A10000000000000000000010 /* Rime in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* Rime */; };
-		A10000000000000000000011 /* RimeRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* RimeRuntime.swift */; };
-		A10000000000000000000012 /* RimeKeyMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* RimeKeyMapper.swift */; };
+		A1000000000000000000000B /* InputModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* InputModels.swift */; };
+		A1000000000000000000000C /* InputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* InputService.swift */; };
+		A1000000000000000000000D /* EngineSmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* EngineSmokeTest.swift */; };
+		A10000000000000000000010 /* fy.dict.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* fy.dict.yaml */; };
+		A10000000000000000000011 /* NativeRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* NativeRuntime.swift */; };
+		A10000000000000000000012 /* KeyMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000016 /* KeyMapper.swift */; };
 		A10000000000000000000013 /* M3SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000017 /* M3SmokeTest.swift */; };
 		A10000000000000000000014 /* zh-Hans.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000018 /* zh-Hans.lproj */; };
 		A10000000000000000000015 /* en.lproj in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000019 /* en.lproj */; };
@@ -40,7 +40,7 @@
 /* Begin PBXFileReference section */
 		A20000000000000000000001 /* Main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Main.swift; sourceTree = "<group>"; };
 		A20000000000000000000002 /* ApplicationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationDelegate.swift; sourceTree = "<group>"; };
-		A20000000000000000000003 /* RimeInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeInputController.swift; sourceTree = "<group>"; };
+		A20000000000000000000003 /* WindWhisperInputController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindWhisperInputController.swift; sourceTree = "<group>"; };
 		A20000000000000000000004 /* InputSourceMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputSourceMetadata.swift; sourceTree = "<group>"; };
 		A20000000000000000000005 /* MaintenanceCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceCommand.swift; sourceTree = "<group>"; };
 		A20000000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -49,17 +49,12 @@
 		A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */ = {isa = PBXFileReference; lastKnownFileType = image.pdf; path = "WindWhisperInputIcon-v1.pdf"; sourceTree = "<group>"; };
 		A2000000000000000000000A /* zh_CN.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = zh_CN.lproj; sourceTree = "<group>"; };
 		A2000000000000000000000B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		A2000000000000000000000C /* RimeBridge.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = RimeBridge.c; sourceTree = "<group>"; };
-		A2000000000000000000000D /* RimeBridge.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = RimeBridge.h; sourceTree = "<group>"; };
-		A2000000000000000000000E /* RimeBridge-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "RimeBridge-Bridging-Header.h"; sourceTree = "<group>"; };
-		A2000000000000000000000F /* RimeModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeModels.swift; sourceTree = "<group>"; };
-		A20000000000000000000010 /* RimeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeService.swift; sourceTree = "<group>"; };
-		A20000000000000000000011 /* RimeSmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeSmokeTest.swift; sourceTree = "<group>"; };
-		A20000000000000000000012 /* librime.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; path = librime.1.dylib; sourceTree = "<group>"; };
-		A20000000000000000000013 /* Rime */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Rime; sourceTree = "<group>"; };
-		A20000000000000000000014 /* rime_api.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = rime_api.h; sourceTree = "<group>"; };
-		A20000000000000000000015 /* RimeRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeRuntime.swift; sourceTree = "<group>"; };
-		A20000000000000000000016 /* RimeKeyMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RimeKeyMapper.swift; sourceTree = "<group>"; };
+		A2000000000000000000000F /* InputModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModels.swift; sourceTree = "<group>"; };
+		A20000000000000000000010 /* InputService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputService.swift; sourceTree = "<group>"; };
+		A20000000000000000000011 /* EngineSmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EngineSmokeTest.swift; sourceTree = "<group>"; };
+		A20000000000000000000013 /* fy.dict.yaml */ = {isa = PBXFileReference; lastKnownFileType = text; path = fy.dict.yaml; sourceTree = "<group>"; };
+		A20000000000000000000015 /* NativeRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRuntime.swift; sourceTree = "<group>"; };
+		A20000000000000000000016 /* KeyMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyMapper.swift; sourceTree = "<group>"; };
 		A20000000000000000000017 /* M3SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M3SmokeTest.swift; sourceTree = "<group>"; };
 		A20000000000000000000018 /* zh-Hans.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = "zh-Hans.lproj"; sourceTree = "<group>"; };
 		A20000000000000000000019 /* en.lproj */ = {isa = PBXFileReference; lastKnownFileType = folder; path = en.lproj; sourceTree = "<group>"; };
@@ -94,7 +89,6 @@
 				A40000000000000000000002 /* App */,
 				A40000000000000000000003 /* Sources */,
 				A40000000000000000000006 /* Resources */,
-				A40000000000000000000008 /* Vendor */,
 				A40000000000000000000007 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -104,7 +98,7 @@
 			children = (
 				A20000000000000000000001 /* Main.swift */,
 				A20000000000000000000002 /* ApplicationDelegate.swift */,
-				A20000000000000000000015 /* RimeRuntime.swift */,
+				A20000000000000000000015 /* NativeRuntime.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -116,7 +110,7 @@
 				A4000000000000000000000D /* CandidateWindow */,
 				A4000000000000000000000E /* Configuration */,
 				A40000000000000000000005 /* Installer */,
-				A40000000000000000000009 /* RimeBridge */,
+				A40000000000000000000009 /* InputEngine */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -124,8 +118,8 @@
 		A40000000000000000000004 /* InputController */ = {
 			isa = PBXGroup;
 			children = (
-				A20000000000000000000003 /* RimeInputController.swift */,
-				A20000000000000000000016 /* RimeKeyMapper.swift */,
+				A20000000000000000000003 /* WindWhisperInputController.swift */,
+				A20000000000000000000016 /* KeyMapper.swift */,
 				A20000000000000000000017 /* M3SmokeTest.swift */,
 			);
 			path = InputController;
@@ -147,7 +141,7 @@
 				A20000000000000000000006 /* Info.plist */,
 				A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */,
 				A2000000000000000000000B /* Assets.xcassets */,
-				A20000000000000000000013 /* Rime */,
+				A20000000000000000000013 /* fy.dict.yaml */,
 				A2000000000000000000000A /* zh_CN.lproj */,
 				A20000000000000000000018 /* zh-Hans.lproj */,
 				A20000000000000000000019 /* en.lproj */,
@@ -163,50 +157,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A40000000000000000000008 /* Vendor */ = {
+		A40000000000000000000009 /* InputEngine */ = {
 			isa = PBXGroup;
 			children = (
-				A4000000000000000000000A /* librime */,
+				A2000000000000000000000F /* InputModels.swift */,
+				A20000000000000000000010 /* InputService.swift */,
+				A20000000000000000000011 /* EngineSmokeTest.swift */,
 			);
-			path = Vendor;
-			sourceTree = "<group>";
-		};
-		A40000000000000000000009 /* RimeBridge */ = {
-			isa = PBXGroup;
-			children = (
-				A2000000000000000000000C /* RimeBridge.c */,
-				A2000000000000000000000D /* RimeBridge.h */,
-				A2000000000000000000000E /* RimeBridge-Bridging-Header.h */,
-				A2000000000000000000000F /* RimeModels.swift */,
-				A20000000000000000000010 /* RimeService.swift */,
-				A20000000000000000000011 /* RimeSmokeTest.swift */,
-			);
-			path = RimeBridge;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000A /* librime */ = {
-			isa = PBXGroup;
-			children = (
-				A4000000000000000000000B /* include */,
-				A4000000000000000000000C /* lib */,
-			);
-			path = librime;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000B /* include */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000014 /* rime_api.h */,
-			);
-			path = include;
-			sourceTree = "<group>";
-		};
-		A4000000000000000000000C /* lib */ = {
-			isa = PBXGroup;
-			children = (
-				A20000000000000000000012 /* librime.1.dylib */,
-			);
-			path = lib;
+			path = InputEngine;
 			sourceTree = "<group>";
 		};
 		A4000000000000000000000D /* CandidateWindow */ = {
@@ -296,7 +254,7 @@
 				A10000000000000000000007 /* WindWhisperInputIcon-v1.pdf in Resources */,
 				A10000000000000000000008 /* zh_CN.lproj in Resources */,
 				A10000000000000000000009 /* Assets.xcassets in Resources */,
-				A10000000000000000000010 /* Rime in Resources */,
+				A10000000000000000000010 /* fy.dict.yaml in Resources */,
 				A10000000000000000000014 /* zh-Hans.lproj in Resources */,
 				A10000000000000000000015 /* en.lproj in Resources */,
 			);
@@ -311,15 +269,15 @@
 			files = (
 				A10000000000000000000001 /* Main.swift in Sources */,
 				A10000000000000000000002 /* ApplicationDelegate.swift in Sources */,
-				A10000000000000000000003 /* RimeInputController.swift in Sources */,
+				A10000000000000000000003 /* WindWhisperInputController.swift in Sources */,
 				A10000000000000000000004 /* InputSourceMetadata.swift in Sources */,
 				A10000000000000000000005 /* MaintenanceCommand.swift in Sources */,
 				A10000000000000000000006 /* InputSourceManager.swift in Sources */,
-				A1000000000000000000000B /* RimeModels.swift in Sources */,
-				A1000000000000000000000C /* RimeService.swift in Sources */,
-				A1000000000000000000000D /* RimeSmokeTest.swift in Sources */,
-				A10000000000000000000011 /* RimeRuntime.swift in Sources */,
-				A10000000000000000000012 /* RimeKeyMapper.swift in Sources */,
+				A1000000000000000000000B /* InputModels.swift in Sources */,
+				A1000000000000000000000C /* InputService.swift in Sources */,
+				A1000000000000000000000D /* EngineSmokeTest.swift in Sources */,
+				A10000000000000000000011 /* NativeRuntime.swift in Sources */,
+				A10000000000000000000012 /* KeyMapper.swift in Sources */,
 				A10000000000000000000013 /* M3SmokeTest.swift in Sources */,
 				A10000000000000000000017 /* CandidateWindowController.swift in Sources */,
 				A10000000000000000000018 /* CandidateWindowPositioner.swift in Sources */,

@@ -1,9 +1,9 @@
 import Foundation
 
 enum FengYuSchema: String, CaseIterable, Sendable {
-    case flypy = "flypy"
-    case flypyPhonetic = "double_pinyin_flypy"
-    case fullPinyin = "luna_pinyin"
+    case flypy = "flypyShape"
+    case flypyPhonetic = "flypyPhonetic"
+    case fullPinyin = "fullPinyin"
 
     var displayName: String {
         switch self {
@@ -55,9 +55,9 @@ struct FengYuSettingsSnapshot: Equatable, Sendable {
         colorScheme: .system
     )
 
-    func apply(to session: RimeSession) throws {
+    func apply(to session: InputSession) throws {
         guard session.selectSchema(identifier: schema.rawValue) else {
-            throw RimeBridgeError.bridge(
+            throw InputEngineError.runtime(
                 code: -2,
                 message: "The selected input schema is unavailable: \(schema.rawValue)"
             )
@@ -69,7 +69,7 @@ struct FengYuSettingsSnapshot: Equatable, Sendable {
             session.setOption("zh_simp", enabled: usesSimplifiedChinese),
         ].allSatisfy { $0 }
         guard optionsApplied else {
-            throw RimeBridgeError.bridge(
+            throw InputEngineError.runtime(
                 code: -3,
                 message: "Input engine runtime options are unavailable."
             )
@@ -87,10 +87,8 @@ final class FengYuSettingsStore: @unchecked Sendable {
     static let shared = FengYuSettingsStore()
 
     private enum Key {
-        // v2 intentionally resets the former pure-phonetic Flypy default to
-        // the user-requested 小鹤音形 schema while keeping both menu choices.
+        // v2 keeps the current schema selection isolated from older preference formats.
         static let schema = "settings.schema.v2"
-        static let legacySchema = "settings.schema.v1"
         static let fullWidth = "settings.fullWidth.v1"
         static let simplified = "settings.simplified.v1"
         static let orientation = "settings.candidateOrientation.v1"
@@ -108,16 +106,13 @@ final class FengYuSettingsStore: @unchecked Sendable {
             self.defaults =
                 UserDefaults(suiteName: InputSourceMetadata.persistentDataIdentifier)
                 ?? .standard
-            let sources = legacyDefaults
-                ?? InputSourceMetadata.legacyPersistentDataIdentifiers.compactMap(UserDefaults.init(suiteName:))
-            migrateLegacyValues(from: sources)
+            migrateLegacyValues(from: legacyDefaults ?? [])
         }
     }
 
     private func migrateLegacyValues(from legacyDefaults: [UserDefaults]) {
         let keys = [
             Key.schema,
-            Key.legacySchema,
             Key.fullWidth,
             Key.simplified,
             Key.orientation,
@@ -169,7 +164,6 @@ final class FengYuSettingsStore: @unchecked Sendable {
             let wasDefault = unlockedSnapshot() == .defaults
             [
                 Key.schema,
-                Key.legacySchema,
                 Key.fullWidth,
                 Key.simplified,
                 Key.orientation,

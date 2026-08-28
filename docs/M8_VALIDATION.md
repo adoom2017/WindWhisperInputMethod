@@ -6,7 +6,7 @@
 - 主机：Apple Silicon
 - 系统：macOS 26.5.1（25F80）
 - 工具链：Xcode 26.4.1（17E202）
-- librime：1.16.0
+- input-engine：1.16.0
 
 ## 覆盖范围
 

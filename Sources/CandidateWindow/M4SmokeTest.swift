@@ -31,14 +31,14 @@ enum M4SmokeTest {
 
     private static func verifyCandidateModel() throws {
         let model = CandidateWindowModel(
-            menu: RimeMenuSnapshot(
+            menu: MenuSnapshot(
                 pageSize: 5,
                 pageNumber: 2,
                 isLastPage: false,
                 highlightedIndex: 1,
                 candidates: [
-                    RimeCandidateSnapshot(text: "风", comment: "feng"),
-                    RimeCandidateSnapshot(text: "语", comment: nil),
+                    CandidateSnapshot(text: "风", comment: "feng"),
+                    CandidateSnapshot(text: "语", comment: nil),
                 ]
             )
         )
@@ -48,7 +48,7 @@ enum M4SmokeTest {
             model.entries.map(\.shortcut) == ["1", "2"],
             model.entries.map(\.text) == ["风", "语"]
         else {
-            throw RimeBridgeError.smokeAssertion("candidate presentation model is incorrect.")
+            throw InputEngineError.smokeAssertion("candidate presentation model is incorrect.")
         }
     }
 
@@ -72,7 +72,7 @@ enum M4SmokeTest {
                 candidateFrames: frames
             ) == nil
         else {
-            throw RimeBridgeError.smokeAssertion("candidate mouse hit testing is incorrect.")
+            throw InputEngineError.smokeAssertion("candidate mouse hit testing is incorrect.")
         }
     }
 
@@ -86,7 +86,7 @@ enum M4SmokeTest {
             visibleFrame: visibleFrame
         )
         guard below.origin == NSPoint(x: 400, y: 294) else {
-            throw RimeBridgeError.smokeAssertion("candidate panel did not prefer the space below.")
+            throw InputEngineError.smokeAssertion("candidate panel did not prefer the space below.")
         }
 
         let flipped = CandidateWindowPositioner.frame(
@@ -95,7 +95,7 @@ enum M4SmokeTest {
             visibleFrame: visibleFrame
         )
         guard flipped.origin == NSPoint(x: 400, y: 46) else {
-            throw RimeBridgeError.smokeAssertion("candidate panel did not flip above the insertion point.")
+            throw InputEngineError.smokeAssertion("candidate panel did not flip above the insertion point.")
         }
 
         let constrained = CandidateWindowPositioner.frame(
@@ -104,7 +104,7 @@ enum M4SmokeTest {
             visibleFrame: visibleFrame
         )
         guard constrained.maxX == visibleFrame.maxX else {
-            throw RimeBridgeError.smokeAssertion("candidate panel exceeded the visible frame.")
+            throw InputEngineError.smokeAssertion("candidate panel exceeded the visible frame.")
         }
     }
 
@@ -121,13 +121,13 @@ enum M4SmokeTest {
                 candidates: [right, left]
             ) == right
         else {
-            throw RimeBridgeError.smokeAssertion("candidate panel selected the wrong display.")
+            throw InputEngineError.smokeAssertion("candidate panel selected the wrong display.")
         }
     }
 
     private static func verifyNonactivatingPanel() throws {
         guard CandidatePanelConfiguration.styleMask.contains(.nonactivatingPanel) else {
-            throw RimeBridgeError.smokeAssertion("candidate panel can steal application focus.")
+            throw InputEngineError.smokeAssertion("candidate panel can steal application focus.")
         }
     }
 
@@ -138,67 +138,67 @@ enum M4SmokeTest {
         client.lineHeightRectangle = lineRect
         client.firstRectResult = fallbackRect
         guard CandidateAnchorResolver.anchorRect(in: client) == lineRect else {
-            throw RimeBridgeError.smokeAssertion("input line rectangle was not preferred for positioning.")
+            throw InputEngineError.smokeAssertion("input line rectangle was not preferred for positioning.")
         }
 
         client.lineHeightRectangle = .zero
         guard CandidateAnchorResolver.anchorRect(in: client) == fallbackRect else {
-            throw RimeBridgeError.smokeAssertion("firstRect positioning fallback failed.")
+            throw InputEngineError.smokeAssertion("firstRect positioning fallback failed.")
         }
 
         client.firstRectResult = .zero
         guard CandidateAnchorResolver.anchorRect(in: client) == nil else {
-            throw RimeBridgeError.smokeAssertion("an invalid candidate anchor was accepted.")
+            throw InputEngineError.smokeAssertion("an invalid candidate anchor was accepted.")
         }
     }
 
     private static func verifyEngineCandidateInteraction(root: URL) throws {
-        let paths = try RimeServicePaths.applicationDefaults()
-        let service = try RimeService(paths: .temporary(root: root, sharedData: paths.sharedData))
+        let paths = try InputServicePaths.applicationDefaults()
+        let service = try InputService(paths: .temporary(root: root, sharedData: paths.sharedData))
         try service.deploy(fullCheck: true)
         let session = try service.makeSession()
-        guard session.selectSchema(identifier: "luna_pinyin") else {
-            throw RimeBridgeError.smokeAssertion("M4 could not select its full pinyin fixture")
+        guard session.selectSchema(identifier: FengYuSchema.fullPinyin.rawValue) else {
+            throw InputEngineError.smokeAssertion("M4 could not select its full pinyin fixture")
         }
 
         guard session.simulate(sequence: "shi") else {
-            throw RimeBridgeError.smokeAssertion("candidate test sequence was rejected.")
+            throw InputEngineError.smokeAssertion("candidate test sequence was rejected.")
         }
         let initial = try session.readSnapshot()
         guard initial.menu.candidates.count > 1 else {
-            throw RimeBridgeError.smokeAssertion("candidate test did not produce multiple candidates.")
+            throw InputEngineError.smokeAssertion("candidate test did not produce multiple candidates.")
         }
 
         guard session.process(keyCode: 0xFF54) else {
-            throw RimeBridgeError.smokeAssertion("Down was not consumed while candidates were visible.")
+            throw InputEngineError.smokeAssertion("Down was not consumed while candidates were visible.")
         }
         let highlighted = try session.readSnapshot()
         guard
             highlighted.menu.highlightedIndex != initial.menu.highlightedIndex,
             highlighted.menu.candidates == initial.menu.candidates
         else {
-            throw RimeBridgeError.smokeAssertion("keyboard highlight did not stay synchronized with Rime.")
+            throw InputEngineError.smokeAssertion("keyboard highlight did not stay synchronized with the input engine.")
         }
 
         guard !highlighted.menu.isLastPage else {
-            throw RimeBridgeError.smokeAssertion("candidate test sequence did not produce multiple pages.")
+            throw InputEngineError.smokeAssertion("candidate test sequence did not produce multiple pages.")
         }
         guard session.process(keyCode: 0xFF56) else {
-            throw RimeBridgeError.smokeAssertion("PageDown was not consumed.")
+            throw InputEngineError.smokeAssertion("PageDown was not consumed.")
         }
         let nextPage = try session.readSnapshot()
         guard nextPage.menu.pageNumber == highlighted.menu.pageNumber + 1 else {
-            throw RimeBridgeError.smokeAssertion("candidate page did not stay synchronized with Rime.")
+            throw InputEngineError.smokeAssertion("candidate page did not stay synchronized with the input engine.")
         }
 
         let selectionSnapshot = try session.readSnapshot()
         let selectionIndex = min(1, selectionSnapshot.menu.candidates.count - 1)
         let expectedCommit = selectionSnapshot.menu.candidates[selectionIndex].text
         guard session.selectCandidate(at: selectionIndex) else {
-            throw RimeBridgeError.smokeAssertion("semantic candidate selection was rejected.")
+            throw InputEngineError.smokeAssertion("semantic candidate selection was rejected.")
         }
         guard try session.readSnapshot().commitText == expectedCommit else {
-            throw RimeBridgeError.smokeAssertion("candidate selection committed a different item.")
+            throw InputEngineError.smokeAssertion("candidate selection committed a different item.")
         }
     }
 }

@@ -2,14 +2,14 @@ import AppKit
 import InputMethodKit
 import OSLog
 
-final class RimeInputController: IMKInputController, @unchecked Sendable {
+final class WindWhisperInputController: IMKInputController, @unchecked Sendable {
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? InputSourceMetadata.bundleIdentifier,
         category: "InputController"
     )
 
     private weak var inputClient: IMKTextInput?
-    private var session: RimeSession?
+    private var session: InputSession?
     private var hasMarkedText = false
     private var lastModifierFlags: NSEvent.ModifierFlags = []
     private var didLogSessionError = false
@@ -143,11 +143,11 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         if event.type == .flagsChanged {
             return handleModifierFlagsChanged(event, session: session, client: client)
         }
-        guard let mappedKey = RimeKeyMapper.map(event) else {
+        guard let mappedKey = KeyMapper.map(event) else {
             return false
         }
         guard let session else {
-            logger.debug("Key passed through because no Rime session is available")
+            logger.debug("Key passed through because no input session is available")
             return false
         }
         guard session.process(keyCode: mappedKey.keyCode, modifierMask: mappedKey.modifierMask) else {
@@ -160,7 +160,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         } catch {
             logger.error("Unable to update composition: \(error.localizedDescription, privacy: .public)")
             session.clearComposition()
-            hasMarkedText = RimeClientUpdater.clearMarkedText(in: client)
+            hasMarkedText = ClientUpdater.clearMarkedText(in: client)
             hideCandidateWindow()
         }
         return true
@@ -168,7 +168,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
 
     private func handleModifierFlagsChanged(
         _ event: NSEvent,
-        session: RimeSession?,
+        session: InputSession?,
         client: IMKTextInput
     ) -> Bool {
         let modifierFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -177,7 +177,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         guard changes.isEmpty == false else {
             return true
         }
-        guard let mappedKey = RimeKeyMapper.mapModifierChange(
+        guard let mappedKey = KeyMapper.mapModifierChange(
             keyCode: event.keyCode,
             modifierFlags: modifierFlags,
             changedFlags: changes
@@ -218,11 +218,11 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
             return
         }
         do {
-            session = try RimeRuntime.shared.makeSession()
+            session = try NativeRuntime.shared.makeSession()
             didLogSessionError = false
         } catch {
             if !didLogSessionError {
-                logger.error("Unable to create Rime session: \(error.localizedDescription, privacy: .public)")
+                logger.error("Unable to create input session: \(error.localizedDescription, privacy: .public)")
                 didLogSessionError = true
             }
         }
@@ -300,11 +300,11 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         }
 
         session.clearComposition()
-        hasMarkedText = RimeClientUpdater.clearMarkedText(in: client)
+        hasMarkedText = ClientUpdater.clearMarkedText(in: client)
     }
 
-    private func apply(_ snapshot: RimeSnapshot, to client: IMKTextInput) {
-        hasMarkedText = RimeClientUpdater.apply(
+    private func apply(_ snapshot: InputSnapshot, to client: IMKTextInput) {
+        hasMarkedText = ClientUpdater.apply(
             snapshot,
             to: client,
             hadMarkedText: hasMarkedText
@@ -312,7 +312,7 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         updateCandidateWindow(snapshot: snapshot, client: client)
     }
 
-    private func updateCandidateWindow(snapshot: RimeSnapshot, client: IMKTextInput) {
+    private func updateCandidateWindow(snapshot: InputSnapshot, client: IMKTextInput) {
         guard snapshot.composition != nil, !snapshot.menu.candidates.isEmpty else {
             hideCandidateWindow()
             return
@@ -357,13 +357,13 @@ final class RimeInputController: IMKInputController, @unchecked Sendable {
         } catch {
             logger.error("Unable to apply candidate selection: \(error.localizedDescription, privacy: .public)")
             session.clearComposition()
-            hasMarkedText = RimeClientUpdater.clearMarkedText(in: client)
+            hasMarkedText = ClientUpdater.clearMarkedText(in: client)
             hideCandidateWindow()
         }
     }
 
     private func presentCandidateWindow(
-        menu: RimeMenuSnapshot,
+        menu: MenuSnapshot,
         anchorRect: NSRect,
         clientWindowLevel: CGWindowLevel
     ) {
@@ -462,7 +462,7 @@ final class CandidateWindowUpdateGate: @unchecked Sendable {
     }
 }
 
-extension RimeInputController {
+extension WindWhisperInputController {
     @objc func fengYuSelectFlypySchemaCommand(_ command: Any) {
         FengYuSettingsMenuController.shared.selectSchema(.flypy)
     }
@@ -557,10 +557,10 @@ enum CandidateAnchorResolver {
     }
 }
 
-enum RimeClientUpdater {
+enum ClientUpdater {
     @discardableResult
     static func apply(
-        _ snapshot: RimeSnapshot,
+        _ snapshot: InputSnapshot,
         to client: IMKTextInput,
         hadMarkedText: Bool
     ) -> Bool {

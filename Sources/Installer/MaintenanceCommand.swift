@@ -62,7 +62,7 @@ enum MaintenanceCommand {
             printDiagnostics()
             return EXIT_SUCCESS
         case "--engine-smoke":
-            return RimeSmokeTest.run(arguments: arguments)
+            return EngineSmokeTest.run(arguments: arguments)
         case "--m3-smoke":
             return M3SmokeTest.run()
         case "--m4-smoke":
@@ -70,11 +70,11 @@ enum MaintenanceCommand {
         case "--m5-smoke":
             return M5SmokeTest.run()
         case "--m6-smoke":
-            return RimeSmokeTest.run(arguments: arguments)
+            return EngineSmokeTest.run(arguments: arguments)
         case "--m7-smoke":
-            return RimeSmokeTest.run(arguments: arguments)
+            return EngineSmokeTest.run(arguments: arguments)
         case "--m8-smoke":
-            return RimeSmokeTest.run(arguments: arguments)
+            return EngineSmokeTest.run(arguments: arguments)
         case "--m5-preview":
             return MainActor.assumeIsolated {
                 M5SmokeTest.preview()
@@ -175,7 +175,7 @@ enum MaintenanceCommand {
               --input-method-parent-status Print parent registration state
               --current-input-source   Print the current keyboard input source ID
               --diagnose               Print non-sensitive bundle diagnostics
-              --engine-smoke           Run the isolated input-engine M2 integration test
+              --engine-smoke           Run the isolated input engine integration test
               --m3-smoke               Run the M3 key mapping and composition test
               --m4-smoke               Run the M4 candidate window and interaction test
               --m5-smoke               Run the M5 native material and layout test

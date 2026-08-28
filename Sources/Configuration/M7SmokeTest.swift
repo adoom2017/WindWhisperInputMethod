@@ -47,9 +47,9 @@ enum M7SmokeTest {
 
     @MainActor
     private static func execute(arguments: [String]) throws -> Result {
-        let suiteName = "com.shendongchun.inputmethod.rime.m7-smoke.\(UUID().uuidString)"
+        let suiteName = "com.shendongchun.inputmethod.windwhisper.m7-smoke.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
-            throw RimeBridgeError.smokeAssertion("could not create isolated M7 preferences")
+            throw InputEngineError.smokeAssertion("could not create isolated M7 preferences")
         }
         defer { defaults.removePersistentDomain(forName: suiteName) }
 
@@ -57,11 +57,11 @@ enum M7SmokeTest {
 
         let store = FengYuSettingsStore(defaults: defaults)
         guard store.snapshot == .defaults else {
-            throw RimeBridgeError.smokeAssertion("new settings did not use product defaults")
+            throw InputEngineError.smokeAssertion("new settings did not use product defaults")
         }
-        defaults.set("double_pinyin_flypy", forKey: "settings.schema.v1")
+        defaults.set(FengYuSchema.flypyPhonetic.rawValue, forKey: "settings.schema.v1")
         guard store.snapshot.schema == .flypy else {
-            throw RimeBridgeError.smokeAssertion("legacy pure-phonetic default was not migrated")
+            throw InputEngineError.smokeAssertion("legacy pure-phonetic default was not migrated")
         }
 
         let changeCount = LockedCounter()
@@ -91,7 +91,7 @@ enum M7SmokeTest {
         guard FengYuSettingsStore(defaults: defaults).snapshot == expected,
             changeCount.value == 1
         else {
-            throw RimeBridgeError.smokeAssertion("settings were not persisted or notified")
+            throw InputEngineError.smokeAssertion("settings were not persisted or notified")
         }
 
         defaults.set("removed_schema", forKey: "settings.schema.v2")
@@ -103,7 +103,7 @@ enum M7SmokeTest {
             repaired.candidateOrientation == FengYuSettingsSnapshot.defaults.candidateOrientation,
             repaired.colorScheme == FengYuSettingsSnapshot.defaults.colorScheme
         else {
-            throw RimeBridgeError.smokeAssertion("invalid preferences did not fall back safely")
+            throw InputEngineError.smokeAssertion("invalid preferences did not fall back safely")
         }
         store.update {
             $0.schema = expected.schema
@@ -117,9 +117,9 @@ enum M7SmokeTest {
         try verifyUserFacingEngineError()
 
         guard let resources = Bundle.main.resourceURL else {
-            throw RimeBridgeError.missingBundledData
+            throw InputEngineError.missingBundledData
         }
-        let sharedData = resources.appendingPathComponent("Rime", isDirectory: true)
+        let sharedData = resources
         let explicitRoot = argumentValue(after: "--user-data-root", in: arguments)
         let root = explicitRoot.map { URL(fileURLWithPath: $0, isDirectory: true) }
             ?? FileManager.default.temporaryDirectory
@@ -132,7 +132,7 @@ enum M7SmokeTest {
             }
         }
 
-        let service = try RimeService(
+        let service = try InputService(
             paths: .temporary(root: root, sharedData: sharedData),
             minLogLevel: 2
         )
@@ -150,7 +150,7 @@ enum M7SmokeTest {
                 session.option("zh_simp") == false,
                 session.option("zh_trad") == true
             else {
-                throw RimeBridgeError.smokeAssertion("settings diverged between Rime sessions")
+                throw InputEngineError.smokeAssertion("settings diverged between input engine sessions")
             }
         }
 
@@ -158,15 +158,15 @@ enum M7SmokeTest {
         let composingSettings = FengYuSettingsSnapshot.defaults
         try composingSettings.apply(to: composingSession)
         guard composingSession.simulate(sequence: "ni") else {
-            throw RimeBridgeError.smokeAssertion("composition fixture was not consumed")
+            throw InputEngineError.smokeAssertion("composition fixture was not consumed")
         }
         let beforeCommit = try composingSession.readSnapshot()
         guard beforeCommit.composition != nil, composingSession.commitComposition() else {
-            throw RimeBridgeError.smokeAssertion("composition could not be preserved before settings")
+            throw InputEngineError.smokeAssertion("composition could not be preserved before settings")
         }
         let committed = try composingSession.readSnapshot()
         guard let text = committed.commitText, !text.isEmpty else {
-            throw RimeBridgeError.smokeAssertion("settings preservation produced no committed text")
+            throw InputEngineError.smokeAssertion("settings preservation produced no committed text")
         }
         try expected.apply(to: composingSession)
 
@@ -174,23 +174,23 @@ enum M7SmokeTest {
 
         store.reset()
         guard store.snapshot == .defaults, changeCount.value == 3 else {
-            throw RimeBridgeError.smokeAssertion("restore defaults did not clear persisted settings")
+            throw InputEngineError.smokeAssertion("restore defaults did not clear persisted settings")
         }
         return Result(sessionCount: 2)
     }
 
-    private static func verifySimplifiedTraditionalConversion(service: RimeService) throws {
+    private static func verifySimplifiedTraditionalConversion(service: InputService) throws {
         let session = try service.makeSession()
         var traditional = FengYuSettingsSnapshot.defaults
         traditional.schema = .fullPinyin
         traditional.usesSimplifiedChinese = false
         try traditional.apply(to: session)
         guard session.simulate(sequence: "hanzi") else {
-            throw RimeBridgeError.smokeAssertion("traditional conversion fixture was not consumed")
+            throw InputEngineError.smokeAssertion("traditional conversion fixture was not consumed")
         }
         let traditionalSnapshot = try session.readSnapshot()
         guard traditionalSnapshot.menu.candidates.contains(where: { $0.text == "漢字" }) else {
-            throw RimeBridgeError.smokeAssertion("traditional candidate fixture was missing")
+            throw InputEngineError.smokeAssertion("traditional candidate fixture was missing")
         }
 
         session.clearComposition()
@@ -198,11 +198,11 @@ enum M7SmokeTest {
         simplified.usesSimplifiedChinese = true
         try simplified.apply(to: session)
         guard session.simulate(sequence: "hanzi") else {
-            throw RimeBridgeError.smokeAssertion("simplified conversion fixture was not consumed")
+            throw InputEngineError.smokeAssertion("simplified conversion fixture was not consumed")
         }
         let simplifiedSnapshot = try session.readSnapshot()
         guard simplifiedSnapshot.menu.candidates.contains(where: { $0.text == "汉字" }) else {
-            throw RimeBridgeError.smokeAssertion("OpenCC did not convert the candidate to simplified Chinese")
+            throw InputEngineError.smokeAssertion("simplified conversion did not produce the expected candidate")
         }
     }
 
@@ -214,15 +214,15 @@ enum M7SmokeTest {
             let currentDefaults = UserDefaults(suiteName: currentSuiteName),
             let legacyDefaults = UserDefaults(suiteName: legacySuiteName)
         else {
-            throw RimeBridgeError.smokeAssertion("could not create migration preference suites")
+            throw InputEngineError.smokeAssertion("could not create migration preference suites")
         }
         defer {
             currentDefaults.removePersistentDomain(forName: currentSuiteName)
             legacyDefaults.removePersistentDomain(forName: legacySuiteName)
         }
 
-        currentDefaults.set("flypy", forKey: "settings.schema.v2")
-        legacyDefaults.set("luna_pinyin", forKey: "settings.schema.v2")
+        currentDefaults.set(FengYuSchema.flypy.rawValue, forKey: "settings.schema.v2")
+        legacyDefaults.set(FengYuSchema.fullPinyin.rawValue, forKey: "settings.schema.v2")
         legacyDefaults.set(true, forKey: "settings.fullWidth.v1")
         legacyDefaults.set(false, forKey: "settings.simplified.v1")
         legacyDefaults.set("vertical", forKey: "settings.candidateOrientation.v1")
@@ -238,9 +238,9 @@ enum M7SmokeTest {
             !snapshot.usesSimplifiedChinese,
             snapshot.candidateOrientation == .vertical,
             snapshot.colorScheme == .dark,
-            legacyDefaults.string(forKey: "settings.schema.v2") == "luna_pinyin"
+            legacyDefaults.string(forKey: "settings.schema.v2") == FengYuSchema.fullPinyin.rawValue
         else {
-            throw RimeBridgeError.smokeAssertion(
+            throw InputEngineError.smokeAssertion(
                 "legacy preferences were not migrated without overwriting current values"
             )
         }
@@ -248,15 +248,15 @@ enum M7SmokeTest {
 
     private static func verifyLayouts() throws {
         let model = CandidateWindowModel(
-            menu: RimeMenuSnapshot(
+            menu: MenuSnapshot(
                 pageSize: 3,
                 pageNumber: 0,
                 isLastPage: false,
                 highlightedIndex: 1,
                 candidates: [
-                    RimeCandidateSnapshot(text: "风语", comment: "feng yu"),
-                    RimeCandidateSnapshot(text: "输入法", comment: "shu ru fa"),
-                    RimeCandidateSnapshot(text: "候选窗口", comment: nil),
+                    CandidateSnapshot(text: "风语", comment: "feng yu"),
+                    CandidateSnapshot(text: "输入法", comment: "shu ru fa"),
+                    CandidateSnapshot(text: "候选窗口", comment: nil),
                 ]
             )
         )
@@ -279,7 +279,7 @@ enum M7SmokeTest {
                 .allSatisfy({ $0.maxY <= $1.minY + 0.001 }),
             vertical.pageFrame.minY >= (vertical.candidateFrames.last?.maxY ?? 0)
         else {
-            throw RimeBridgeError.smokeAssertion("candidate orientation layouts are inconsistent")
+            throw InputEngineError.smokeAssertion("candidate orientation layouts are inconsistent")
         }
     }
 
@@ -314,7 +314,7 @@ enum M7SmokeTest {
             guard let action = item.action else {
                 return true
             }
-            return item.target != nil || !RimeInputController.instancesRespond(to: action)
+            return item.target != nil || !WindWhisperInputController.instancesRespond(to: action)
         }
         guard
             titles.contains("输入方案"),
@@ -351,14 +351,14 @@ enum M7SmokeTest {
                 let action = item.action.map(NSStringFromSelector) ?? "nil"
                 return "\(item.title):action=\(action),target=\(item.target.map(String.init(describing:)) ?? "nil")"
             }.joined(separator: "; ")
-            throw RimeBridgeError.smokeAssertion(
+            throw InputEngineError.smokeAssertion(
                 "M7 settings menu is incomplete or has an unroutable InputMethodKit command: \(details)"
             )
         }
 
         let visibleText = ([controller.menu.title] + titles).joined(separator: "\n")
-        guard visibleText.contains("风语"), !visibleText.localizedCaseInsensitiveContains("Rime") else {
-            throw RimeBridgeError.smokeAssertion("settings menu contains a legacy product name")
+        guard visibleText.contains("风语"), !visibleText.localizedCaseInsensitiveContains("input engine") else {
+            throw InputEngineError.smokeAssertion("settings menu contains a legacy product name")
         }
     }
 
@@ -368,7 +368,7 @@ enum M7SmokeTest {
     }
 
     private static func verifyDiagnostics(settings: FengYuSettingsSnapshot) throws {
-        let runtime = RimeRuntimeDiagnosticStatus(
+        let runtime = NativeRuntimeDiagnosticStatus(
             isReady: true,
             version: "test",
             lastError: "SENSITIVE_PREEDIT_SENTINEL",
@@ -383,21 +383,21 @@ enum M7SmokeTest {
             diagnostics.contains("inputContentIncluded=false"),
             diagnostics.contains("startupErrorPresent=true")
         else {
-            throw RimeBridgeError.smokeAssertion("diagnostics exposed sensitive content or paths")
+            throw InputEngineError.smokeAssertion("diagnostics exposed sensitive content or paths")
         }
         guard
             diagnostics.contains("风语脱敏诊断"),
-            !diagnostics.localizedCaseInsensitiveContains("Rime")
+            !diagnostics.localizedCaseInsensitiveContains("input engine")
         else {
-            throw RimeBridgeError.smokeAssertion("diagnostics contain a legacy product name")
+            throw InputEngineError.smokeAssertion("diagnostics contain a legacy product name")
         }
     }
 
     private static func verifyUserFacingEngineError() throws {
-        let error = RimeBridgeError.bridge(code: -1, message: "Rime internal sentinel")
+        let error = InputEngineError.runtime(code: -1, message: "input engine internal sentinel")
         let message = error.localizedDescription
-        guard message.contains("Input engine"), !message.localizedCaseInsensitiveContains("Rime") else {
-            throw RimeBridgeError.smokeAssertion("user-facing engine errors expose an internal name")
+        guard message.contains("Input engine"), !message.localizedCaseInsensitiveContains("input engine") else {
+            throw InputEngineError.smokeAssertion("user-facing engine errors expose an internal name")
         }
     }
 

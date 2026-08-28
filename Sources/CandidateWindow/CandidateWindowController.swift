@@ -18,7 +18,7 @@ struct CandidateWindowModel: Equatable, Sendable {
     let highlightedIndex: Int
     let entries: [CandidateWindowEntry]
 
-    init(menu: RimeMenuSnapshot) {
+    init(menu: MenuSnapshot) {
         pageNumber = max(menu.pageNumber, 0)
         isLastPage = menu.isLastPage
         highlightedIndex = menu.candidates.indices.contains(menu.highlightedIndex)
@@ -117,7 +117,7 @@ final class CandidateWindowCoordinator {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
     }
 
-    func update(menu: RimeMenuSnapshot, anchorRect: NSRect, clientWindowLevel: CGWindowLevel) {
+    func update(menu: MenuSnapshot, anchorRect: NSRect, clientWindowLevel: CGWindowLevel) {
         let model = CandidateWindowModel(menu: menu)
         guard !model.entries.isEmpty, anchorRect.isUsableCandidateAnchor else {
             hide()
@@ -220,7 +220,7 @@ final class CandidateWindowCoordinator {
 
 final class CandidateListView: NSView {
     private(set) var model = CandidateWindowModel(
-        menu: RimeMenuSnapshot(
+        menu: MenuSnapshot(
             pageSize: 0,
             pageNumber: 0,
             isLastPage: true,

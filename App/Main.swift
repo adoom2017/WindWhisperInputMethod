@@ -9,7 +9,7 @@ enum WindWhisperApplication {
             exit(exitCode)
         }
 
-        RimeRuntime.shared.start()
+        NativeRuntime.shared.start()
 
         guard
             let bundleIdentifier = Bundle.main.bundleIdentifier,

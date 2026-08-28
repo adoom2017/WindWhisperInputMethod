@@ -63,9 +63,9 @@
 	<key>InputMethodConnectionName</key>
 	<string>WindWhisper_Local_Connection</string>
 	<key>InputMethodServerControllerClass</key>
-	<string>windwhisper.RimeInputController</string>
+	<string>windwhisper.WindWhisperInputController</string>
 	<key>InputMethodServerDelegateClass</key>
-	<string>windwhisper.RimeInputController</string>
+	<string>windwhisper.WindWhisperInputController</string>
 	<key>LSBackgroundOnly</key>
 	<false/>
 	<key>LSUIElement</key>

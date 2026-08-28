@@ -15,7 +15,7 @@ if FileManager.default.fileExists(atPath: outputURL.path) {
     try FileManager.default.removeItem(at: outputURL)
 }
 // Match the 22×16 pt canvas used by macOS input-source badges such as
-// Squirrel's bundled menu icon. A square 32×32 page is rendered too large and
+// The menu icon follows macOS input-source proportions. A square 32×32 page is rendered too large and
 // sits differently in the menu's fixed icon column.
 var mediaBox = CGRect(x: 0, y: 0, width: 22, height: 16)
 

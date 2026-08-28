@@ -5,10 +5,8 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 
-# Local dependencies and generated Rime data
+# Local dependencies and generated engine data
 Vendor/Build/
-Resources/Rime/build/*
-!Resources/Rime/build/
 *.userdb/
 
 # Logs and local configuration

@@ -23,8 +23,8 @@ enum M3SmokeTest {
             print("compositionEditing=passed")
             try verifyShiftModeSwitch(root: temporaryRoot)
             print("shiftModeSwitch=passed")
-            try verifyRimeShortcutRouting(root: temporaryRoot)
-            print("rimeShortcutRouting=passed")
+            try verifyShortcutRouting(root: temporaryRoot)
+            print("shortcutRouting=passed")
             try verifyFrontendCommit(root: temporaryRoot)
             print("frontendCommit=passed")
             try verifyInputClientFlow(root: temporaryRoot.appendingPathComponent("client", isDirectory: true))
@@ -38,13 +38,13 @@ enum M3SmokeTest {
 
     private static func verifyKeyMapping() throws {
         let letter = try requireEvent(character: "n", keyCode: UInt16(kVK_ANSI_N))
-        guard RimeKeyMapper.map(letter) == RimeMappedKey(keyCode: 0x6E, modifierMask: 0) else {
-            throw RimeBridgeError.smokeAssertion("ASCII letter mapping is incorrect.")
+        guard KeyMapper.map(letter) == MappedKey(keyCode: 0x6E, modifierMask: 0) else {
+            throw InputEngineError.smokeAssertion("ASCII letter mapping is incorrect.")
         }
 
         let backspace = try requireEvent(character: "\u{7F}", keyCode: UInt16(kVK_Delete))
-        guard RimeKeyMapper.map(backspace)?.keyCode == 0xFF08 else {
-            throw RimeBridgeError.smokeAssertion("Backspace mapping is incorrect.")
+        guard KeyMapper.map(backspace)?.keyCode == 0xFF08 else {
+            throw InputEngineError.smokeAssertion("Backspace mapping is incorrect.")
         }
 
         let exclamation = try requireEvent(
@@ -53,11 +53,11 @@ enum M3SmokeTest {
             keyCode: UInt16(kVK_ANSI_1),
             flags: .shift
         )
-        guard RimeKeyMapper.map(exclamation) == RimeMappedKey(
+        guard KeyMapper.map(exclamation) == MappedKey(
             keyCode: 0x21,
-            modifierMask: RimeKeyMapper.ModifierMask.shift
+            modifierMask: KeyMapper.ModifierMask.shift
         ) else {
-            throw RimeBridgeError.smokeAssertion("Shifted punctuation mapping is incorrect.")
+            throw InputEngineError.smokeAssertion("Shifted punctuation mapping is incorrect.")
         }
     }
 
@@ -71,11 +71,11 @@ enum M3SmokeTest {
             keyCode: UInt16(kVK_ANSI_1),
             flags: .shift
         )
-        guard let mapped = RimeKeyMapper.map(event),
+        guard let mapped = KeyMapper.map(event),
             session.process(keyCode: mapped.keyCode, modifierMask: mapped.modifierMask),
             try session.readSnapshot().commitText == "！"
         else {
-            throw RimeBridgeError.smokeAssertion(
+            throw InputEngineError.smokeAssertion(
                 "Shift+1 did not commit the Chinese exclamation mark."
             )
         }
@@ -87,8 +87,8 @@ enum M3SmokeTest {
             keyCode: UInt16(kVK_ANSI_N),
             flags: .command
         )
-        guard RimeKeyMapper.map(command) == nil else {
-            throw RimeBridgeError.smokeAssertion("A Command shortcut was not passed through.")
+        guard KeyMapper.map(command) == nil else {
+            throw InputEngineError.smokeAssertion("A Command shortcut was not passed through.")
         }
 
         let control = try requireEvent(
@@ -96,8 +96,8 @@ enum M3SmokeTest {
             keyCode: UInt16(kVK_ANSI_J),
             flags: .control
         )
-        guard RimeKeyMapper.map(control)?.modifierMask == RimeKeyMapper.ModifierMask.control else {
-            throw RimeBridgeError.smokeAssertion("A Control shortcut was not routed to Rime.")
+        guard KeyMapper.map(control)?.modifierMask == KeyMapper.ModifierMask.control else {
+            throw InputEngineError.smokeAssertion("A Control shortcut was not routed to the input engine.")
         }
 
         let option = try requireEvent(
@@ -105,31 +105,31 @@ enum M3SmokeTest {
             keyCode: UInt16(kVK_ANSI_N),
             flags: .option
         )
-        guard RimeKeyMapper.map(option)?.modifierMask == RimeKeyMapper.ModifierMask.option else {
-            throw RimeBridgeError.smokeAssertion("An Option key was not offered to Rime.")
+        guard KeyMapper.map(option)?.modifierMask == KeyMapper.ModifierMask.option else {
+            throw InputEngineError.smokeAssertion("An Option key was not offered to the input engine.")
         }
     }
 
     private static func verifyModifierMapping() throws {
-        let press = RimeKeyMapper.mapModifierChange(
+        let press = KeyMapper.mapModifierChange(
             keyCode: UInt16(kVK_Shift),
             modifierFlags: .shift,
             changedFlags: .shift
         )
-        let release = RimeKeyMapper.mapModifierChange(
+        let release = KeyMapper.mapModifierChange(
             keyCode: 0,
             modifierFlags: [],
             changedFlags: .shift
         )
-        guard press == RimeMappedKey(
+        guard press == MappedKey(
             keyCode: 0xFFE1,
-            modifierMask: RimeKeyMapper.ModifierMask.shift
-        ), release == RimeMappedKey(
+            modifierMask: KeyMapper.ModifierMask.shift
+        ), release == MappedKey(
             keyCode: 0xFFE1,
-            modifierMask: RimeKeyMapper.ModifierMask.release
+            modifierMask: KeyMapper.ModifierMask.release
         )
         else {
-            throw RimeBridgeError.smokeAssertion("Shift press/release mapping is incorrect.")
+            throw InputEngineError.smokeAssertion("Shift press/release mapping is incorrect.")
         }
     }
 
@@ -142,7 +142,7 @@ enum M3SmokeTest {
             InputModeIndicatorState.chinese.accessibilityText == "中文",
             InputModeIndicatorState.english.accessibilityText == "英文"
         else {
-            throw RimeBridgeError.smokeAssertion("Input mode indicator transition is incorrect.")
+            throw InputEngineError.smokeAssertion("Input mode indicator transition is incorrect.")
         }
     }
 
@@ -151,58 +151,58 @@ enum M3SmokeTest {
         try process(character: "n", keyCode: UInt16(kVK_ANSI_N), in: session)
         try process(character: "i", keyCode: UInt16(kVK_ANSI_I), in: session)
         guard try session.readSnapshot().composition?.text == "ni" else {
-            throw RimeBridgeError.smokeAssertion("The expected marked text was not created.")
+            throw InputEngineError.smokeAssertion("The expected marked text was not created.")
         }
 
         try process(character: "\u{7F}", keyCode: UInt16(kVK_Delete), in: session)
         guard try session.readSnapshot().composition?.text == "n" else {
-            throw RimeBridgeError.smokeAssertion("Backspace did not edit the composition.")
+            throw InputEngineError.smokeAssertion("Backspace did not edit the composition.")
         }
 
         try process(character: "\u{1B}", keyCode: UInt16(kVK_Escape), in: session)
         guard try session.readSnapshot().composition == nil else {
-            throw RimeBridgeError.smokeAssertion("Escape did not clear the composition.")
+            throw InputEngineError.smokeAssertion("Escape did not clear the composition.")
         }
     }
 
     private static func verifyShiftModeSwitch(root: URL) throws {
         let session = try makeSession(root: root.appendingPathComponent("shift", isDirectory: true))
         guard session.option("ascii_mode") == false else {
-            throw RimeBridgeError.smokeAssertion("The session did not start in Chinese mode.")
+            throw InputEngineError.smokeAssertion("The session did not start in Chinese mode.")
         }
         guard session.simulate(sequence: "ni") else {
-            throw RimeBridgeError.smokeAssertion("Could not prepare a composition for Shift.")
+            throw InputEngineError.smokeAssertion("Could not prepare a composition for Shift.")
         }
         try tapModifier(UInt16(kVK_Shift), flag: .shift, in: session)
         let switched = try session.readSnapshot()
         guard switched.status.isASCIIMode, switched.commitText == "ni",
             switched.composition == nil
         else {
-            throw RimeBridgeError.smokeAssertion("Shift did not commit the code and enter English mode.")
+            throw InputEngineError.smokeAssertion("Shift did not commit the code and enter English mode.")
         }
         guard !session.process(keyCode: 0x61) else {
-            throw RimeBridgeError.smokeAssertion("English mode did not pass a letter through to macOS.")
+            throw InputEngineError.smokeAssertion("English mode did not pass a letter through to macOS.")
         }
         let english = try session.readSnapshot()
         guard english.commitText == nil, english.composition == nil else {
-            throw RimeBridgeError.smokeAssertion("English mode unexpectedly composed ASCII text.")
+            throw InputEngineError.smokeAssertion("English mode unexpectedly composed ASCII text.")
         }
         try tapModifier(UInt16(kVK_Shift), flag: .shift, in: session)
         let restored = try session.readSnapshot()
         guard !restored.status.isASCIIMode, restored.commitText == nil else {
-            throw RimeBridgeError.smokeAssertion("A second Shift tap did not restore Chinese mode.")
+            throw InputEngineError.smokeAssertion("A second Shift tap did not restore Chinese mode.")
         }
 
         try tapModifier(UInt16(kVK_RightShift), flag: .shift, in: session)
         guard try session.readSnapshot().status.isASCIIMode == false else {
-            throw RimeBridgeError.smokeAssertion("Right Shift should be a no-op like rime-origin.")
+            throw InputEngineError.smokeAssertion("Right Shift should be a no-op in the native key mapping.")
         }
     }
 
-    private static func verifyRimeShortcutRouting(root: URL) throws {
+    private static func verifyShortcutRouting(root: URL) throws {
         let session = try makeSession(
             root: root.appendingPathComponent("shortcuts", isDirectory: true),
-            schemaIdentifier: "flypy"
+            schemaIdentifier: FengYuSchema.flypy.rawValue
         )
         let punctuationBefore = session.option("ascii_punct")
         try routeShortcut(
@@ -214,7 +214,7 @@ enum M3SmokeTest {
         guard let punctuationBefore,
             session.option("ascii_punct") == !punctuationBefore
         else {
-            throw RimeBridgeError.smokeAssertion("Control+. did not toggle Chinese/English punctuation.")
+            throw InputEngineError.smokeAssertion("Control+. did not toggle Chinese/English punctuation.")
         }
 
         let simplificationBefore = session.option("simplification")
@@ -227,7 +227,7 @@ enum M3SmokeTest {
         guard let simplificationBefore,
             session.option("simplification") == !simplificationBefore
         else {
-            throw RimeBridgeError.smokeAssertion("Control+j did not toggle character conversion.")
+            throw InputEngineError.smokeAssertion("Control+j did not toggle character conversion.")
         }
 
         let fullShapeBefore = session.option("full_shape")
@@ -235,7 +235,7 @@ enum M3SmokeTest {
         guard let fullShapeBefore,
             session.option("full_shape") == !fullShapeBefore
         else {
-            throw RimeBridgeError.smokeAssertion("Shift+Space did not toggle full-width mode.")
+            throw InputEngineError.smokeAssertion("Shift+Space did not toggle full-width mode.")
         }
     }
 
@@ -252,7 +252,7 @@ enum M3SmokeTest {
             try process(character: character, keyCode: keyCode, in: session)
         }
         guard try session.readSnapshot().commitText == "你好" else {
-            throw RimeBridgeError.smokeAssertion("The frontend sequence did not commit the expected text.")
+            throw InputEngineError.smokeAssertion("The frontend sequence did not commit the expected text.")
         }
     }
 
@@ -263,7 +263,7 @@ enum M3SmokeTest {
 
         func processAndPublish(_ character: String, keyCode: UInt16) throws {
             try process(character: character, keyCode: keyCode, in: session)
-            hasMarkedText = RimeClientUpdater.apply(
+            hasMarkedText = ClientUpdater.apply(
                 try session.readSnapshot(),
                 to: client,
                 hadMarkedText: hasMarkedText
@@ -277,17 +277,17 @@ enum M3SmokeTest {
             try processAndPublish(character, keyCode: keyCode)
         }
         guard client.markedText == "ni" else {
-            throw RimeBridgeError.smokeAssertion("The frontend did not publish marked text.")
+            throw InputEngineError.smokeAssertion("The frontend did not publish marked text.")
         }
 
         try processAndPublish("\u{7F}", keyCode: UInt16(kVK_Delete))
         guard client.markedText == "n" else {
-            throw RimeBridgeError.smokeAssertion("The frontend did not update marked text after Backspace.")
+            throw InputEngineError.smokeAssertion("The frontend did not update marked text after Backspace.")
         }
 
         try processAndPublish("\u{1B}", keyCode: UInt16(kVK_Escape))
         guard client.markedText.isEmpty else {
-            throw RimeBridgeError.smokeAssertion("The frontend did not clear marked text after Escape.")
+            throw InputEngineError.smokeAssertion("The frontend did not clear marked text after Escape.")
         }
 
         for (character, keyCode) in [
@@ -301,20 +301,20 @@ enum M3SmokeTest {
             try processAndPublish(character, keyCode: keyCode)
         }
         guard client.committedText == "你好", client.markedText.isEmpty else {
-            throw RimeBridgeError.smokeAssertion("The frontend did not commit text to its IMK client.")
+            throw InputEngineError.smokeAssertion("The frontend did not commit text to its IMK client.")
         }
     }
 
     private static func makeSession(
         root: URL,
-        schemaIdentifier: String = "luna_pinyin"
-    ) throws -> RimeSession {
-        let paths = try RimeServicePaths.applicationDefaults()
-        let service = try RimeService(paths: .temporary(root: root, sharedData: paths.sharedData))
+        schemaIdentifier: String = FengYuSchema.fullPinyin.rawValue
+    ) throws -> InputSession {
+        let paths = try InputServicePaths.applicationDefaults()
+        let service = try InputService(paths: .temporary(root: root, sharedData: paths.sharedData))
         try service.deploy(fullCheck: true)
         let session = try service.makeSession()
         guard session.selectSchema(identifier: schemaIdentifier) else {
-            throw RimeBridgeError.smokeAssertion("M3 could not select schema \(schemaIdentifier)")
+            throw InputEngineError.smokeAssertion("M3 could not select schema \(schemaIdentifier)")
         }
         return session
     }
@@ -323,32 +323,32 @@ enum M3SmokeTest {
         character: String,
         keyCode: UInt16,
         flags: NSEvent.ModifierFlags = [],
-        in session: RimeSession
+        in session: InputSession
     ) throws {
         let event = try requireEvent(character: character, keyCode: keyCode, flags: flags)
-        guard let mapped = RimeKeyMapper.map(event) else {
-            throw RimeBridgeError.smokeAssertion("A test key could not be mapped.")
+        guard let mapped = KeyMapper.map(event) else {
+            throw InputEngineError.smokeAssertion("A test key could not be mapped.")
         }
         guard session.process(keyCode: mapped.keyCode, modifierMask: mapped.modifierMask) else {
-            throw RimeBridgeError.smokeAssertion("librime rejected a mapped test key.")
+            throw InputEngineError.smokeAssertion("input-engine rejected a mapped test key.")
         }
     }
 
     private static func tapModifier(
         _ keyCode: UInt16,
         flag: NSEvent.ModifierFlags,
-        in session: RimeSession
+        in session: InputSession
     ) throws {
-        guard let press = RimeKeyMapper.mapModifierChange(
+        guard let press = KeyMapper.mapModifierChange(
             keyCode: keyCode,
             modifierFlags: flag,
             changedFlags: flag
-        ), let release = RimeKeyMapper.mapModifierChange(
+        ), let release = KeyMapper.mapModifierChange(
             keyCode: keyCode,
             modifierFlags: [],
             changedFlags: flag
         ) else {
-            throw RimeBridgeError.smokeAssertion("A modifier event could not be mapped.")
+            throw InputEngineError.smokeAssertion("A modifier event could not be mapped.")
         }
         _ = session.process(keyCode: press.keyCode, modifierMask: press.modifierMask)
         _ = session.process(keyCode: release.keyCode, modifierMask: release.modifierMask)
@@ -358,11 +358,11 @@ enum M3SmokeTest {
         character: String,
         keyCode: UInt16,
         flags: NSEvent.ModifierFlags,
-        in session: RimeSession
+        in session: InputSession
     ) throws {
         let event = try requireEvent(character: character, keyCode: keyCode, flags: flags)
-        guard let mapped = RimeKeyMapper.map(event) else {
-            throw RimeBridgeError.smokeAssertion("A Rime shortcut could not be mapped.")
+        guard let mapped = KeyMapper.map(event) else {
+            throw InputEngineError.smokeAssertion("An input-engine shortcut could not be mapped.")
         }
         _ = session.process(keyCode: mapped.keyCode, modifierMask: mapped.modifierMask)
     }
@@ -387,7 +387,7 @@ enum M3SmokeTest {
                 keyCode: keyCode
             )
         else {
-            throw RimeBridgeError.smokeAssertion("A synthetic key event could not be created.")
+            throw InputEngineError.smokeAssertion("A synthetic key event could not be created.")
         }
         return event
     }
@@ -457,7 +457,7 @@ final class M3InputClientDouble: NSObject, IMKTextInput {
     }
 
     func bundleIdentifier() -> String! {
-        "com.shendongchun.inputmethod.rime.m3-smoke"
+        "com.shendongchun.inputmethod.windwhisper.m3-smoke"
     }
 
     func windowLevel() -> CGWindowLevel {

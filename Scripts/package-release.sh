@@ -91,7 +91,7 @@ fi
 /bin/cp "$project_root/docs/KNOWN_ISSUES.md" "$staging_root/KNOWN_ISSUES.md"
 
 executable_sha="$(/usr/bin/shasum -a 256 "$release_app/Contents/MacOS/windwhisper" | /usr/bin/awk '{print $1}')"
-data_lock_sha="$(/usr/bin/shasum -a 256 "$project_root/Resources/Rime/DATA_LOCK.json" | /usr/bin/awk '{print $1}')"
+dictionary_sha="$(/usr/bin/shasum -a 256 "$project_root/Resources/fy.dict.yaml" | /usr/bin/awk '{print $1}')"
 manifest="$staging_root/VERSION_MANIFEST.json"
 /usr/bin/plutil -create xml1 "$manifest"
 /usr/bin/plutil -insert product -string windwhisper "$manifest"
@@ -102,7 +102,7 @@ manifest="$staging_root/VERSION_MANIFEST.json"
 /usr/bin/plutil -insert signingMode -string "$mode" "$manifest"
 /usr/bin/plutil -insert inputEngineVersion -string native-1.0 "$manifest"
 /usr/bin/plutil -insert executableSHA256 -string "$executable_sha" "$manifest"
-/usr/bin/plutil -insert dataLockSHA256 -string "$data_lock_sha" "$manifest"
+/usr/bin/plutil -insert dictionarySHA256 -string "$dictionary_sha" "$manifest"
 /usr/bin/plutil -convert json "$manifest"
 
 /usr/bin/ditto -c -k --keepParent "$staging_root" "$archive_path"

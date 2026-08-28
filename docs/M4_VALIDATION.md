@@ -11,7 +11,7 @@ M4 已提供一个不抢焦点的基线候选窗，并已由用户在实际输�
 ./Scripts/test-m4.sh Release
 ```
 
-覆盖候选快照到展示模型、本页序号、鼠标命中、非激活面板约束、InputMethodKit 输入行矩形与 `firstRect` 回退、多显示器选择、上下翻转、屏幕边界、Rime 高亮、翻页和选择提交。M3 回归继续由 `Scripts/test-m3.sh` 覆盖。
+覆盖候选快照到展示模型、本页序号、鼠标命中、非激活面板约束、InputMethodKit 输入行矩形与 `firstRect` 回退、多显示器选择、上下翻转、屏幕边界、input engine 高亮、翻页和选择提交。M3 回归继续由 `Scripts/test-m3.sh` 覆盖。
 
 ## TextEdit 人工门禁
 

@@ -110,7 +110,7 @@ enum M5SmokeTest {
             accessible.animationDuration == 0,
             accessible.cornerRadius < normal.cornerRadius
         else {
-            throw RimeBridgeError.smokeAssertion("candidate accessibility theme fallback is incorrect.")
+            throw InputEngineError.smokeAssertion("candidate accessibility theme fallback is incorrect.")
         }
     }
 
@@ -132,11 +132,11 @@ enum M5SmokeTest {
             layout.candidateFrames[3].width >= 78,
             layout.pageFrame.maxX <= layout.size.width + 0.001
         else {
-            throw RimeBridgeError.smokeAssertion("horizontal candidate layout exceeded its bounds.")
+            throw InputEngineError.smokeAssertion("horizontal candidate layout exceeded its bounds.")
         }
         for pair in zip(layout.candidateFrames, layout.candidateFrames.dropFirst()) {
             guard pair.0.maxX <= pair.1.minX + 0.001 else {
-                throw RimeBridgeError.smokeAssertion("horizontal candidate cells overlap.")
+                throw InputEngineError.smokeAssertion("horizontal candidate cells overlap.")
             }
         }
     }
@@ -154,7 +154,7 @@ enum M5SmokeTest {
             widths[0] > widths[1],
             widths[1] > widths[2]
         else {
-            throw RimeBridgeError.smokeAssertion("long candidate widths were not constrained fairly.")
+            throw InputEngineError.smokeAssertion("long candidate widths were not constrained fairly.")
         }
     }
 
@@ -191,7 +191,7 @@ enum M5SmokeTest {
             singleVertical.size.height
                 == pagedVertical.size.height - theme.candidateHeight - theme.candidateSpacing
         else {
-            throw RimeBridgeError.smokeAssertion(
+            throw InputEngineError.smokeAssertion(
                 "single-page candidate layout still reserved pagination chrome."
             )
         }
@@ -203,11 +203,11 @@ enum M5SmokeTest {
             CandidatePanelConfiguration.material == .popover,
             CandidatePanelConfiguration.blendingMode == .behindWindow
         else {
-            throw RimeBridgeError.smokeAssertion("native material configuration is incorrect.")
+            throw InputEngineError.smokeAssertion("native material configuration is incorrect.")
         }
         if #available(macOS 26.0, *) {
             guard CandidatePanelConfiguration.renderingMode == .nativeGlass else {
-                throw RimeBridgeError.smokeAssertion("native glass was not selected on macOS 26.")
+                throw InputEngineError.smokeAssertion("native glass was not selected on macOS 26.")
             }
         }
     }
@@ -239,14 +239,14 @@ enum M5SmokeTest {
                 guard
                     let representation = view.bitmapImageRepForCachingDisplay(in: view.bounds)
                 else {
-                    throw RimeBridgeError.smokeAssertion("candidate snapshot bitmap could not be created.")
+                    throw InputEngineError.smokeAssertion("candidate snapshot bitmap could not be created.")
                 }
                 view.cacheDisplay(in: view.bounds, to: representation)
                 guard
                     let png = representation.representation(using: .png, properties: [:]),
                     png.count > 1_000
                 else {
-                    throw RimeBridgeError.smokeAssertion("candidate visual snapshot was empty.")
+                    throw InputEngineError.smokeAssertion("candidate visual snapshot was empty.")
                 }
             }
         }
@@ -267,7 +267,7 @@ enum M5SmokeTest {
                 )
                 view.update(state: state)
                 guard let representation = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
-                    throw RimeBridgeError.smokeAssertion(
+                    throw InputEngineError.smokeAssertion(
                         "input mode indicator bitmap could not be created."
                     )
                 }
@@ -276,7 +276,7 @@ enum M5SmokeTest {
                     let png = representation.representation(using: .png, properties: [:]),
                     png.count > 500
                 else {
-                    throw RimeBridgeError.smokeAssertion(
+                    throw InputEngineError.smokeAssertion(
                         "input mode indicator snapshot was empty."
                     )
                 }
@@ -288,24 +288,24 @@ enum M5SmokeTest {
         CandidateWindowModel(menu: previewMenu)
     }
 
-    private static var previewMenu: RimeMenuSnapshot {
-        RimeMenuSnapshot(
+    private static var previewMenu: MenuSnapshot {
+        MenuSnapshot(
             pageSize: 5,
             pageNumber: 1,
             isLastPage: false,
             highlightedIndex: 1,
             candidates: [
-                RimeCandidateSnapshot(text: "风语", comment: "feng yu"),
-                RimeCandidateSnapshot(text: "这是一个需要截断的很长候选词", comment: "辅助编码 abcdef"),
-                RimeCandidateSnapshot(text: "输入法", comment: "shu ru fa"),
-                RimeCandidateSnapshot(text: "候选", comment: nil),
-                RimeCandidateSnapshot(text: "毛玻璃", comment: "native material"),
+                CandidateSnapshot(text: "风语", comment: "feng yu"),
+                CandidateSnapshot(text: "这是一个需要截断的很长候选词", comment: "辅助编码 abcdef"),
+                CandidateSnapshot(text: "输入法", comment: "shu ru fa"),
+                CandidateSnapshot(text: "候选", comment: nil),
+                CandidateSnapshot(text: "毛玻璃", comment: "native material"),
             ]
         )
     }
 
-    private static var singlePagePreviewMenu: RimeMenuSnapshot {
-        RimeMenuSnapshot(
+    private static var singlePagePreviewMenu: MenuSnapshot {
+        MenuSnapshot(
             pageSize: previewMenu.pageSize,
             pageNumber: 0,
             isLastPage: true,

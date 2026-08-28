@@ -1,25 +1,25 @@
 import Foundation
 
-struct RimeCandidateSnapshot: Equatable, Sendable {
+struct CandidateSnapshot: Equatable, Sendable {
     let text: String
     let comment: String?
 }
 
-struct RimeCompositionSnapshot: Equatable, Sendable {
+struct CompositionSnapshot: Equatable, Sendable {
     let text: String
     let selectionRange: NSRange
     let cursorPosition: Int
 }
 
-struct RimeMenuSnapshot: Equatable, Sendable {
+struct MenuSnapshot: Equatable, Sendable {
     let pageSize: Int
     let pageNumber: Int
     let isLastPage: Bool
     let highlightedIndex: Int
-    let candidates: [RimeCandidateSnapshot]
+    let candidates: [CandidateSnapshot]
 }
 
-struct RimeStatusSnapshot: Equatable, Sendable {
+struct StatusSnapshot: Equatable, Sendable {
     let schemaIdentifier: String?
     let schemaName: String?
     let isComposing: Bool
@@ -27,14 +27,14 @@ struct RimeStatusSnapshot: Equatable, Sendable {
     let isDisabled: Bool
 }
 
-struct RimeSnapshot: Equatable, Sendable {
+struct InputSnapshot: Equatable, Sendable {
     let commitText: String?
-    let composition: RimeCompositionSnapshot?
-    let menu: RimeMenuSnapshot
-    let status: RimeStatusSnapshot
+    let composition: CompositionSnapshot?
+    let menu: MenuSnapshot
+    let status: StatusSnapshot
 }
 
-enum RimeRangeConverter {
+enum RangeConverter {
     static func utf16Offset(forUTF8Offset offset: Int, in text: String) -> Int? {
         guard offset >= 0 else {
             return nil

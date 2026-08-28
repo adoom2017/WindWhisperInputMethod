@@ -10,8 +10,8 @@
 ## 实施约束
 
 - 一次只推进一个里程碑；先让最小闭环可验证。
-- 不得跨过 `RimeBridge` 从 UI 直接访问 librime。
-- 不得把候选窗逻辑、Rime 部署或 YAML 解析堆入 InputController。
+- 不得跨过 `InputEngine` 从 UI 直接访问 input-engine。
+- 不得把候选窗逻辑、input engine 部署或 YAML 解析堆入 InputController。
 - C 结构体初始化、指针生命周期和 free 调用必须集中封装并测试。
 - 不得在按键处理路径执行部署、磁盘扫描或网络请求。
 - 不得记录用户明文输入，不得绕过 Secure Input。

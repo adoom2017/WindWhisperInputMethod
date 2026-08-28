@@ -1,7 +1,7 @@
 import Foundation
 import OSLog
 
-struct RimeRuntimeDiagnosticStatus: Sendable {
+struct NativeRuntimeDiagnosticStatus: Sendable {
     let isReady: Bool
     let version: String
     let lastError: String?
@@ -9,15 +9,15 @@ struct RimeRuntimeDiagnosticStatus: Sendable {
     let logDirectoryExists: Bool
 }
 
-final class RimeRuntime: @unchecked Sendable {
-    static let shared = RimeRuntime()
+final class NativeRuntime: @unchecked Sendable {
+    static let shared = NativeRuntime()
 
     private let stateLock = NSLock()
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? InputSourceMetadata.bundleIdentifier,
-        category: "RimeRuntime"
+        category: "NativeRuntime"
     )
-    private var service: RimeService?
+    private var service: InputService?
     private var startupAttempted = false
     private var startupErrorDescription: String?
 
@@ -37,21 +37,21 @@ final class RimeRuntime: @unchecked Sendable {
         startupAttempted = true
 
         do {
-            let service = try RimeService(paths: .applicationDefaults())
+            let service = try InputService(paths: .applicationDefaults())
             try service.deploy(fullCheck: false)
             self.service = service
-            logger.notice("native input engine is ready")
+            logger.notice("windwhisper input engine is ready")
             return true
         } catch {
             startupErrorDescription = error.localizedDescription
-            logger.error("native input engine startup failed: \(error.localizedDescription, privacy: .public)")
+            logger.error("windwhisper input engine startup failed: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
 
-    func makeSession() throws -> RimeSession {
+    func makeSession() throws -> InputSession {
         guard start() else {
-            throw RimeBridgeError.bridge(
+            throw InputEngineError.runtime(
                 code: -1,
                 message: startupErrorDescription ?? "The input engine could not be started."
             )
@@ -61,7 +61,7 @@ final class RimeRuntime: @unchecked Sendable {
         let service = self.service
         stateLock.unlock()
         guard let service else {
-            throw RimeBridgeError.bridge(code: -1, message: "The input engine is unavailable.")
+            throw InputEngineError.runtime(code: -1, message: "The input engine is unavailable.")
         }
         let session = try service.makeSession()
         try FengYuSettingsStore.shared.snapshot.apply(to: session)
@@ -70,7 +70,7 @@ final class RimeRuntime: @unchecked Sendable {
 
     func redeploy(fullCheck: Bool = true) throws {
         guard start() else {
-            throw RimeBridgeError.bridge(
+            throw InputEngineError.runtime(
                 code: -1,
                 message: startupErrorDescription ?? "The input engine could not be started."
             )
@@ -79,19 +79,19 @@ final class RimeRuntime: @unchecked Sendable {
         let service = self.service
         stateLock.unlock()
         guard let service else {
-            throw RimeBridgeError.bridge(code: -1, message: "The input engine is unavailable.")
+            throw InputEngineError.runtime(code: -1, message: "The input engine is unavailable.")
         }
         try service.deploy(fullCheck: fullCheck)
     }
 
-    func diagnosticStatus() -> RimeRuntimeDiagnosticStatus {
+    func diagnosticStatus() -> NativeRuntimeDiagnosticStatus {
         stateLock.lock()
         let service = self.service
         let lastError = startupErrorDescription
         stateLock.unlock()
 
         let fileManager = FileManager.default
-        return RimeRuntimeDiagnosticStatus(
+        return NativeRuntimeDiagnosticStatus(
             isReady: service != nil,
             version: service?.version ?? "unknown",
             lastError: lastError,
@@ -108,6 +108,6 @@ final class RimeRuntime: @unchecked Sendable {
         stateLock.lock()
         service = nil
         stateLock.unlock()
-        logger.notice("native input engine stopped")
+        logger.notice("windwhisper input engine stopped")
     }
 }

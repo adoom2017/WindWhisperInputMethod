@@ -1,12 +1,12 @@
 import AppKit
 import Carbon
 
-struct RimeMappedKey: Equatable {
+struct MappedKey: Equatable {
     let keyCode: Int32
     let modifierMask: Int32
 }
 
-enum RimeKeyMapper {
+enum KeyMapper {
     enum ModifierMask {
         static let shift: Int32 = 1 << 0
         static let capsLock: Int32 = 1 << 1
@@ -56,7 +56,7 @@ enum RimeKeyMapper {
         UInt16(kVK_Space): 0x20,
     ]
 
-    static func map(_ event: NSEvent) -> RimeMappedKey? {
+    static func map(_ event: NSEvent) -> MappedKey? {
         guard event.type == .keyDown else {
             return nil
         }
@@ -69,7 +69,7 @@ enum RimeKeyMapper {
         let modifierMask = modifierMask(for: flags)
 
         if let specialKey = specialKeys[event.keyCode] {
-            return RimeMappedKey(keyCode: specialKey, modifierMask: modifierMask)
+            return MappedKey(keyCode: specialKey, modifierMask: modifierMask)
         }
 
         let printableCharacters = flags.intersection([.control, .option]).isEmpty
@@ -85,14 +85,14 @@ enum RimeKeyMapper {
             return nil
         }
 
-        return RimeMappedKey(keyCode: Int32(scalar.value), modifierMask: modifierMask)
+        return MappedKey(keyCode: Int32(scalar.value), modifierMask: modifierMask)
     }
 
     static func mapModifierChange(
         keyCode eventKeyCode: UInt16,
         modifierFlags: NSEvent.ModifierFlags,
         changedFlags: NSEvent.ModifierFlags
-    ) -> RimeMappedKey? {
+    ) -> MappedKey? {
         let descriptor = modifierDescriptor(for: eventKeyCode)
             ?? inferredModifierDescriptor(from: changedFlags)
         guard let descriptor else {
@@ -105,7 +105,7 @@ enum RimeKeyMapper {
         } else if !modifierFlags.contains(descriptor.flag) {
             mask |= ModifierMask.release
         }
-        return RimeMappedKey(keyCode: descriptor.symbol, modifierMask: mask)
+        return MappedKey(keyCode: descriptor.symbol, modifierMask: mask)
     }
 
     static func modifierMask(for flags: NSEvent.ModifierFlags) -> Int32 {

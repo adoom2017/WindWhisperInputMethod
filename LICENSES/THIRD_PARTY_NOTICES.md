@@ -1,47 +1,15 @@
 # 第三方组件清单
 
-## librime 1.16.0
+## 风语词库
 
-- 项目：https://github.com/rime/librime
-- 固定 tag：`1.16.0`
-- 固定 commit：`a251145d3aafa33871824a40bbec04c966bd8b56`
-- 使用内容：官方 macOS universal 动态库、C API headers，以及同一 tag `data/minimal` 下的基础 Rime 数据。
-- 许可证：BSD-3-Clause，完整文本见 `librime-BSD-3-Clause.txt`。
-- 修改：未修改第三方二进制、headers 或最小数据；仅在本工程内重命名发布库副本为其 install name `librime.1.dylib`。
-- 获取与校验：`Scripts/fetch-librime.sh`；锁定信息见 `Vendor/librime/LOCK.json`。
+`Resources/fy.dict.yaml` 是项目内置的合并词库，包含全拼、双拼、音形和辅助候选数据。文件中的 `weight` 与 `original-order` 列保留合并前的候选优先级。
 
-## Rime 基础数据
+词库来源、许可和生成规则以项目提交记录及 `docs/DICTIONARY_AUDIT.md` 为准。小鹤音形部分来自用户本地配置，仅限本机使用，未经授权不得再分发。
 
-- 获取位置：librime `1.16.0` 固定提交的 `data/minimal`。
-- 上游项目：`rime/rime-luna-pinyin`、`rime/rime-cangjie` 及 Rime essay 数据。
-- 使用内容：`luna_pinyin`、`cangjie5`、`essay.txt`、标点和默认配置；M6 将全拼名称适配为“风语全拼”，并加入独立辅码 translator。
-- 许可证：LGPL-3.0 及源文件内的数据专有声明，完整 LGPL 文本见 `rime-data-LGPL-3.0.txt`。
-- 精确来源与文件清单：`Resources/Rime/DATA_LOCK.json` 和 `docs/RIME_DATA.md`。
+## 风语代码
 
-## Rime double pinyin
+应用代码由项目维护者编写，使用 Apple InputMethodKit、AppKit 和 Swift 系统框架。
 
-- 项目：https://github.com/rime/rime-double-pinyin
-- 固定 commit：`01a13287cbd27819be1c34fa1ddc1b3643d5001b`
-- 使用内容：自然码、小鹤、微软、智能 ABC 四套 schema。
-- 许可证：GPL-3.0，完整文本见 `rime-double-pinyin-GPL-3.0.txt`。
-- 修改：名称改为简体中文；移除未随包提供的 stroke 反查依赖；增加风语辅码依赖、translator 和 recognizer。拼写代数保持上游原样。
+## 风语图标
 
-## 风语辅码索引
-
-- 派生来源：本包锁定的 `luna_pinyin.dict.yaml` 与 `cangjie5.dict.yaml`。
-- 规则：完整拼音后附加仓颉首码；由 `Scripts/generate-aux-dictionary.swift` 可复现生成。
-- 许可证：按兼容的 GPL-3.0 随包提供。
-
-## OpenCC 1.1.9 转换数据
-
-- 项目：https://github.com/BYVoid/OpenCC
-- 固定 tag：`ver.1.1.9`
-- 固定 commit：`556ed22496d650bd0b13b6c163be9814637970ae`
-- 使用内容：传统到简体转换所需的 `t2s.json`、`TSCharacters.ocd2` 和 `TSPhrases.ocd2`。
-- 分发来源：官方 `rime/squirrel` 1.1.2 发布包；包及输出文件 SHA-256 见 `Resources/Rime/DATA_LOCK.json`。
-- 许可证：Apache-2.0，完整文本见 `OpenCC-Apache-2.0.txt`。
-- 修改：未修改转换配置或词典，只从配套发布包中选择首版实际使用的 `t2s` 文件。
-
-## 风语原创图标
-
-当前应用图标、输入法菜单图标和切换器图标均为风语原创资源，不使用 Rime/鼠须管图标或其视觉元素。
+应用图标、输入法菜单图标和切换器图标均为风语原创资源。

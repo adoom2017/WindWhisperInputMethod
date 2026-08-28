@@ -12,7 +12,7 @@ final class ApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        RimeRuntime.shared.stop()
+        NativeRuntime.shared.stop()
         logger.notice("Input method process is stopping")
     }
 }

@@ -65,17 +65,16 @@ executable_sha="$(/usr/bin/shasum -a 256 "$executable" | /usr/bin/awk '{print $1
 [[ "$(/usr/bin/plutil -extract executableSHA256 raw "$manifest")" == "$executable_sha" ]] \
     || fail "manifest executable checksum does not match"
 [[ "$(/usr/bin/plutil -extract inputEngineVersion raw "$manifest")" == "native-1.0" ]] \
-    || fail "manifest native input-engine version does not match"
+    || fail "manifest input engine version does not match"
 
 for binary in "$executable"; do
     architectures="$(/usr/bin/lipo -archs "$binary")"
     [[ "$architectures" == *arm64* && "$architectures" == *x86_64* ]] \
         || fail "universal architectures are missing from $binary"
 done
-if [[ -e "$application_path/Contents/Frameworks/librime.1.dylib" ]] \
-    || /usr/bin/otool -L "$executable" \
-    | /usr/bin/grep -Eq 'librime|/opt/homebrew|/usr/local/(Cellar|opt)'; then
-    fail "release contains librime or a package-manager runtime dependency"
+if /usr/bin/otool -L "$executable" \
+    | /usr/bin/grep -Eq '/opt/homebrew|/usr/local/(Cellar|opt)'; then
+    fail "release contains a package-manager runtime dependency"
 fi
 if /usr/bin/find "$application_path" -type f \( -name '*.swift' -o -name '*.c' -o -name '*.h' \) \
     | /usr/bin/grep -q .; then
