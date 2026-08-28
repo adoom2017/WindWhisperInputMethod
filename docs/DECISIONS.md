@@ -30,6 +30,7 @@
 - 只读词库位于应用包 `Contents/Resources`；用户词条和设置位于
   `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/User`；日志单独存放。
 - 启动时只创建缺失的用户文件，不覆盖已有词条或设置。
+- 自定义词管理界面保存后重新读取用户词条；新服务构建成功后才替换旧服务，失败时保持现有输入能力。
 
 ## ADR-006：设置与降级
 

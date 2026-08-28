@@ -79,8 +79,8 @@ struct FengYuSettingsSnapshot: Equatable, Sendable {
 
 extension Notification.Name {
     static let fengYuSettingsDidChange = Notification.Name("FengYuSettingsDidChange")
-    static let fengYuWillRedeploy = Notification.Name("FengYuWillRedeploy")
-    static let fengYuDidRedeploy = Notification.Name("FengYuDidRedeploy")
+    static let fengYuWillRefreshConfiguration = Notification.Name("FengYuWillRefreshConfiguration")
+    static let fengYuDidRefreshConfiguration = Notification.Name("FengYuDidRefreshConfiguration")
 }
 
 final class FengYuSettingsStore: @unchecked Sendable {

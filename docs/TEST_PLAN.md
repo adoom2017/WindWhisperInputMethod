@@ -37,7 +37,7 @@
 - 会话：切应用、切窗口、切输入源、休眠唤醒、进程重启。
 - 方案：每个双拼固定编码样例；小鹤音形按恢复词典验证单键、辅码、词组和四字词顺序；通用辅码命中、不命中、歧义和回退。
 - 中英文：验证原配置的左 Shift `commit_code`、右 Shift/Caps Lock `noop`，以及 Control/Option 快捷键进入 input engine。
-- 异常：资源缺失、配置损坏、部署失败、磁盘只读、session 失效。
+- 异常：资源缺失、配置损坏、刷新失败、磁盘只读、session 失效。
 
 ## M3—M9 自动化与人工门禁
 
@@ -48,7 +48,7 @@
 - M4 候选窗显示已由用户在实际输入中确认；完整键盘、鼠标和多屏检查项保留在 `docs/M4_VALIDATION.md` 作为后续回归清单。
 - `Scripts/test-m5.sh Debug|Release` 覆盖正常/无障碍主题 fallback、横向布局边界、候选间不重叠、短正文优先与长文本公平压缩、macOS 26 `NSGlassEffectView` 和旧系统 `NSVisualEffectView` 回退配置，以及 Aqua/Dark Aqua × 普通/降低透明度与增强对比度的离屏 PNG 渲染。
 - M5 本机视觉门禁按 `docs/M5_VALIDATION.md` 执行，重点确认实际桌面内容下的毛玻璃、候选截断、快速输入稳定性和系统无障碍显示设置。
-- `Scripts/test-m6.sh Debug|Release` 覆盖六套拼音方案、小鹤恢复词典的简码/词组/候选顺序、部署生成三个 bin、`top/sys/user/full` 层级、通用辅码、用户覆盖/词典保护、部署失败和数据锁。
+- `Scripts/test-m6.sh Debug|Release` 覆盖三种内置输入模式、合并词库的简码/词组/候选顺序、通用辅码、用户词条保护和配置刷新。
 - `Scripts/test-m7.sh Debug|Release` 覆盖设置持久化、非法值回退、多 session 同步、设置前组合提交、繁简选项、横竖排布局、输入法菜单完整性、InputMethodKit 命令路由、诊断脱敏和恢复默认值。
 - M7 人工门禁按 `docs/M7_VALIDATION.md` 执行，重点确认系统输入法菜单可见、修改后当前应用与新应用一致，以及菜单操作不显示或记录输入内容。
 - `Scripts/test-m8.sh Release [seconds]` 覆盖 UTF-8/UTF-16 边界、Command 透传、单次 commit、候选异步更新失效、session 生命周期，并记录引擎初始化、按键和候选布局延迟与 RSS 变化。
@@ -61,7 +61,7 @@
 每次发布候选记录：
 
 - 冷启动与首次可输入时间。
-- 首次部署和增量部署耗时。
+- 引擎初始化和配置刷新耗时。
 - 普通按键处理 P50/P95/P99。
 - context 到候选窗刷新耗时。
 - 空闲/持续输入 CPU 与内存。

@@ -38,7 +38,6 @@ final class NativeRuntime: @unchecked Sendable {
 
         do {
             let service = try InputService(paths: .applicationDefaults())
-            try service.deploy(fullCheck: false)
             self.service = service
             logger.notice("windwhisper input engine is ready")
             return true
@@ -68,20 +67,20 @@ final class NativeRuntime: @unchecked Sendable {
         return session
     }
 
-    func redeploy(fullCheck: Bool = true) throws {
-        guard start() else {
-            throw InputEngineError.runtime(
-                code: -1,
-                message: startupErrorDescription ?? "The input engine could not be started."
-            )
-        }
+    func refreshConfiguration(paths requestedPaths: InputServicePaths? = nil) throws {
         stateLock.lock()
-        let service = self.service
+        let currentPaths = service?.paths
         stateLock.unlock()
-        guard let service else {
-            throw InputEngineError.runtime(code: -1, message: "The input engine is unavailable.")
-        }
-        try service.deploy(fullCheck: fullCheck)
+
+        let paths = try requestedPaths ?? currentPaths ?? .applicationDefaults()
+        let refreshedService = try InputService(paths: paths)
+
+        stateLock.lock()
+        service = refreshedService
+        startupAttempted = true
+        startupErrorDescription = nil
+        stateLock.unlock()
+        logger.notice("windwhisper configuration refreshed")
     }
 
     func diagnosticStatus() -> NativeRuntimeDiagnosticStatus {

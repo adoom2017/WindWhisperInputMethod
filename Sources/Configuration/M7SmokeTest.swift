@@ -136,7 +136,6 @@ enum M7SmokeTest {
             paths: .temporary(root: root, sharedData: sharedData),
             minLogLevel: 2
         )
-        try service.deploy(fullCheck: true)
         let sessionOne = try service.makeSession()
         let sessionTwo = try service.makeSession()
         try expected.apply(to: sessionOne)
@@ -322,7 +321,8 @@ enum M7SmokeTest {
             titles.contains("简体中文"),
             titles.contains("候选排列"),
             titles.contains("候选主题"),
-            titles.contains("重新部署输入引擎"),
+            titles.contains("管理自定义词…"),
+            !titles.contains("刷新配置"),
             titles.contains("打开用户目录"),
             titles.contains("查看脱敏诊断…"),
             titles.contains("恢复默认设置…"),

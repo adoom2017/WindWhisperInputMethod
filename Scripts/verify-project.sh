@@ -97,6 +97,6 @@ verify_sha256() {
 
 verify_sha256 \
     "$project_root/Resources/fy.dict.yaml" \
-    "656ac1929458eae577ae372ec158a725e158392ebf80ddd7a94a34976b8a0bc2"
+    "9166aa5dcc76560110485d1cece4fd04692aab37969c78fd7dc9633b5d043c02"
 
 echo "Project metadata verified."

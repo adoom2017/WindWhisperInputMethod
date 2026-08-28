@@ -88,6 +88,8 @@ final class WindWhisperInputController: IMKInputController, @unchecked Sendable 
             FengYuSettingsMenuController.shared.selectColorScheme(.light)
         case #selector(fengYuSelectDarkColorSchemeCommand(_:)):
             FengYuSettingsMenuController.shared.selectColorScheme(.dark)
+        case #selector(fengYuManageCustomWordsCommand(_:)):
+            FengYuSettingsMenuController.shared.manageCustomWords()
         default:
             super.doCommand(by: selector, command: infoDictionary)
         }
@@ -239,14 +241,14 @@ final class WindWhisperInputController: IMKInputController, @unchecked Sendable 
                 self?.applyChangedSettings()
             },
             center.addObserver(
-                forName: .fengYuWillRedeploy,
+                forName: .fengYuWillRefreshConfiguration,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                self?.prepareForRedeploy()
+                self?.prepareForConfigurationRefresh()
             },
             center.addObserver(
-                forName: .fengYuDidRedeploy,
+                forName: .fengYuDidRefreshConfiguration,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
@@ -276,7 +278,7 @@ final class WindWhisperInputController: IMKInputController, @unchecked Sendable 
         }
     }
 
-    private func prepareForRedeploy() {
+    private func prepareForConfigurationRefresh() {
         finishComposition()
         hideCandidateWindow()
         hideInputModeIndicator()
@@ -503,8 +505,8 @@ extension WindWhisperInputController {
         FengYuSettingsMenuController.shared.selectColorScheme(.dark)
     }
 
-    @objc func fengYuRedeployCommand(_ command: Any) {
-        FengYuSettingsMenuController.shared.redeploy()
+    @objc func fengYuManageCustomWordsCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.manageCustomWords()
     }
 
     @objc func fengYuOpenUserDirectoryCommand(_ command: Any) {

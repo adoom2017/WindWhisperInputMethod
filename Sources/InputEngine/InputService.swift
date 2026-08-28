@@ -335,10 +335,6 @@ final class InputService: @unchecked Sendable {
         _ = minLogLevel
     }
 
-    func deploy(fullCheck: Bool) throws {
-        _ = fullCheck
-    }
-
     func makeSession() throws -> InputSession {
         lock.lock()
         activeSessions += 1

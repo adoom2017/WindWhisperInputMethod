@@ -5,7 +5,7 @@
 
 ## 已交付
 
-- 进程级 `NativeRuntime`，负责正式用户数据目录中的初始化和快速部署。
+- 进程级 `NativeRuntime`，负责正式用户数据目录中的初始化和配置刷新。
 - 每个 InputMethodKit controller 独立 input engine session，以及服务级串行化引擎访问。
 - macOS 按键到 input engine key symbol/mask 的映射。
 - Command 快捷键透传给应用；Control/Option 和 modifier 按下/释放映射给 input engine。左 Shift 遵循原配置 `commit_code`，右 Shift 与 Caps Lock 为 `noop`。

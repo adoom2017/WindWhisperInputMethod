@@ -45,7 +45,8 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
 
     let menu = NSMenu(title: "风语")
     private let store: FengYuSettingsStore
-    private var isRedeploying = false
+    private var isApplyingCustomWords = false
+    private var customWordsEditor: CustomWordsEditorWindowController?
 
     init(store: FengYuSettingsStore = .shared) {
         self.store = store
@@ -110,12 +111,10 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         )
 
         menu.addItem(.separator())
-        let redeploy = actionItem(
-            title: isRedeploying ? "正在重新部署…" : "重新部署输入引擎",
-            action: #selector(WindWhisperInputController.fengYuRedeployCommand(_:))
-        )
-        redeploy.isEnabled = !isRedeploying
-        menu.addItem(redeploy)
+        menu.addItem(actionItem(
+            title: "管理自定义词…",
+            action: #selector(WindWhisperInputController.fengYuManageCustomWordsCommand(_:))
+        ))
         menu.addItem(actionItem(
             title: "打开用户目录",
             action: #selector(WindWhisperInputController.fengYuOpenUserDirectoryCommand(_:))
@@ -211,40 +210,78 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         rebuildMenu()
     }
 
-    func redeploy() {
-        guard !isRedeploying else {
+    private func applyCustomWords() {
+        guard !isApplyingCustomWords else {
             return
         }
-        isRedeploying = true
-        rebuildMenu()
-        NotificationCenter.default.post(name: .fengYuWillRedeploy, object: self)
+        isApplyingCustomWords = true
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             let errorMessage: String?
             do {
-                try NativeRuntime.shared.redeploy(fullCheck: true)
+                try NativeRuntime.shared.refreshConfiguration()
                 errorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
             }
             DispatchQueue.main.async {
-                self?.finishRedeploy(errorMessage: errorMessage)
+                self?.finishApplyingCustomWords(errorMessage: errorMessage)
             }
         }
     }
 
-    private func finishRedeploy(errorMessage: String?) {
-        isRedeploying = false
-        NotificationCenter.default.post(name: .fengYuDidRedeploy, object: self)
-        rebuildMenu()
+    func manageCustomWords() {
+        DispatchQueue.main.async { [weak self] in
+            self?.presentCustomWordsEditor()
+        }
+    }
+
+    @MainActor
+    private func presentCustomWordsEditor() {
+        if let customWordsEditor, customWordsEditor.window?.isVisible == true {
+            NSApp.activate(ignoringOtherApps: true)
+            customWordsEditor.window?.makeKeyAndOrderFront(nil)
+            return
+        }
+
+        do {
+            let store = try CustomWordsStore.applicationDefaults()
+            let document = try store.load()
+            let editor = CustomWordsEditorWindowController(
+                document: document,
+                store: store
+            ) { [weak self] in
+                self?.applyCustomWords()
+            }
+            editor.onWindowClosed = { [weak self, weak editor] in
+                guard self?.customWordsEditor === editor else { return }
+                self?.customWordsEditor = nil
+            }
+            customWordsEditor = editor
+            NSApp.activate(ignoringOtherApps: true)
+            editor.showWindow(nil)
+            editor.window?.makeKeyAndOrderFront(nil)
+        } catch {
+            showMessage(
+                title: "无法读取自定义词",
+                message: "请检查 custom_words.tsv 的格式后重试。\n\n\(error.localizedDescription)",
+                style: .warning
+            )
+        }
+    }
+
+    private func finishApplyingCustomWords(errorMessage: String?) {
+        isApplyingCustomWords = false
         if let errorMessage {
             showMessage(
-                title: "重新部署失败",
-                message: "请打开用户目录检查自定义配置，或恢复默认设置后重试。\n\n\(errorMessage)",
+                title: "自定义词已保存，但未能应用",
+                message: "请检查自定义词内容后重新保存。\n\n\(errorMessage)",
                 style: .warning
             )
         } else {
-            showMessage(title: "重新部署完成", message: "风语配置已经更新。")
+            NotificationCenter.default.post(name: .fengYuWillRefreshConfiguration, object: self)
+            NotificationCenter.default.post(name: .fengYuDidRefreshConfiguration, object: self)
+            showMessage(title: "保存完成", message: "自定义词已经生效。")
         }
     }
 

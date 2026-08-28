@@ -4,8 +4,7 @@ import Foundation
 enum M8SmokeTest {
     private struct Measurements {
         let engineInitializationMilliseconds: Double
-        let fullDeploymentMilliseconds: Double
-        let incrementalDeploymentMilliseconds: Double
+        let configurationRefreshMilliseconds: Double
         let keyLatency: Percentiles
         let candidateLayoutLatency: Percentiles
         let stressIterations: Int
@@ -29,8 +28,7 @@ enum M8SmokeTest {
             print("sessionLifecycle=passed")
             print("snapshotAllocationBalance=passed")
             print("engineInitializationMs=\(format(measurements.engineInitializationMilliseconds))")
-            print("fullDeploymentMs=\(format(measurements.fullDeploymentMilliseconds))")
-            print("incrementalDeploymentMs=\(format(measurements.incrementalDeploymentMilliseconds))")
+            print("configurationRefreshMs=\(format(measurements.configurationRefreshMilliseconds))")
             print("keyLatencyP50Ms=\(format(measurements.keyLatency.p50))")
             print("keyLatencyP95Ms=\(format(measurements.keyLatency.p95))")
             print("keyLatencyP99Ms=\(format(measurements.keyLatency.p99))")
@@ -72,15 +70,14 @@ enum M8SmokeTest {
             }
         }
 
+        let paths = InputServicePaths.temporary(root: root, sharedData: sharedData)
         var service: InputService!
         let initialization = try measure {
-            service = try InputService(
-                paths: .temporary(root: root, sharedData: sharedData),
-                minLogLevel: 2
-            )
+            service = try InputService(paths: paths, minLogLevel: 2)
         }
-        let fullDeployment = try measure { try service.deploy(fullCheck: true) }
-        let incrementalDeployment = try measure { try service.deploy(fullCheck: false) }
+        let configurationRefresh = try measure {
+            service = try InputService(paths: paths, minLogLevel: 2)
+        }
 
         try verifySingleCommitDelivery(service: service)
         let performance = try measureInputPath(service: service)
@@ -106,8 +103,7 @@ enum M8SmokeTest {
 
         return Measurements(
             engineInitializationMilliseconds: initialization,
-            fullDeploymentMilliseconds: fullDeployment,
-            incrementalDeploymentMilliseconds: incrementalDeployment,
+            configurationRefreshMilliseconds: configurationRefresh,
             keyLatency: performance.key,
             candidateLayoutLatency: performance.layout,
             stressIterations: stressIterations,

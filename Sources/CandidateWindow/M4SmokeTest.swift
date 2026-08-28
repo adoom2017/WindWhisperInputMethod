@@ -155,7 +155,6 @@ enum M4SmokeTest {
     private static func verifyEngineCandidateInteraction(root: URL) throws {
         let paths = try InputServicePaths.applicationDefaults()
         let service = try InputService(paths: .temporary(root: root, sharedData: paths.sharedData))
-        try service.deploy(fullCheck: true)
         let session = try service.makeSession()
         guard session.selectSchema(identifier: FengYuSchema.fullPinyin.rawValue) else {
             throw InputEngineError.smokeAssertion("M4 could not select its full pinyin fixture")

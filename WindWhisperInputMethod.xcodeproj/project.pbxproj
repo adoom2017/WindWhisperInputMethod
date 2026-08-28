@@ -35,6 +35,9 @@
 		A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000023 /* FengYuSettingsMenu.swift */; };
 		A10000000000000000000020 /* M7SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000024 /* M7SmokeTest.swift */; };
 		A10000000000000000000021 /* InputModeIndicatorController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000025 /* InputModeIndicatorController.swift */; };
+		A10000000000000000000022 /* M8SmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000026 /* M8SmokeTest.swift */; };
+		A10000000000000000000023 /* CustomWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000027 /* CustomWords.swift */; };
+		A10000000000000000000024 /* CustomWordsEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000028 /* CustomWordsEditor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -70,6 +73,8 @@
 		A20000000000000000000024 /* M7SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M7SmokeTest.swift; sourceTree = "<group>"; };
 		A20000000000000000000025 /* InputModeIndicatorController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModeIndicatorController.swift; sourceTree = "<group>"; };
 		A20000000000000000000026 /* M8SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M8SmokeTest.swift; sourceTree = "<group>"; };
+		A20000000000000000000027 /* CustomWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWords.swift; sourceTree = "<group>"; };
+		A20000000000000000000028 /* CustomWordsEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWordsEditor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -163,6 +168,7 @@
 				A2000000000000000000000F /* InputModels.swift */,
 				A20000000000000000000010 /* InputService.swift */,
 				A20000000000000000000011 /* EngineSmokeTest.swift */,
+				A20000000000000000000026 /* M8SmokeTest.swift */,
 			);
 			path = InputEngine;
 			sourceTree = "<group>";
@@ -187,6 +193,8 @@
 				A20000000000000000000022 /* FengYuSettings.swift */,
 				A20000000000000000000023 /* FengYuSettingsMenu.swift */,
 				A20000000000000000000024 /* M7SmokeTest.swift */,
+				A20000000000000000000027 /* CustomWords.swift */,
+				A20000000000000000000028 /* CustomWordsEditor.swift */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -289,6 +297,9 @@
 				A1000000000000000000001F /* FengYuSettingsMenu.swift in Sources */,
 				A10000000000000000000020 /* M7SmokeTest.swift in Sources */,
 				A10000000000000000000021 /* InputModeIndicatorController.swift in Sources */,
+				A10000000000000000000022 /* M8SmokeTest.swift in Sources */,
+				A10000000000000000000023 /* CustomWords.swift in Sources */,
+				A10000000000000000000024 /* CustomWordsEditor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

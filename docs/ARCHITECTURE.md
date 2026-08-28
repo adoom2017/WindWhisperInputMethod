@@ -5,7 +5,7 @@
 1. InputMethodKit 处理系统会话；原生 Swift 引擎处理输入语义；候选窗只处理表现与交互。
 2. 全局引擎生命周期、每会话生命周期与 UI 生命周期分别管理。
 3. 输入引擎内部只暴露值类型快照和语义动作，Swift 业务层不依赖外部运行库。
-4. 任何耗时部署都不进入按键热路径，任何 AppKit 更新都回到主线程。
+4. 任何磁盘读取和配置解析都不进入按键热路径，任何 AppKit 更新都回到主线程。
 5. 前端不实现双拼或辅码算法，它们由输入引擎根据词库索引处理。
 
 ## 组件边界
@@ -87,7 +87,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 
 - `FengYuSettingsStore` 是设置唯一来源，使用版本化 `UserDefaults` key 保存方案、全角、简繁、候选方向和颜色主题；未知枚举值自动回退产品默认，不让损坏偏好阻止输入。
 - `IMKInputController.menu()` 返回风语设置菜单，设置只出现在系统输入法菜单中，不创建额外常驻状态栏图标。方案、候选排列和候选主题以顶层叶子按分组排列，规避 `TextInputMenuAgent` 不转发嵌套叶子 action 的限制；菜单 target 不访问 marked text 或候选内容。
-- 新输入引擎 session 由 `NativeRuntime.makeSession()` 统一应用设置；现有 controller 监听进程内通知，在设置变化前先提交组合，再更新自身 session。
+- 新输入引擎 session 由 `NativeRuntime.makeSession()` 统一应用设置；现有 controller 监听进程内通知，在设置变化前先提交组合，再更新自身 session。刷新配置时先完整加载新词库，成功后原子替换服务并重建所有 session；加载失败则继续使用旧服务。
 - Swift 直接设置简繁、全角等运行时选项，不依赖桥接层或外部词库。
 - 横排与竖排是两个纯布局策略，共享同一候选模型、绘制、点击和翻页动作；主题只固定系统/浅色/深色 appearance，不绕过系统降低透明度、增强对比度和减少动态效果。
 - 脱敏诊断只输出版本、架构、设置值、引擎就绪状态及目录是否存在；不接收输入快照，也不输出完整 Home 路径或 input-engine 原始错误正文。
@@ -96,7 +96,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 
 - `CandidateWindowUpdateGate` 为每个异步候选窗展示或隐藏任务分配单调代次；新任务会使旧任务失效，避免快速切换 client 后旧候选窗重新出现或旧隐藏任务遮掉新候选。
 - `InputEngine` 只暴露计数型诊断：活跃 session、桥接快照分配和进程 RSS。诊断不包含按键、组合、候选或提交内容，并复用 service 锁保持一致性。
-- M8 smoke 在隔离 user data 中测量 engine 初始化、全量/增量部署、`process_key + snapshot + 纯布局` 的 P50/P95/P99，并按可配置时长反复创建/销毁 session。
+- M8 smoke 在隔离 user data 中测量 engine 初始化、配置刷新、`process_key + snapshot + 纯布局` 的 P50/P95/P99，并按可配置时长反复创建/销毁 session。
 - 快照分配由 C 层在深复制和 `rb_snapshot_clear` 两端配对计数；任何测试结束后的非零余额都直接阻断阶段验收。
 
 ## M9 发布与安装事务

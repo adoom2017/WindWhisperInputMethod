@@ -311,7 +311,6 @@ enum M3SmokeTest {
     ) throws -> InputSession {
         let paths = try InputServicePaths.applicationDefaults()
         let service = try InputService(paths: .temporary(root: root, sharedData: paths.sharedData))
-        try service.deploy(fullCheck: true)
         let session = try service.makeSession()
         guard session.selectSchema(identifier: schemaIdentifier) else {
             throw InputEngineError.smokeAssertion("M3 could not select schema \(schemaIdentifier)")
