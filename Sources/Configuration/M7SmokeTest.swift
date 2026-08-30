@@ -179,29 +179,26 @@ enum M7SmokeTest {
     }
 
     private static func verifySimplifiedTraditionalConversion(service: InputService) throws {
-        let session = try service.makeSession()
-        var traditional = FengYuSettingsSnapshot.defaults
-        traditional.schema = .fullPinyin
-        traditional.usesSimplifiedChinese = false
-        try traditional.apply(to: session)
-        guard session.simulate(sequence: "hanzi") else {
-            throw InputEngineError.smokeAssertion("traditional conversion fixture was not consumed")
-        }
-        let traditionalSnapshot = try session.readSnapshot()
-        guard traditionalSnapshot.menu.candidates.contains(where: { $0.text == "漢字" }) else {
-            throw InputEngineError.smokeAssertion("traditional candidate fixture was missing")
-        }
-
-        session.clearComposition()
-        var simplified = traditional
-        simplified.usesSimplifiedChinese = true
-        try simplified.apply(to: session)
-        guard session.simulate(sequence: "hanzi") else {
-            throw InputEngineError.smokeAssertion("simplified conversion fixture was not consumed")
-        }
-        let simplifiedSnapshot = try session.readSnapshot()
-        guard simplifiedSnapshot.menu.candidates.contains(where: { $0.text == "汉字" }) else {
-            throw InputEngineError.smokeAssertion("simplified conversion did not produce the expected candidate")
+        for (usesSimplified, expected, rejected) in [
+            (true, "汉字", "漢字"),
+            (false, "漢字", "汉字"),
+        ] {
+            let session = try service.makeSession()
+            var settings = FengYuSettingsSnapshot.defaults
+            settings.schema = .fullPinyin
+            settings.usesSimplifiedChinese = usesSimplified
+            try settings.apply(to: session)
+            guard session.simulate(sequence: "hanzi") else {
+                throw InputEngineError.smokeAssertion("script conversion fixture was not consumed")
+            }
+            let snapshot = try session.readSnapshot()
+            guard snapshot.menu.candidates.first?.text == expected,
+                !snapshot.menu.candidates.contains(where: { $0.text == rejected }),
+                session.commitComposition(),
+                try session.readSnapshot().commitText == expected
+            else {
+                throw InputEngineError.smokeAssertion("configured Chinese script was not applied to commit")
+            }
         }
     }
 

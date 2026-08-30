@@ -7,8 +7,8 @@ enum FengYuSchema: String, CaseIterable, Sendable {
 
     var displayName: String {
         switch self {
-        case .flypy: "小鹤双拼（音形辅码）"
-        case .flypyPhonetic: "小鹤双拼（纯音码）"
+        case .flypy: "小鹤音形"
+        case .flypyPhonetic: "小鹤双拼"
         case .fullPinyin: "风语全拼"
         }
     }

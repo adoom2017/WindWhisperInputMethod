@@ -7,6 +7,9 @@ enum EngineSmokeTest {
             print("engineVersion=native-1.0")
             print("fullPinyin=passed")
             print("flypyPhonetic=passed")
+            print("longSentenceInput=passed")
+            print("statisticalLanguageModel=passed")
+            print("simplifiedTraditionalConversion=passed")
             print("flypyShape=passed")
             print("flypyFourKeyAutoCommit=passed")
             print("flypyFourKeyMultipleCandidates=passed")
@@ -51,6 +54,8 @@ enum EngineSmokeTest {
         }
         try verifyCandidate(service: service, schema: .fullPinyin, code: "nihao", text: "你好")
         try verifyCandidate(service: service, schema: .flypyPhonetic, code: "nihc", text: "你好")
+        try verifyLongSentenceInput(service: service)
+        try verifyScriptConversion(service: service)
         try verifyCandidate(service: service, schema: .flypy, code: "ubu", text: "是不是")
         try verifyFirstCandidate(service: service, schema: .flypy, code: "iys", text: "纯")
         try verifyOrderedCandidates(
@@ -103,6 +108,84 @@ enum EngineSmokeTest {
             throw InputEngineError.smokeAssertion("four-key Flypy auto commit failed")
         }
 
+    }
+
+    private static func verifyLongSentenceInput(service: InputService) throws {
+        let fixtures: [(FengYuSchema, code: String, expected: String)] = [
+            (.fullPinyin, "jintiantianqihenhao", "今天天气很好"),
+            (.flypyPhonetic, "jbtmtmqihfhc", "今天天气很好"),
+            (.fullPinyin, "haishiyiyang", "还是一样"),
+            (.flypyPhonetic, "hduiyiyh", "还是一样"),
+            (.fullPinyin, "yiqi", "一起"),
+            (.fullPinyin, "womenkeyiyiqi", "我们可以一起"),
+            (.flypyPhonetic, "womfkeyiyiqi", "我们可以一起"),
+            (.fullPinyin, "woxiangyaozhege", "我想要这个"),
+            (.flypyPhonetic, "woxlycvege", "我想要这个"),
+            (.fullPinyin, "zhegeshijie", "这个世界"),
+        ]
+        for (schema, code, expectedText) in fixtures {
+            let session = try service.makeSession()
+            var settings = FengYuSettingsSnapshot.defaults
+            settings.schema = schema
+            try settings.apply(to: session)
+            guard session.simulate(sequence: code) else {
+                throw InputEngineError.smokeAssertion("\(schema.displayName) did not consume a long sentence")
+            }
+            let snapshot = try session.readSnapshot()
+            guard snapshot.menu.candidates.first?.text == expectedText,
+                session.commitComposition(),
+                try session.readSnapshot().commitText == expectedText
+            else {
+                throw InputEngineError.smokeAssertion(
+                    "\(schema.displayName) did not decode \(code): \(snapshot.menu.candidates.map(\.text))"
+                )
+            }
+        }
+
+        let traditionalSession = try service.makeSession()
+        var traditionalSettings = FengYuSettingsSnapshot.defaults
+        traditionalSettings.schema = .fullPinyin
+        traditionalSettings.usesSimplifiedChinese = false
+        try traditionalSettings.apply(to: traditionalSession)
+        guard traditionalSession.simulate(sequence: "haishiyiyang"),
+            try traditionalSession.readSnapshot().menu.candidates.first?.text == "還是一樣",
+            traditionalSession.commitComposition(),
+            try traditionalSession.readSnapshot().commitText == "還是一樣"
+        else {
+            throw InputEngineError.smokeAssertion("traditional long sentence conversion was not applied")
+        }
+    }
+
+    private static func verifyScriptConversion(service: InputService) throws {
+        let fixtures: [(FengYuSchema, String)] = [
+            (.fullPinyin, "hanzi"),
+            (.flypyPhonetic, "hjzi"),
+        ]
+        for (schema, code) in fixtures {
+            for (usesSimplified, expected, rejected) in [
+                (true, "汉字", "漢字"),
+                (false, "漢字", "汉字"),
+            ] {
+                let session = try service.makeSession()
+                var settings = FengYuSettingsSnapshot.defaults
+                settings.schema = schema
+                settings.usesSimplifiedChinese = usesSimplified
+                try settings.apply(to: session)
+                guard session.simulate(sequence: code) else {
+                    throw InputEngineError.smokeAssertion("\(schema.displayName) did not consume a script fixture")
+                }
+                let snapshot = try session.readSnapshot()
+                guard snapshot.menu.candidates.first?.text == expected,
+                    !snapshot.menu.candidates.contains(where: { $0.text == rejected }),
+                    session.commitComposition(),
+                    try session.readSnapshot().commitText == expected
+                else {
+                    throw InputEngineError.smokeAssertion(
+                        "\(schema.displayName) did not honor the configured Chinese script"
+                    )
+                }
+            }
+        }
     }
 
     private static func verifyCandidate(

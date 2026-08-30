@@ -67,10 +67,90 @@ private struct NativeDictionaryEntry: Sendable {
     let order: Int
 }
 
+private struct NativeSentencePath {
+    let text: String
+    let unigramScore: Double
+    let segmentCount: Int
+}
+
+private struct NativeStatisticalLanguageModel {
+    struct Builder {
+        private var bigramFrequencies = [UInt64: Float]()
+        private var trigramFrequencies = [UInt64: Float]()
+
+        mutating func observe(text: String, frequency: Int) {
+            let scalars = text.unicodeScalars.map(\.value)
+            guard frequency > 0, (2...12).contains(scalars.count) else { return }
+            let contribution = Float(log1p(Double(frequency)))
+            for index in 1..<scalars.count {
+                bigramFrequencies[Self.bigramKey(scalars[index - 1], scalars[index]), default: 0]
+                    += contribution
+            }
+            guard scalars.count >= 3 else { return }
+            for index in 2..<scalars.count {
+                trigramFrequencies[
+                    Self.trigramKey(scalars[index - 2], scalars[index - 1], scalars[index]),
+                    default: 0
+                ] += contribution
+            }
+        }
+
+        func build() -> NativeStatisticalLanguageModel {
+            NativeStatisticalLanguageModel(
+                bigramFrequencies: bigramFrequencies,
+                trigramFrequencies: trigramFrequencies
+            )
+        }
+
+        private static func bigramKey(_ first: UInt32, _ second: UInt32) -> UInt64 {
+            UInt64(first) << 21 | UInt64(second)
+        }
+
+        private static func trigramKey(_ first: UInt32, _ second: UInt32, _ third: UInt32) -> UInt64 {
+            UInt64(first) << 42 | UInt64(second) << 21 | UInt64(third)
+        }
+    }
+
+    private let bigramFrequencies: [UInt64: Float]
+    private let trigramFrequencies: [UInt64: Float]
+
+    func score(text: String) -> Double {
+        let scalars = text.unicodeScalars.map(\.value)
+        guard scalars.count >= 2 else { return 0 }
+
+        var bigramScore = 0.0
+        for index in 1..<scalars.count {
+            let key = UInt64(scalars[index - 1]) << 21 | UInt64(scalars[index])
+            bigramScore += log1p(Double(bigramFrequencies[key, default: 0]))
+        }
+        bigramScore /= Double(scalars.count - 1)
+
+        guard scalars.count >= 3 else { return bigramScore }
+        var trigramScore = 0.0
+        for index in 2..<scalars.count {
+            let key = UInt64(scalars[index - 2]) << 42
+                | UInt64(scalars[index - 1]) << 21
+                | UInt64(scalars[index])
+            trigramScore += log1p(Double(trigramFrequencies[key, default: 0]))
+        }
+        trigramScore /= Double(scalars.count - 2)
+        return bigramScore * 0.8 + trigramScore * 1.2
+    }
+
+    func score(path: NativeSentencePath) -> Double {
+        let characterCount = max(path.text.count, 1)
+        let normalizedUnigramScore = path.unigramScore / Double(characterCount)
+        return score(text: path.text)
+            + normalizedUnigramScore * 0.25
+            - Double(path.segmentCount) * 4.0
+    }
+}
+
 private final class NativeDictionary: @unchecked Sendable {
     private let shapeEntries: [NativeDictionaryEntry]
     private let pinyinEntries: [NativeDictionaryEntry]
     private let flypyPhoneticEntries: [NativeDictionaryEntry]
+    private let languageModel: NativeStatisticalLanguageModel
 
     init(sharedData: URL, userData: URL) throws {
         let dictionaryURL = sharedData.appendingPathComponent("fy.dict.yaml")
@@ -80,6 +160,7 @@ private final class NativeDictionary: @unchecked Sendable {
 
         let allEntries = try Self.readConsolidatedEntries(at: dictionaryURL)
         let shape = allEntries.filter { $0.source == .flypy }
+        var languageModelBuilder = NativeStatisticalLanguageModel.Builder()
         let customURL = userData.appendingPathComponent("custom_words.tsv")
         var shapeEntries = shape.map(\.entry)
         if FileManager.default.fileExists(atPath: customURL.path) {
@@ -112,12 +193,31 @@ private final class NativeDictionary: @unchecked Sendable {
         }
 
         var order = pinyin.count
+        var simplifiedCharacterCache = [Character: String]()
+        func simplifiedText(_ text: String) -> String {
+            text.reduce(into: "") { result, character in
+                if let cached = simplifiedCharacterCache[character] {
+                    result += cached
+                    return
+                }
+                let source = String(character)
+                let simplified = source.applyingTransform(
+                    StringTransform(rawValue: "Hant-Hans"),
+                    reverse: false
+                ) ?? source
+                simplifiedCharacterCache[character] = simplified
+                result += simplified
+            }
+        }
         for entry in essayRows {
-            let text = entry.text
+            let simplified = simplifiedText(entry.text)
+            if entry.weight >= 500 {
+                languageModelBuilder.observe(text: simplified, frequency: entry.weight)
+            }
             var code = ""
             var flypyCode = ""
             var complete = true
-            for character in text {
+            for character in simplified {
                 guard let syllable = primaryPinyin[character],
                     let encodedSyllable = Self.flypySyllable(syllable)
                 else {
@@ -128,9 +228,14 @@ private final class NativeDictionary: @unchecked Sendable {
                 flypyCode += encodedSyllable
             }
             guard complete else { continue }
-            pinyin.append(NativeDictionaryEntry(text: text, code: code, weight: entry.weight, order: order))
+            pinyin.append(NativeDictionaryEntry(
+                text: simplified,
+                code: code,
+                weight: entry.weight,
+                order: order
+            ))
             flypyPhonetic.append(NativeDictionaryEntry(
-                text: text,
+                text: simplified,
                 code: flypyCode,
                 weight: entry.weight,
                 order: order
@@ -140,6 +245,7 @@ private final class NativeDictionary: @unchecked Sendable {
 
         pinyinEntries = Self.sortedForPrefixSearch(pinyin)
         flypyPhoneticEntries = Self.sortedForPrefixSearch(flypyPhonetic)
+        languageModel = languageModelBuilder.build()
     }
 
     private enum ConsolidatedSource {
@@ -217,13 +323,137 @@ private final class NativeDictionary: @unchecked Sendable {
             if $0.weight != $1.weight { return $0.weight > $1.weight }
             return $0.order < $1.order
         }
+
+        let sentenceCandidates: [String]
+        switch schema {
+        case .flypy:
+            sentenceCandidates = []
+        case .flypyPhonetic, .fullPinyin:
+            sentenceCandidates = Self.sentenceCandidates(
+                for: normalized,
+                in: entries,
+                schema: schema,
+                languageModel: languageModel,
+                limit: min(limit, 20)
+            )
+        }
+
         var seen = Set<String>()
         var result = [String]()
-        for entry in matches where seen.insert(entry.text).inserted {
-            result.append(entry.text)
+        let rankedMatches: [String]
+        if schema == .flypy {
+            rankedMatches = matches.map(\.text)
+        } else {
+            let exactMatches = matches.filter { $0.code == normalized }.map(\.text)
+            let prefixMatches = matches.filter { $0.code != normalized }.map(\.text)
+            rankedMatches = Self.rankedUniqueTexts(
+                exactMatches + sentenceCandidates,
+                languageModel: languageModel
+            ) + prefixMatches
+        }
+        for text in rankedMatches where seen.insert(text).inserted {
+            result.append(text)
             if result.count == limit { break }
         }
         return result
+    }
+
+    private static func sentenceCandidates(
+        for code: String,
+        in entries: [NativeDictionaryEntry],
+        schema: FengYuSchema,
+        languageModel: NativeStatisticalLanguageModel,
+        limit: Int
+    ) -> [String] {
+        let bytes = Array(code.utf8)
+        guard !bytes.isEmpty else { return [] }
+
+        let pathLimit = max(limit, 12)
+        let maximumTokenLength = 24
+        var paths = Array(repeating: [NativeSentencePath](), count: bytes.count + 1)
+        paths[0] = [NativeSentencePath(text: "", unigramScore: 0, segmentCount: 0)]
+
+        for position in bytes.indices where !paths[position].isEmpty {
+            let upperBound = min(bytes.count, position + maximumTokenLength)
+            guard position < upperBound else { continue }
+            for end in (position + 1)...upperBound {
+                if schema == .flypyPhonetic, !(end - position).isMultiple(of: 2) {
+                    continue
+                }
+                let token = String(decoding: bytes[position..<end], as: UTF8.self)
+                let tokenEntries = exactEntries(for: token, in: entries, limit: 4)
+                guard !tokenEntries.isEmpty else { continue }
+
+                for path in paths[position] {
+                    for entry in tokenEntries {
+                        paths[end].append(NativeSentencePath(
+                            text: path.text + entry.text,
+                            unigramScore: path.unigramScore + log1p(Double(max(entry.weight, 0))),
+                            segmentCount: path.segmentCount + 1
+                        ))
+                    }
+                }
+                paths[end] = rankedUniquePaths(
+                    paths[end],
+                    languageModel: languageModel,
+                    limit: pathLimit
+                )
+            }
+        }
+
+        return rankedUniquePaths(
+            paths[bytes.count],
+            languageModel: languageModel,
+            limit: limit
+        ).map(\.text)
+    }
+
+    private static func exactEntries(
+        for code: String,
+        in entries: [NativeDictionaryEntry],
+        limit: Int
+    ) -> [NativeDictionaryEntry] {
+        let start = lowerBound(in: entries, prefix: code)
+        guard start < entries.count, entries[start].code == code else { return [] }
+        var result = [NativeDictionaryEntry]()
+        var index = start
+        while index < entries.count, entries[index].code == code, result.count < limit {
+            result.append(entries[index])
+            index += 1
+        }
+        return result
+    }
+
+    private static func rankedUniquePaths(
+        _ paths: [NativeSentencePath],
+        languageModel: NativeStatisticalLanguageModel,
+        limit: Int
+    ) -> [NativeSentencePath] {
+        var seen = Set<String>()
+        return paths.map { path in (path, languageModel.score(path: path)) }
+            .sorted {
+                if $0.1 != $1.1 { return $0.1 > $1.1 }
+                return $0.0.text < $1.0.text
+            }
+            .map(\.0)
+            .filter { seen.insert($0.text).inserted }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    private static func rankedUniqueTexts(
+        _ texts: [String],
+        languageModel: NativeStatisticalLanguageModel
+    ) -> [String] {
+        var seen = Set<String>()
+        return texts.enumerated()
+            .filter { seen.insert($0.element).inserted }
+            .map { ($0.offset, $0.element, languageModel.score(text: $0.element)) }
+            .sorted {
+                if $0.2 != $1.2 { return $0.2 > $1.2 }
+                return $0.0 < $1.0
+            }
+            .map(\.1)
     }
 
     private static func readCodedEntries(at url: URL, baseWeight: Int) throws -> [NativeDictionaryEntry] {
@@ -413,7 +643,12 @@ final class InputSession: @unchecked Sendable {
             if modifierMask & KeyMapper.ModifierMask.release != 0 {
                 defer { leftShiftPending = false }
                 guard leftShiftPending else { return false }
-                if !buffer.isEmpty { commitSelectedCandidate() }
+                if !buffer.isEmpty {
+                    // Shift mode switching commits the literal preedit code;
+                    // candidate conversion remains reserved for selection/commit.
+                    pendingCommit = buffer
+                    clearComposition(keepingCommit: true)
+                }
                 options["ascii_mode", default: false].toggle()
                 return true
             }
@@ -540,6 +775,9 @@ final class InputSession: @unchecked Sendable {
         defer { lock.unlock() }
         guard options[name] != nil else { return false }
         options[name] = enabled
+        if !buffer.isEmpty, ["simplification", "zh_simp", "zh_trad"].contains(name) {
+            updateCandidates()
+        }
         return true
     }
 
@@ -594,7 +832,14 @@ final class InputSession: @unchecked Sendable {
     }
 
     private func updateCandidates() {
-        candidates = service.dictionary.candidates(for: buffer, schema: schema)
+        let transform = StringTransform(
+            rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans"
+        )
+        var seen = Set<String>()
+        candidates = service.dictionary.candidates(for: buffer, schema: schema).compactMap { text in
+            let converted = text.applyingTransform(transform, reverse: false) ?? text
+            return seen.insert(converted).inserted ? converted : nil
+        }
         highlightedIndex = 0
         pageNumber = 0
     }
@@ -620,6 +865,7 @@ final class InputSession: @unchecked Sendable {
             options["simplification", default: true].toggle()
             options["zh_simp"] = options["simplification"]
             options["zh_trad"] = !(options["simplification"] ?? true)
+            if !buffer.isEmpty { updateCandidates() }
             return true
         }
         if control, keyCode == 46 {

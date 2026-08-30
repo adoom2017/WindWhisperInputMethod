@@ -56,7 +56,8 @@ Process Exit   ──► destroy sessions ──► finalize engine
 ## 输入引擎所有权
 
 - `InputService` 持有进程级原生输入引擎；`InputSession` 强持有 service 并在 `deinit` 释放 session。
-- `fy.dict.yaml` 的词条、编码、权重和原始顺序在启动时一次性解析为内存索引。
+- `fy.dict.yaml` 的词条、编码、权重和原始顺序在启动时一次性解析为内存索引；高频 essay 词条同时构建只读字符二元、三元统计表。
+- 全拼与小鹤双拼纯音码使用有限 beam search 组合完整词条，并结合词频、字符二元/三元连贯度和分词惩罚重排；小鹤音形保持原有形码排序。
 - Swift 快照只含值类型；组合串的 UTF-8/UTF-16 范围转换集中在 `RangeConverter`。
 
 ## M3 输入闭环
