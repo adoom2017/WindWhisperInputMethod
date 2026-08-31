@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="WindWhisper" Manufacturer="WindWhisper" Version="1.0.0" UpgradeCode="9A4D32D6-6D4A-4C8D-9F2F-8A0B7D0E6D11">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64"/>
+    <MajorUpgrade DowngradeErrorMessage="A newer WindWhisper is already installed." Schedule="afterInstallValidate" />
+    <MediaTemplate EmbedCab="yes"/>
+    <Feature Id="Main" Title="WindWhisper" Level="1"><ComponentGroupRef Id="Application"/></Feature>
+  </Product>
+  <Fragment><Directory Id="TARGETDIR" Name="SourceDir"><Directory Id="ProgramFiles64Folder"><Directory Id="INSTALLFOLDER" Name="WindWhisper"/></Directory></Directory></Fragment>
+  <Fragment><ComponentGroup Id="Application" Directory="INSTALLFOLDER"><Component Id="Engine"><File Source="build\\fy_engine.dll"/><File Source="build\\fy_tsf.dll" KeyPath="yes"/></Component></ComponentGroup></Fragment>
+</Wix>

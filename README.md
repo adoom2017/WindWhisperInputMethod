@@ -28,6 +28,20 @@
 ./Scripts/build.sh Debug
 ```
 
+### Windows (x64 preview)
+
+共享输入核心和 TSF 适配层位于 `Core/` 与 `Platform/Windows/`，使用 CMake
+和 Visual Studio 2022 生成 x64 工程：
+
+```text
+cmake -S Build -B build/windows -A x64
+cmake --build build/windows --config Release
+ctest --test-dir build/windows -C Release
+```
+
+MSI 使用 WiX 4 编译 `Installer/Windows/Product.wxs`。安装器注册 TSF COM
+组件并将用户数据放入 `%LOCALAPPDATA%\\WindWhisper\\InputMethod`；卸载不会删除用户词典。
+
 编译 Release 通用版本：
 
 ```bash
