@@ -5,3 +5,4 @@
 - Developer ID、公证票据和 Gatekeeper 在线评估依赖发布者证书及 Apple 公证凭据。`local` 包不适合对外分发。
 - 输入法更新后，macOS 偶尔会短暂保留输入源图标或注册缓存；重新切换输入源或登录会话可刷新。
 - 卸载默认保留用户词典和设置，彻底删除用户数据必须由用户单独确认。
+- Windows x64 端仍处于开发阶段：TSF composition、DirectWrite 候选窗、profile 注册和 MSI 回滚尚未完成，当前产物不能作为输入法安装使用。接续状态见 `docs/WINDOWS_HANDOFF.md`。

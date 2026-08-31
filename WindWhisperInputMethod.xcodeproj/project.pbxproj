@@ -126,6 +126,8 @@
 				A20000000000000000000003 /* WindWhisperInputController.swift */,
 				A20000000000000000000016 /* KeyMapper.swift */,
 				A20000000000000000000017 /* M3SmokeTest.swift */,
+				A20000000000000000000011 /* EngineSmokeTest.swift */,
+				A20000000000000000000026 /* M8SmokeTest.swift */,
 			);
 			path = InputMethod;
 			sourceTree = "<group>";
@@ -167,8 +169,6 @@
 			children = (
 				A2000000000000000000000F /* InputModels.swift */,
 				A20000000000000000000010 /* InputService.swift */,
-				A20000000000000000000011 /* EngineSmokeTest.swift */,
-				A20000000000000000000026 /* M8SmokeTest.swift */,
 			);
 			path = ../../Core/SwiftAdapter;
 			sourceTree = "<group>";

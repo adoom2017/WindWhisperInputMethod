@@ -1,6 +1,6 @@
 if(WIN32)
   add_library(fy_tsf SHARED TSF/FengYuTextService.cpp CandidateWindow/CandidateWindow.cpp Settings/SettingsStore.cpp)
-  target_include_directories(fy_tsf PRIVATE ${CMAKE_SOURCE_DIR}/Core/include)
+  target_include_directories(fy_tsf PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../Core/include)
   target_link_libraries(fy_tsf PRIVATE fy_engine msctf ole32 user32)
   set_target_properties(fy_tsf PROPERTIES OUTPUT_NAME "fy_tsf")
 endif()
