@@ -148,6 +148,7 @@ private struct NativeStatisticalLanguageModel {
 
 private final class NativeDictionary: @unchecked Sendable {
     private let shapeEntries: [NativeDictionaryEntry]
+    private let shapeCodesByText: [String: [String]]
     private let pinyinEntries: [NativeDictionaryEntry]
     private let flypyPhoneticEntries: [NativeDictionaryEntry]
     private let languageModel: NativeStatisticalLanguageModel
@@ -167,6 +168,7 @@ private final class NativeDictionary: @unchecked Sendable {
             shapeEntries.insert(contentsOf: try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000), at: 0)
         }
         self.shapeEntries = Self.sortedForPrefixSearch(shapeEntries)
+        shapeCodesByText = Self.shapeCodesByText(shapeEntries)
 
         let pinyinRows = allEntries.filter { $0.source == .pinyin }.map(\.entry)
         let essayRows = allEntries.filter { $0.source == .essay }.map(\.entry)
@@ -358,6 +360,16 @@ private final class NativeDictionary: @unchecked Sendable {
         return result
     }
 
+    func shapeCodeComment(for text: String, matchingPrefix prefix: String) -> String? {
+        guard !prefix.isEmpty, let codes = shapeCodesByText[text] else { return nil }
+        let matches = codes.filter { $0.hasPrefix(prefix) }
+        guard !matches.isEmpty else { return nil }
+        let longerMatches = matches.filter { $0.count > prefix.count }
+        return (longerMatches.isEmpty ? matches : longerMatches)
+            .prefix(3)
+            .joined(separator: " / ")
+    }
+
     private static func sentenceCandidates(
         for code: String,
         in entries: [NativeDictionaryEntry],
@@ -487,6 +499,25 @@ private final class NativeDictionary: @unchecked Sendable {
         }
     }
 
+    private static func shapeCodesByText(
+        _ entries: [NativeDictionaryEntry]
+    ) -> [String: [String]] {
+        var result = [String: [String]]()
+        var seen = [String: Set<String>]()
+        for entry in entries where entry.code.count <= 4 {
+            if seen[entry.text, default: []].insert(entry.code).inserted {
+                result[entry.text, default: []].append(entry.code)
+            }
+        }
+        for text in Array(result.keys) {
+            result[text]?.sort {
+                if $0.count != $1.count { return $0.count > $1.count }
+                return $0 < $1
+            }
+        }
+        return result
+    }
+
     private static func lowerBound(in entries: [NativeDictionaryEntry], prefix: String) -> Int {
         var lower = 0
         var upper = entries.count
@@ -591,6 +622,11 @@ final class InputService: @unchecked Sendable {
 }
 
 final class InputSession: @unchecked Sendable {
+    private struct SessionCandidate {
+        let text: String
+        let comment: String?
+    }
+
     private enum Key {
         static let backspace: Int32 = 0xFF08
         static let tab: Int32 = 0xFF09
@@ -610,9 +646,10 @@ final class InputSession: @unchecked Sendable {
     private let lock = NSRecursiveLock()
     private var schema: FengYuSchema = .flypy
     private var buffer = ""
-    private var candidates = [String]()
+    private var candidates = [SessionCandidate]()
     private var highlightedIndex = 0
     private var pageNumber = 0
+    private var reverseLookupMarkerOffset: Int?
     private var pendingCommit: String?
     private var options: [String: Bool] = [
         "ascii_mode": false,
@@ -666,6 +703,11 @@ final class InputSession: @unchecked Sendable {
 
         switch keyCode {
         case Key.backspace:
+            if let markerOffset = reverseLookupMarkerOffset, buffer.count == markerOffset {
+                reverseLookupMarkerOffset = nil
+                updateCandidates()
+                return true
+            }
             guard !buffer.isEmpty else { return false }
             buffer.removeLast()
             updateCandidates()
@@ -690,15 +732,9 @@ final class InputSession: @unchecked Sendable {
             pageNumber = highlightedIndex / pageSize
             return true
         case Key.pageUp:
-            guard pageNumber > 0 else { return false }
-            pageNumber -= 1
-            highlightedIndex = pageNumber * pageSize
-            return true
+            return page(up: true)
         case Key.pageDown:
-            guard (pageNumber + 1) * pageSize < candidates.count else { return false }
-            pageNumber += 1
-            highlightedIndex = pageNumber * pageSize
-            return true
+            return page(up: false)
         case 0x20:
             guard !buffer.isEmpty else { return false }
             commitSelectedCandidate()
@@ -707,16 +743,31 @@ final class InputSession: @unchecked Sendable {
             break
         }
 
+        if keyCode == 0x2D, page(up: true) { return true }
+        if keyCode == 0x3D, page(up: false) { return true }
+
         if keyCode >= 0x31, keyCode <= 0x39, !buffer.isEmpty {
             return selectCandidate(at: Int(keyCode - 0x31))
         }
         if let scalar = UnicodeScalar(UInt32(bitPattern: keyCode)) {
             let character = Character(scalar)
+            if character == "~", schema == .flypy {
+                guard !buffer.isEmpty, !candidates.isEmpty else { return false }
+                if reverseLookupMarkerOffset == nil {
+                    reverseLookupMarkerOffset = buffer.count
+                } else {
+                    reverseLookupMarkerOffset = nil
+                }
+                updateCandidates()
+                return true
+            }
             if character.isASCII, character.isLetter {
                 guard modifierMask & KeyMapper.ModifierMask.shift == 0 else { return false }
                 buffer.append(Character(String(character).lowercased()))
                 updateCandidates()
-                if schema == .flypy, buffer.count >= 4, candidates.count == 1 {
+                if schema == .flypy, reverseLookupMarkerOffset == nil,
+                    buffer.count >= 4, candidates.count == 1
+                {
                     commitSelectedCandidate()
                 }
                 return true
@@ -806,10 +857,11 @@ final class InputSession: @unchecked Sendable {
         let pageStart = pageNumber * pageSize
         let pageEnd = min(pageStart + pageSize, candidates.count)
         let pageCandidates = pageStart < pageEnd ? Array(candidates[pageStart..<pageEnd]) : []
-        let composition = buffer.isEmpty ? nil : CompositionSnapshot(
-            text: buffer,
-            selectionRange: NSRange(location: buffer.utf16.count, length: 0),
-            cursorPosition: buffer.utf16.count
+        let compositionText = displayedCompositionText()
+        let composition = compositionText.isEmpty ? nil : CompositionSnapshot(
+            text: compositionText,
+            selectionRange: NSRange(location: compositionText.utf16.count, length: 0),
+            cursorPosition: compositionText.utf16.count
         )
         return InputSnapshot(
             commitText: commit,
@@ -819,12 +871,14 @@ final class InputSession: @unchecked Sendable {
                 pageNumber: pageNumber,
                 isLastPage: pageEnd >= candidates.count,
                 highlightedIndex: max(0, highlightedIndex - pageStart),
-                candidates: pageCandidates.map { CandidateSnapshot(text: $0, comment: nil) }
+                candidates: pageCandidates.map {
+                    CandidateSnapshot(text: $0.text, comment: $0.comment)
+                }
             ),
             status: StatusSnapshot(
                 schemaIdentifier: schema.rawValue,
                 schemaName: schema.displayName,
-                isComposing: !buffer.isEmpty,
+                isComposing: !compositionText.isEmpty,
                 isASCIIMode: options["ascii_mode"] == true,
                 isDisabled: false
             )
@@ -838,14 +892,19 @@ final class InputSession: @unchecked Sendable {
         var seen = Set<String>()
         candidates = service.dictionary.candidates(for: buffer, schema: schema).compactMap { text in
             let converted = text.applyingTransform(transform, reverse: false) ?? text
-            return seen.insert(converted).inserted ? converted : nil
+            guard seen.insert(converted).inserted else { return nil }
+            let comment = reverseLookupMarkerOffset == nil ? nil
+                : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer)
+            return SessionCandidate(text: converted, comment: comment)
         }
         highlightedIndex = 0
         pageNumber = 0
     }
 
     private func commitSelectedCandidate(suffix: String = "") {
-        let text = candidates.indices.contains(highlightedIndex) ? candidates[highlightedIndex] : buffer
+        let text = candidates.indices.contains(highlightedIndex)
+            ? candidates[highlightedIndex].text
+            : buffer
         pendingCommit = text + suffix
         clearComposition(keepingCommit: true)
     }
@@ -855,7 +914,28 @@ final class InputSession: @unchecked Sendable {
         candidates = []
         highlightedIndex = 0
         pageNumber = 0
+        reverseLookupMarkerOffset = nil
         if !keepingCommit { pendingCommit = nil }
+    }
+
+    private func page(up: Bool) -> Bool {
+        if up {
+            guard pageNumber > 0 else { return false }
+            pageNumber -= 1
+        } else {
+            guard (pageNumber + 1) * pageSize < candidates.count else { return false }
+            pageNumber += 1
+        }
+        highlightedIndex = pageNumber * pageSize
+        return true
+    }
+
+    private func displayedCompositionText() -> String {
+        guard let markerOffset = reverseLookupMarkerOffset else { return buffer }
+        let insertionIndex = buffer.index(buffer.startIndex, offsetBy: markerOffset)
+        var result = buffer
+        result.insert("~", at: insertionIndex)
+        return result
     }
 
     private func handleOptionShortcut(keyCode: Int32, modifierMask: Int32) -> Bool {

@@ -13,6 +13,8 @@ enum EngineSmokeTest {
             print("flypyShape=passed")
             print("flypyFourKeyAutoCommit=passed")
             print("flypyFourKeyMultipleCandidates=passed")
+            print("candidatePageAliases=passed")
+            print("flypyCodeReverseLookup=passed")
             print("customWords=passed")
             print("customWordsRefresh=passed")
             print("customWordsManagement=passed")
@@ -68,6 +70,8 @@ enum EngineSmokeTest {
             try verifyOrderedCandidates(service: service, schema: .flypy, code: code, expected: expected)
         }
         try verifyCandidate(service: service, schema: .flypy, code: "fy", text: "风语输入法")
+        try verifyCandidatePageAliases(service: service)
+        try verifyFlypyCodeReverseLookup(service: service)
 
         try "刷新配置\tsx\t9999999\n".write(
             to: paths.userData.appendingPathComponent("custom_words.tsv"),
@@ -108,6 +112,71 @@ enum EngineSmokeTest {
             throw InputEngineError.smokeAssertion("four-key Flypy auto commit failed")
         }
 
+    }
+
+    private static func verifyCandidatePageAliases(service: InputService) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: FengYuSchema.flypy.rawValue),
+            session.simulate(sequence: "ni")
+        else {
+            throw InputEngineError.smokeAssertion("could not prepare candidates for page aliases")
+        }
+        let firstPage = try session.readSnapshot()
+        guard !firstPage.menu.isLastPage,
+            session.process(keyCode: 0x3D),
+            try session.readSnapshot().menu.pageNumber == 1,
+            session.process(keyCode: 0x2D),
+            try session.readSnapshot().menu.pageNumber == 0
+        else {
+            throw InputEngineError.smokeAssertion("-/= did not page through candidates")
+        }
+    }
+
+    private static func verifyFlypyCodeReverseLookup(service: InputService) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: FengYuSchema.flypy.rawValue),
+            session.simulate(sequence: "ni"),
+            session.process(keyCode: 0x7E, modifierMask: KeyMapper.ModifierMask.shift)
+        else {
+            throw InputEngineError.smokeAssertion("could not enter Flypy code reverse lookup")
+        }
+        let lookup = try session.readSnapshot()
+        guard lookup.composition?.text == "ni~",
+            lookup.menu.candidates.first?.text == "你",
+            lookup.menu.candidates.first?.comment == "nirx",
+            session.simulate(sequence: "r")
+        else {
+            throw InputEngineError.smokeAssertion("Flypy reverse lookup did not expose the full code")
+        }
+        let narrowed = try session.readSnapshot()
+        guard narrowed.composition?.text == "ni~r",
+            narrowed.menu.candidates.first?.text == "倪",
+            narrowed.menu.candidates.first?.comment == "nire",
+            session.process(keyCode: 0xFF08),
+            try session.readSnapshot().composition?.text == "ni~",
+            session.process(keyCode: 0xFF08),
+            try session.readSnapshot().composition?.text == "ni"
+        else {
+            throw InputEngineError.smokeAssertion("Flypy reverse lookup editing state is inconsistent")
+        }
+
+        let commitSession = try service.makeSession()
+        guard commitSession.selectSchema(identifier: FengYuSchema.flypy.rawValue),
+            commitSession.simulate(sequence: "ni~"),
+            commitSession.selectCandidate(at: 0),
+            try commitSession.readSnapshot().commitText == "你"
+        else {
+            throw InputEngineError.smokeAssertion("Flypy reverse lookup committed its annotation")
+        }
+
+        let pinyin = try service.makeSession()
+        guard pinyin.selectSchema(identifier: FengYuSchema.fullPinyin.rawValue),
+            pinyin.simulate(sequence: "ni"),
+            !pinyin.process(keyCode: 0x7E, modifierMask: KeyMapper.ModifierMask.shift),
+            try pinyin.readSnapshot().composition?.text == "ni"
+        else {
+            throw InputEngineError.smokeAssertion("reverse lookup leaked into another schema")
+        }
     }
 
     private static func verifyLongSentenceInput(service: InputService) throws {

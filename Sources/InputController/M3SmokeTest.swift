@@ -59,6 +59,24 @@ enum M3SmokeTest {
         ) else {
             throw InputEngineError.smokeAssertion("Shifted punctuation mapping is incorrect.")
         }
+
+        let minus = try requireEvent(character: "-", keyCode: UInt16(kVK_ANSI_Minus))
+        let equal = try requireEvent(character: "=", keyCode: UInt16(kVK_ANSI_Equal))
+        let tilde = try requireEvent(
+            character: "~",
+            charactersIgnoringModifiers: "`",
+            keyCode: UInt16(kVK_ANSI_Grave),
+            flags: .shift
+        )
+        guard KeyMapper.map(minus) == MappedKey(keyCode: 0x2D, modifierMask: 0),
+            KeyMapper.map(equal) == MappedKey(keyCode: 0x3D, modifierMask: 0),
+            KeyMapper.map(tilde) == MappedKey(
+                keyCode: 0x7E,
+                modifierMask: KeyMapper.ModifierMask.shift
+            )
+        else {
+            throw InputEngineError.smokeAssertion("Candidate paging/reverse lookup mapping is incorrect.")
+        }
     }
 
     private static func verifyShiftedPunctuation(root: URL) throws {

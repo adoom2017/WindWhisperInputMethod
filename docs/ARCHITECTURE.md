@@ -58,6 +58,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - `InputService` 持有进程级原生输入引擎；`InputSession` 强持有 service 并在 `deinit` 释放 session。
 - `fy.dict.yaml` 的词条、编码、权重和原始顺序在启动时一次性解析为内存索引；高频 essay 词条同时构建只读字符二元、三元统计表。
 - 全拼与小鹤双拼纯音码使用有限 beam search 组合完整词条，并结合词频、字符二元/三元连贯度和分词惩罚重排；小鹤音形保持原有形码排序。
+- 小鹤音形额外维护词条到四键内完整编码的只读反查索引；`InputSession` 记录 `~` 在预编辑串中的位置，并通过 `CandidateSnapshot.comment` 输出匹配编码，不改变候选提交正文。
 - Swift 快照只含值类型；组合串的 UTF-8/UTF-16 范围转换集中在 `RangeConverter`。
 
 ## M3 输入闭环
@@ -78,7 +79,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - `CandidateWindowModel` 只接收不可变 `MenuSnapshot`，生成页码、1—9 本页序号、候选正文、注释与高亮索引；展示层不持有或查询 input engine session。
 - `CandidateWindowCoordinator` 持有 `.nonactivatingPanel`，用非激活窗口样式保持宿主文本焦点；面板仅通过 `CandidateWindowAction` 向 controller 回传语义选择或翻页。
 - `WindWhisperInputController` 在文本状态写入 client 后读取插入点屏幕矩形，再刷新候选窗；优先使用 `attributes(forCharacterIndex:lineHeightRectangle:)` 返回的输入行矩形，并以当前插入点、selected range 和 marked range 的 `firstRect` 作为兼容回退。鼠标选择由 controller 调用 session，重新读取完整快照并同时更新文本和窗口。
-- 键盘数字、方向键和 PageUp/PageDown 仍经过统一按键映射进入 input-engine。前端不自行计算页码或高亮，因此键盘和鼠标不会形成第二套候选状态。
+- 键盘数字、方向键、PageUp/PageDown 和 `-`/`=` 仍经过统一按键映射进入 input-engine。前端不自行计算页码、高亮或反查编码，因此键盘和鼠标不会形成第二套候选状态。
 - controller 停用、关闭、提交、client/session 缺失或快照读取失败时立即隐藏面板，避免跨应用残留。
 - macOS 26 以 `NSGlassEffectView` clear 样式作为内容根视图，由系统玻璃直接控制圆角且关闭矩形 panel 阴影；macOS 13—15 回退到 popover / behind-window / active 的 `NSVisualEffectView`。`CandidateWindowTheme` 集中提供圆角、间距、字体、颜色、宽度上限和动画时长，并根据降低透明度、增强对比度和减少动态效果生成安全降级。
 - `CandidateHorizontalLayout` 是不依赖 window/session 的纯布局边界：先测量候选正文和注释，再在 760pt 上限内按比例压缩，输出候选、页码和前后翻页命中区域。竖排不进入首版，但布局边界已独立，后续可新增策略而不改 input engine 或 controller。

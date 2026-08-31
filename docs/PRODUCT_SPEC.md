@@ -39,7 +39,8 @@
 | 删除编码 | Backspace |
 | 候选选择 | 1–9 或 schema 定义 |
 | 高亮移动 | ↑/↓ 或 ←/→，随布局方向 |
-| 翻页 | PageUp/PageDown、`-`/`=` 等由 schema 定义 |
+| 翻页 | PageUp/PageDown、`-` 上翻、`=` 下翻 |
+| 小鹤音形编码反查 | 输入音码后按 `~`，候选注释显示完整音形编码；可继续输入编码缩小范围 |
 | 中英文切换 | 单按左/右 Shift 切换；Shift 组合键不误触；有组合时提交编码后切换 |
 
 前端不得无条件覆盖 schema 的有效键位。M3 已确定 Command、Control、Option 组合默认交给宿主应用；前端只拦截经完整按下—释放且未参与其他按键的 Shift 单击，Caps Lock 仍交给系统/input engine。
