@@ -12,7 +12,7 @@
 
 | 组件 | 输入 | 输出 | 明确不负责 |
 |---|---|---|---|
-| App/Server | 进程事件、IMK 连接 | controller、全局服务 | 候选布局、编码算法 |
+| Platform/macOS/App | 进程事件、IMK 连接 | controller、全局服务 | 候选布局、编码算法 |
 | InputController | NSEvent、client 状态 | commit、marked text、UI 快照 | 绘图、词库解析 |
 | InputEngine | 规范化按键、会话动作 | 值类型 context/status/commit | AppKit、窗口定位 |
 | CandidateWindow | 候选快照、光标矩形、主题 | 选择/翻页等语义动作 | 引擎访问、文本提交 |
