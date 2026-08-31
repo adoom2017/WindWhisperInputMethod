@@ -2,6 +2,7 @@
 #ifdef _WIN32
 #include <msctf.h>
 #include <windows.h>
+extern const CLSID CLSID_FengYuTextService;
 
 class FengYuTextService final : public ITfTextInputProcessorEx, public ITfKeyEventSink {
 public:
