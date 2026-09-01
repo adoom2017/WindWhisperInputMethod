@@ -1,0 +1,102 @@
+#include "WindowsKeyMapper.h"
+
+#ifdef _WIN32
+namespace {
+constexpr uint32_t kKeyPageUp = 0xFF55;
+constexpr uint32_t kKeyPageDown = 0xFF56;
+constexpr uint32_t kModifierShift = 1u << 0;
+constexpr uint32_t kModifierCapsLock = 1u << 1;
+constexpr uint32_t kModifierControl = 1u << 2;
+constexpr uint32_t kModifierAlt = 1u << 3;
+}
+
+bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
+                     bool control, bool alt, bool composing,
+                     FyMappedKey *mapped) {
+    if (!mapped) {
+        return false;
+    }
+    *mapped = {};
+    mapped->modifiers = (shift ? kModifierShift : 0) |
+                        (caps_lock ? kModifierCapsLock : 0) |
+                        (control ? kModifierControl : 0) |
+                        (alt ? kModifierAlt : 0);
+
+    if (control || alt) {
+        return false;
+    }
+    if (virtual_key >= 'A' && virtual_key <= 'Z') {
+        if (shift) {
+            return false;
+        }
+        mapped->key = static_cast<uint32_t>(virtual_key - 'A' + 'a');
+        return true;
+    }
+    if (!composing) {
+        return false;
+    }
+    if (virtual_key >= '1' && virtual_key <= '9') {
+        mapped->key = static_cast<uint32_t>(virtual_key);
+        return true;
+    }
+
+    switch (virtual_key) {
+    case VK_BACK:
+        mapped->key = 0x08;
+        return true;
+    case VK_ESCAPE:
+        mapped->key = 0x1B;
+        return true;
+    case VK_SPACE:
+        mapped->key = 0x20;
+        return true;
+    case VK_RETURN:
+        mapped->key = 0x0D;
+        return true;
+    case VK_PRIOR:
+        mapped->key = kKeyPageUp;
+        return true;
+    case VK_NEXT:
+        mapped->key = kKeyPageDown;
+        return true;
+    case VK_LEFT:
+        mapped->key = 0xFF51;
+        return true;
+    case VK_UP:
+        mapped->key = 0xFF52;
+        return true;
+    case VK_RIGHT:
+        mapped->key = 0xFF53;
+        return true;
+    case VK_DOWN:
+        mapped->key = 0xFF54;
+        return true;
+    case VK_OEM_MINUS:
+        if (!shift) {
+            mapped->key = '-';
+            return true;
+        }
+        return false;
+    case VK_OEM_PLUS:
+        if (!shift) {
+            mapped->key = '=';
+            return true;
+        }
+        return false;
+    case VK_OEM_3:
+        if (shift) {
+            mapped->key = '~';
+            return true;
+        }
+        return false;
+    case VK_OEM_7:
+        if (!shift) {
+            mapped->key = '\'';
+            return true;
+        }
+        return false;
+    default:
+        return false;
+    }
+}
+#endif

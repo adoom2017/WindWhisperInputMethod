@@ -7,7 +7,46 @@
 - Windows 当前状态：共享核心可在 macOS 用 CMake 编译并通过 golden test；TSF DLL、DirectWrite 候选窗和 MSI 尚未在 Windows SDK 环境编译。
 - 目标系统：Windows 10/11 x64。ARM64 不属于首期范围。
 
-不要直接安装 `Installer/Windows/Product.wxs` 生成的产物。它当前只是 WiX 骨架，尚未完成 TSF profile 注册、升级回滚和卸载验证。
+## 2026-08-31 Windows 续作状态
+
+Windows x64 的 TSF 输入链路、COM/TSF 注册器和 WiX 安装包已经可以进入真实机器安装测试：
+
+- Debug/Release 均可构建，`golden`、`tsf_factory`、`windows_key_mapper` 均通过。
+- `fy_tsf.dll` 已实现 COM class factory、thread/context sink、独立 session、异步 edit session、composition 更新/提交/取消和停用清理。
+- MSI 包含 x64 `fy_engine.dll`、`fy_tsf.dll` 和 `fy_tsf_registration.exe`，并具有安装、卸载、升级失败回滚动作。
+- 卸载不触碰 `%LOCALAPPDATA%\WindWhisper\InputMethod`。
+
+构建安装包：
+
+```powershell
+pwsh -NoProfile -File Installer/Windows/build-msi.ps1 -Configuration Release
+```
+
+执行真实安装并自动检查 COM、DLL 加载和中文 TSF profile：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File Installer/Windows/Install-And-Test.ps1
+```
+
+安装或替换 DLL 后不需要注销。刷新语言栏和当前会话 profile：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File Installer/Windows/Refresh-Tsf.ps1
+```
+
+也可以直接双击 `Installer/Windows/Refresh-Tsf-OneClick.cmd`，无需打开 PowerShell。
+
+该脚本会重启 `ctfmon.exe` 和 Windows 11 的 `TextInputHost.exe`，并重新激活 profile；已经打开的记事本、浏览器等仍需关闭后重新打开，以便宿主重新加载 DLL。需要同时刷新任务栏语言指示器时可追加 `-RestartExplorer`。如果 `activate` 因当前会话已经持有 profile 返回 `E_FAIL`，脚本会以 `status` 验证注册仍健康，不要求注销。
+
+脚本会请求一次 UAC，并把完整日志写到 `build/windows/Installer/install.log`。安装包尚未数字签名，本机开发测试时 Windows 会显示“未知发布者”。卸载并验证用户数据保留：
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File Installer/Windows/Install-And-Test.ps1 -Uninstall
+```
+
+2026-08-31 回归更新：Windows C++ 核心已读取同一份 `Resources/fy.dict.yaml`，并覆盖全拼、小鹤双拼、小鹤音形、长句分词、候选排序、反查辅码、四键自动提交、方向键/分页和简繁转换；MSI 同时携带词库与用户词典覆盖。Release 自动化通过 `golden`、`dictionary_smoke`、`tsf_factory` 和 `windows_key_mapper`。输入指示器兼容性已注册 `GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT` 与 `GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT`，并从 `fy_tsf.dll` 提供品牌/模式图标资源。
+
+候选窗目前是 Win32/GDI 非激活实现，鼠标选词、DPI 自适应和多屏边界仍需在真实 Windows 桌面按下方人工矩阵确认。Windows 只注册一个“风语输入法” profile；通过输入指示器旁的模式按钮（`GUID_LBI_INPUTMODE`）选择小鹤音形（默认，四码自动上屏）、小鹤双拼或全拼，选项保存到当前用户注册表。Windows 11 会忽略自定义 GUID 的语言栏项目，因此不能再注册三个独立 profile 来模拟模式。
 
 ## 环境准备
 
@@ -42,7 +81,7 @@ ctest --test-dir build/windows -C Release --output-on-failure
 | `Core/src/fy_engine.cpp` | 最小候选和 golden fixtures | 从 Swift 引擎迁移完整词典、beam search、语言模型、简繁、全半角和用户词典 |
 | `Platform/Windows/TSF` | COM 对象和 class factory 骨架 | 完成 sink 注册、edit session、composition、commit、停用清理和 DLL 生命周期 |
 | `Platform/Windows/CandidateWindow` | 非激活 Win32 窗口骨架 | DirectWrite 绘制、DPI、多屏、插入点定位、鼠标选择和滚轮翻页 |
-| `Platform/Windows/Settings` | 注册表布尔设置与数据目录 | 完整 schema/选项、原子刷新、用户词典管理和设置 UI |
+| `Platform/Windows/Settings` | 注册表布尔设置与数据目录 | 用户词典管理和更完整的设置 UI |
 | `Installer/Windows` | WiX 文件与注册参考 | COM/TSF profile 注册、x64 MSI、升级/回滚/卸载和用户数据保留 |
 
 `Core/SwiftAdapter` 仍是 macOS 当前生产输入算法，不能删除。C++ 核心达到同等 golden 覆盖后，才通过 C ABI 替换 macOS 的 Swift 算法实现。

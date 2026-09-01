@@ -1,11 +1,121 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="*" Name="WindWhisper" Manufacturer="WindWhisper" Version="1.0.0" UpgradeCode="9A4D32D6-6D4A-4C8D-9F2F-8A0B7D0E6D11">
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64"/>
-    <MajorUpgrade DowngradeErrorMessage="A newer WindWhisper is already installed." Schedule="afterInstallValidate" />
-    <MediaTemplate EmbedCab="yes"/>
-    <Feature Id="Main" Title="WindWhisper" Level="1"><ComponentGroupRef Id="Application"/></Feature>
-  </Product>
-  <Fragment><Directory Id="TARGETDIR" Name="SourceDir"><Directory Id="ProgramFiles64Folder"><Directory Id="INSTALLFOLDER" Name="WindWhisper"/></Directory></Directory></Fragment>
-  <Fragment><ComponentGroup Id="Application" Directory="INSTALLFOLDER"><Component Id="Engine"><File Source="build\\fy_engine.dll"/><File Source="build\\fy_tsf.dll" KeyPath="yes"/></Component></ComponentGroup></Fragment>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+      Name="WindWhisper Input Method"
+      Manufacturer="WindWhisper"
+    Version="1.0.20"
+      Language="2052"
+      UpgradeCode="9A4D32D6-6D4A-4C8D-9F2F-8A0B7D0E6D11"
+      Scope="perMachine">
+
+    <SummaryInformation Description="WindWhisper Chinese input method" />
+    <MajorUpgrade
+        DowngradeErrorMessage="A newer WindWhisper Input Method is already installed."
+        Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="WindWhisper Input Method" />
+    </StandardDirectory>
+
+    <Feature Id="Main" Title="WindWhisper Input Method" Level="1">
+    <ComponentRef Id="EngineComponent" />
+      <ComponentRef Id="DictionaryComponent" />
+      <ComponentRef Id="TsfComponent" />
+      <ComponentRef Id="RegistrationComponent" />
+    </Feature>
+
+    <Component Id="EngineComponent" Directory="INSTALLFOLDER" Bitness="always64"
+               Guid="FDAF0808-57C0-4920-BE6F-C35A4EABEF86">
+      <File Id="EngineDll" Source="$(var.SourceDir)\fy_engine.dll" />
+    </Component>
+    <Component Id="DictionaryComponent" Directory="INSTALLFOLDER" Bitness="always64"
+               Guid="D6D7F34C-8BE3-4BD0-9D63-5100F5F8D90E">
+      <File Id="DictionaryFile" Source="$(var.SourceDir)\fy.dict.yaml" />
+    </Component>
+    <Component Id="TsfComponent" Directory="INSTALLFOLDER" Bitness="always64"
+               Guid="8D6FFEE5-9C36-4D54-B19E-8C671712E34C">
+      <File Id="TsfDll" Source="$(var.SourceDir)\fy_tsf.dll" />
+    </Component>
+    <Component Id="RegistrationComponent" Directory="INSTALLFOLDER" Bitness="always64"
+               Guid="FB4E04CF-E7F5-429B-B6A9-1962D910EA5A">
+      <File Id="RegistrationExe" Source="$(var.SourceDir)\fy_tsf_registration.exe" />
+    </Component>
+
+    <CustomAction
+        Id="RollbackTsfRegistration"
+        FileRef="RegistrationExe"
+        ExeCommand="unregister"
+        Execute="rollback"
+        Impersonate="no"
+        Return="ignore" />
+    <CustomAction
+        Id="RegisterTsf"
+        FileRef="RegistrationExe"
+        ExeCommand="register &quot;[#TsfDll]&quot;"
+        Execute="deferred"
+        Impersonate="no"
+        Return="check" />
+    <CustomAction
+        Id="UnregisterTsf"
+        FileRef="RegistrationExe"
+        ExeCommand="unregister"
+        Execute="deferred"
+        Impersonate="no"
+        Return="check" />
+    <CustomAction
+        Id="RollbackTsfUnregistration"
+        FileRef="RegistrationExe"
+        ExeCommand="register &quot;[#TsfDll]&quot;"
+        Execute="rollback"
+        Impersonate="no"
+        Return="ignore" />
+    <CustomAction
+        Id="RollbackCurrentUserProfileEnable"
+        FileRef="RegistrationExe"
+        ExeCommand="disable"
+        Execute="rollback"
+        Impersonate="yes"
+        Return="ignore" />
+    <CustomAction
+        Id="EnableCurrentUserProfile"
+        FileRef="RegistrationExe"
+        ExeCommand="enable"
+        Execute="deferred"
+        Impersonate="yes"
+        Return="check" />
+    <CustomAction
+        Id="DisableCurrentUserProfile"
+        FileRef="RegistrationExe"
+        ExeCommand="disable"
+        Execute="deferred"
+        Impersonate="yes"
+        Return="ignore" />
+    <CustomAction
+        Id="RollbackCurrentUserProfileDisable"
+        FileRef="RegistrationExe"
+        ExeCommand="enable"
+        Execute="rollback"
+        Impersonate="yes"
+        Return="ignore" />
+
+    <InstallExecuteSequence>
+      <Custom Action="RollbackTsfRegistration" After="InstallFiles"
+              Condition="NOT Installed" />
+      <Custom Action="RegisterTsf" After="RollbackTsfRegistration"
+              Condition="NOT Installed" />
+      <Custom Action="RollbackCurrentUserProfileEnable" After="RegisterTsf"
+              Condition="NOT Installed" />
+      <Custom Action="EnableCurrentUserProfile" After="RollbackCurrentUserProfileEnable"
+              Condition="NOT Installed" />
+      <Custom Action="RollbackCurrentUserProfileDisable" Before="DisableCurrentUserProfile"
+              Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="DisableCurrentUserProfile" Before="RollbackTsfUnregistration"
+              Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="RollbackTsfUnregistration" Before="UnregisterTsf"
+              Condition="REMOVE~=&quot;ALL&quot;" />
+      <Custom Action="UnregisterTsf" Before="RemoveFiles"
+              Condition="REMOVE~=&quot;ALL&quot;" />
+    </InstallExecuteSequence>
+  </Package>
 </Wix>

@@ -8,3 +8,8 @@ add_executable(fy_engine_golden tests/golden.cpp)
 target_link_libraries(fy_engine_golden PRIVATE fy_engine)
 enable_testing()
 add_test(NAME golden COMMAND fy_engine_golden)
+add_executable(fy_engine_dictionary_smoke tests/dictionary_smoke.cpp)
+target_compile_definitions(fy_engine_dictionary_smoke PRIVATE
+  FY_DICTIONARY_PATH="${CMAKE_SOURCE_DIR}/Resources/fy.dict.yaml")
+target_link_libraries(fy_engine_dictionary_smoke PRIVATE fy_engine)
+add_test(NAME dictionary_smoke COMMAND fy_engine_dictionary_smoke)

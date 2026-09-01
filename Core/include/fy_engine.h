@@ -34,10 +34,15 @@ typedef struct fy_snapshot {
     int is_last_page; int is_composing; int ascii_mode;
 } fy_snapshot;
 
+// Snapshot strings and candidate arrays are owned by the session and remain
+// valid until the next call that mutates or snapshots that session. A commit is
+// delivered by exactly one successful snapshot.
+
 FY_API fy_engine *fy_engine_create(const char *dictionary_utf8, size_t length);
 FY_API void fy_engine_destroy(fy_engine *engine);
 FY_API fy_session *fy_session_create(fy_engine *engine);
 FY_API void fy_session_destroy(fy_session *session);
+FY_API void fy_session_reset(fy_session *session);
 FY_API int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers);
 FY_API int fy_session_select_candidate(fy_session *session, size_t index);
 FY_API int fy_session_page(fy_session *session, int delta);

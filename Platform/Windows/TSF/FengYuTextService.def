@@ -1,0 +1,4 @@
+LIBRARY fy_tsf
+EXPORTS
+  DllCanUnloadNow PRIVATE
+  DllGetClassObject PRIVATE
