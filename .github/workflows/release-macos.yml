@@ -1,0 +1,130 @@
+name: Release macOS
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub Release tag (for example v1.0.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-macos-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build-sign-notarize:
+    name: Build, notarize, and upload
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      TAG_NAME: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+      WINDWHISPER_CODE_SIGN_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+      WINDWHISPER_NOTARY_PROFILE: windwhisper-ci
+      WINDWHISPER_NOTARY_KEYCHAIN: ${{ runner.temp }}/windwhisper-signing.keychain-db
+      KEYCHAIN_PATH: ${{ runner.temp }}/windwhisper-signing.keychain-db
+      KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG_NAME }}
+          fetch-depth: 0
+
+      - name: Validate release tag and secrets
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          version="${TAG_NAME#v}"
+          if [[ ! "$TAG_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must use vMAJOR.MINOR.PATCH, got: $TAG_NAME" >&2
+            exit 64
+          fi
+          for name in CERTIFICATE_P12 CERTIFICATE_PASSWORD WINDWHISPER_CODE_SIGN_IDENTITY APPLE_ID APPLE_TEAM_ID APPLE_APP_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Required GitHub Actions secret is missing: $name" >&2
+              exit 1
+            fi
+          done
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "RELEASE_BUILD=${GITHUB_RUN_NUMBER}${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          certificate_path="$RUNNER_TEMP/windwhisper-certificate.p12"
+          printf '%s' "$CERTIFICATE_P12" | /usr/bin/base64 -D > "$certificate_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$certificate_path" \
+            -k "$KEYCHAIN_PATH" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+          rm -f "$certificate_path"
+
+      - name: Configure Apple notarization
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -euo pipefail
+          xcrun notarytool store-credentials "$WINDWHISPER_NOTARY_PROFILE" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" \
+            --keychain "$KEYCHAIN_PATH"
+
+      - name: Verify project metadata
+        run: Scripts/verify-project.sh
+
+      - name: Build and package notarized release
+        run: |
+          set -euo pipefail
+          Scripts/package-release.sh notarized "$RELEASE_VERSION" "$RELEASE_BUILD"
+
+      - name: Upload assets to GitHub Release
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets=(dist/windwhisper-"$RELEASE_VERSION"-"$RELEASE_BUILD"-macos-universal.zip*)
+          if (( ${#assets[@]} != 2 )); then
+            echo "Expected release ZIP and SHA-256 file, found ${#assets[@]} assets" >&2
+            exit 1
+          fi
+          gh release upload "$TAG_NAME" "${assets[@]}" \
+            --clobber --repo "$GITHUB_REPOSITORY"
+
+      - name: Preserve build artifacts on workflow failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windwhisper-macos-release-${{ github.run_number }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Remove temporary signing keychain
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
