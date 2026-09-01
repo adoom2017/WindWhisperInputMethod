@@ -95,6 +95,7 @@ ctest --test-dir build/windows -C Release --output-on-failure
 5. 处理 context 销毁、输入源切换、应用退出和 edit-session 拒绝，保证没有残留 marked text 或重复 commit。
 6. 支持 Space/Return/数字选词、Backspace/Escape、PageUp/PageDown、`-`/`=` 和小鹤音形 `~` 反查。
 7. 单独按下并释放 Shift 切换中/英文；已有组合先将编码原样上屏，Shift+字母以及 Ctrl/Alt/Win+Shift 不得误切换。
+8. 任务栏风语按钮左键直接切换中/英文，右键显示原生设置菜单；键盘 Shift 与按钮必须共享同一个模式状态。
 
 ## 共享核心差距
 

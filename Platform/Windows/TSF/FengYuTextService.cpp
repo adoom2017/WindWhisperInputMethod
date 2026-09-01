@@ -444,7 +444,10 @@ private:
 class FengYuLanguageBarButton final : public ITfLangBarItemButton,
                                       public ITfSource {
 public:
-    FengYuLanguageBarButton() { InterlockedIncrement(&g_object_count); }
+    explicit FengYuLanguageBarButton(FengYuTextService *service)
+        : service_(service) {
+        InterlockedIncrement(&g_object_count);
+    }
     ~FengYuLanguageBarButton() {
         if (sink_) sink_->Release();
         InterlockedDecrement(&g_object_count);
@@ -483,10 +486,13 @@ public:
         // TOOLTIP are OnUpdate masks and overlap the low style bits; placing
         // them here accidentally marks the item hidden and is rejected by
         // AddItem on Windows 11.
-        info->dwStyle = TF_LBI_STYLE_SHOWNINTRAY | TF_LBI_STYLE_BTN_MENU;
+        // Use a command button so OnClick receives both left and right clicks.
+        // A pure BTN_MENU item routes every click to InitMenu and therefore
+        // cannot use left click for the Chinese/English mode switch.
+        info->dwStyle = TF_LBI_STYLE_SHOWNINTRAY | TF_LBI_STYLE_BTN_BUTTON;
         info->ulSort = 0;
         StringCchCopyW(info->szDescription, TF_LBI_DESC_MAXLEN,
-                       L"风语输入法方案设置");
+                       L"风语输入法中英文切换与设置");
         DebugLog("language-bar-get-info");
         return S_OK;
     }
@@ -501,13 +507,59 @@ public:
     }
     HRESULT STDMETHODCALLTYPE GetTooltipString(BSTR *tooltip) override {
         if (!tooltip) return E_POINTER;
-        *tooltip = SysAllocString(L"风语输入法：选择小鹤音形、小鹤双拼或全拼");
+        *tooltip = SysAllocString(IsAsciiMode()
+                                      ? L"风语输入法：英文模式（左键切换，右键设置）"
+                                      : L"风语输入法：中文模式（左键切换，右键设置）");
         return *tooltip ? S_OK : E_OUTOFMEMORY;
     }
-    HRESULT STDMETHODCALLTYPE OnClick(TfLBIClick, POINT, const RECT *) override {
-        FengYuConfigureFunction function;
-        return function.Show(GetForegroundWindow(), LANGID_FengYuChineseSimplified,
-                             GUID_FengYuLanguageProfile);
+    HRESULT STDMETHODCALLTYPE OnClick(
+        TfLBIClick click, POINT point, const RECT *) override {
+        DebugLog(click == TF_LBI_CLK_LEFT ? "language-bar-left-click"
+                                          : "language-bar-right-click");
+        if (click == TF_LBI_CLK_LEFT) {
+            return service_ ? service_->ToggleInputModeFromLanguageBar() : E_FAIL;
+        }
+        if (click != TF_LBI_CLK_RIGHT) return S_FALSE;
+
+        HMENU menu = CreatePopupMenu();
+        HMENU schemes = CreatePopupMenu();
+        if (!menu || !schemes) {
+            if (schemes) DestroyMenu(schemes);
+            if (menu) DestroyMenu(menu);
+            return E_OUTOFMEMORY;
+        }
+        AppendMenuW(menu, MF_STRING | MF_DISABLED,
+                    0, IsAsciiMode() ? L"当前：英文模式" : L"当前：中文模式");
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        const std::string schema = ReadConfiguredSchema();
+        AppendMenuW(schemes, MF_STRING |
+                                 (schema == "flypyShape" ? MF_CHECKED : 0),
+                    100, L"小鹤音形（四码自动上屏）");
+        AppendMenuW(schemes, MF_STRING |
+                                 (schema == "flypyPhonetic" ? MF_CHECKED : 0),
+                    101, L"小鹤双拼");
+        AppendMenuW(schemes, MF_STRING |
+                                 (schema == "fullPinyin" ? MF_CHECKED : 0),
+                    102, L"全拼");
+        AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(schemes),
+                    L"输入方案");
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(menu, MF_STRING, 200, L"输入法设置...");
+        if (point.x == 0 && point.y == 0) GetCursorPos(&point);
+        const UINT command = TrackPopupMenu(
+            menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
+            point.x, point.y, 0, GetForegroundWindow(), nullptr);
+        HRESULT result = S_OK;
+        if (command >= 100 && command <= 102) {
+            result = OnMenuSelect(command);
+        } else if (command == 200) {
+            FengYuConfigureFunction function;
+            result = function.Show(GetForegroundWindow(),
+                                   LANGID_FengYuChineseSimplified,
+                                   GUID_FengYuLanguageProfile);
+        }
+        DestroyMenu(menu);
+        return result;
     }
     HRESULT STDMETHODCALLTYPE InitMenu(ITfMenu *menu) override {
         if (!menu) return E_POINTER;
@@ -557,9 +609,18 @@ public:
     }
     HRESULT STDMETHODCALLTYPE GetText(BSTR *text) override {
         if (!text) return E_POINTER;
-        *text = SysAllocString(L"设置");
+        *text = SysAllocString(IsAsciiMode() ? L"英" : L"中");
         return *text ? S_OK : E_OUTOFMEMORY;
     }
+
+    void NotifyModeChanged() {
+        if (sink_) {
+            sink_->OnUpdate(TF_LBI_TEXT | TF_LBI_TOOLTIP | TF_LBI_ICON |
+                            TF_LBI_STATUS);
+        }
+    }
+
+    void Detach() { service_ = nullptr; }
 
     HRESULT STDMETHODCALLTYPE AdviseSink(
         REFIID riid, IUnknown *unknown, DWORD *cookie) override {
@@ -590,9 +651,13 @@ public:
     }
 
 private:
+    bool IsAsciiMode() const {
+        return service_ && service_->ascii_mode_;
+    }
     static constexpr DWORD kSinkCookie = 1;
     LONG refs_ = 1;
     ITfLangBarItemSink *sink_ = nullptr;
+    FengYuTextService *service_ = nullptr;
 };
 
 namespace {
@@ -1173,26 +1238,48 @@ HRESULT FengYuTextService::OnKeyUp(
     if (!shift_tap_.KeyUp(key)) {
         return S_OK;
     }
-
-    const auto session = state_->GetOrCreate(context);
-    if (!session) {
-        return S_OK;
-    }
-    fy_snapshot snapshot{};
-    std::wstring literal;
-    if (fy_session_snapshot(session->session, &snapshot)) {
-        literal = Utf8ToWide(snapshot.composition, snapshot.composition_len);
-    }
-    fy_session_reset(session->session);
-    ascii_mode_ = !ascii_mode_;
-    if (!QueueEditSession(session, client_id_, L"", literal)) {
-        state_->Remove(context);
-        return S_OK;
-    }
-    *eaten = TRUE;
+    const HRESULT result = ToggleInputMode(context);
+    *eaten = SUCCEEDED(result) ? TRUE : FALSE;
     DebugLog(ascii_mode_ ? "shift-mode-english" : "shift-mode-chinese",
-             S_OK, key, *eaten);
+             result, key, *eaten);
+    return result;
+}
+
+HRESULT FengYuTextService::ToggleInputMode(ITfContext *context) {
+    if (client_id_ == TF_CLIENTID_NULL) return E_UNEXPECTED;
+    if (context) {
+        const auto session = state_->GetOrCreate(context);
+        if (!session) return E_OUTOFMEMORY;
+        fy_snapshot snapshot{};
+        std::wstring literal;
+        if (fy_session_snapshot(session->session, &snapshot)) {
+            literal = Utf8ToWide(snapshot.composition, snapshot.composition_len);
+        }
+        fy_session_reset(session->session);
+        if (!QueueEditSession(session, client_id_, L"", literal)) {
+            state_->Remove(context);
+            return E_FAIL;
+        }
+    }
+    ascii_mode_ = !ascii_mode_;
+    if (language_bar_button_) language_bar_button_->NotifyModeChanged();
+    DebugLog(ascii_mode_ ? "input-mode-english" : "input-mode-chinese");
     return S_OK;
+}
+
+HRESULT FengYuTextService::ToggleInputModeFromLanguageBar() {
+    ITfDocumentMgr *document_manager = nullptr;
+    ITfContext *context = nullptr;
+    if (thread_manager_ &&
+        SUCCEEDED(thread_manager_->GetFocus(&document_manager)) &&
+        document_manager) {
+        document_manager->GetTop(&context);
+        document_manager->Release();
+    }
+    const HRESULT result = ToggleInputMode(context);
+    if (context) context->Release();
+    DebugLog("language-bar-toggle-mode", result, ascii_mode_ ? 1 : 0);
+    return result;
 }
 
 HRESULT FengYuTextService::OnPreservedKey(ITfContext *, REFGUID, BOOL *eaten) {
@@ -1327,10 +1414,11 @@ void FengYuTextService::RegisterLanguageBarItem() {
         language_bar_item_manager_ = nullptr;
         return;
     }
-    auto *button = new FengYuLanguageBarButton();
+    auto *button = new FengYuLanguageBarButton(this);
     result = language_bar_item_manager_->AddItem(button);
     if (SUCCEEDED(result)) {
         language_bar_item_ = button;
+        language_bar_button_ = button;
         DebugLog("language-bar-item-added");
     } else {
         DebugLog("language-bar-item-add", result);
@@ -1341,6 +1429,10 @@ void FengYuTextService::RegisterLanguageBarItem() {
 }
 
 void FengYuTextService::UnregisterLanguageBarItem() {
+    if (language_bar_button_) {
+        language_bar_button_->Detach();
+        language_bar_button_ = nullptr;
+    }
     if (language_bar_item_manager_ && language_bar_item_) {
         const HRESULT result = language_bar_item_manager_->RemoveItem(
             language_bar_item_);

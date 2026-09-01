@@ -9,6 +9,7 @@
 #include "WindowsKeyMapper.h"
 
 class FengYuTextServiceState;
+class FengYuLanguageBarButton;
 
 class FengYuTextService final : public ITfTextInputProcessorEx,
                                 public ITfKeyEventSink,
@@ -38,7 +39,10 @@ public:
     HRESULT STDMETHODCALLTYPE GetDescription(BSTR*) override;
     HRESULT STDMETHODCALLTYPE GetFunction(REFGUID, REFIID, IUnknown**) override;
 private:
+    friend class FengYuLanguageBarButton;
     bool MapKey(ITfContext*, WPARAM, uint32_t*, uint32_t*) const;
+    HRESULT ToggleInputMode(ITfContext*);
+    HRESULT ToggleInputModeFromLanguageBar();
     void RemoveContext(ITfContext*);
     void RemoveDocumentManager(ITfDocumentMgr*);
     void ConfigureInputMode(ITfContext*);
@@ -50,6 +54,7 @@ private:
     ITfKeystrokeMgr *keystroke_manager_ = nullptr;
     ITfLangBarItemMgr *language_bar_item_manager_ = nullptr;
     ITfLangBarItemButton *language_bar_item_ = nullptr;
+    FengYuLanguageBarButton *language_bar_button_ = nullptr;
     ITfSource *thread_source_ = nullptr;
     TfClientId client_id_ = TF_CLIENTID_NULL;
     DWORD thread_event_sink_cookie_ = TF_INVALID_COOKIE;
