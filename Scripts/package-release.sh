@@ -8,6 +8,7 @@ version="${2:-}"
 build_number="${3:-$(date +%Y%m%d%H%M)}"
 identity="${WINDWHISPER_CODE_SIGN_IDENTITY:-}"
 notary_profile="${WINDWHISPER_NOTARY_PROFILE:-}"
+notary_keychain="${WINDWHISPER_NOTARY_KEYCHAIN:-}"
 dist_directory="$project_root/dist"
 
 usage() {
@@ -78,8 +79,11 @@ fi
 
 if [[ "$mode" == "notarized" ]]; then
     /usr/bin/ditto -c -k --keepParent "$release_app" "$submission_archive"
-    /usr/bin/xcrun notarytool submit "$submission_archive" \
-        --keychain-profile "$notary_profile" --wait
+    notary_arguments=(--keychain-profile "$notary_profile")
+    if [[ -n "$notary_keychain" ]]; then
+        notary_arguments+=(--keychain "$notary_keychain")
+    fi
+    /usr/bin/xcrun notarytool submit "$submission_archive" "${notary_arguments[@]}" --wait
     /usr/bin/xcrun stapler staple "$release_app"
     /usr/bin/xcrun stapler validate "$release_app"
     /bin/rm -f "$submission_archive"

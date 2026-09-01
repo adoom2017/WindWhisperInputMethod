@@ -53,3 +53,10 @@ Windows 端目前是开发骨架，尚不能安装使用。迁移环境、未完
 ```text
 build/DerivedData/Build/Products/<Configuration>/windwhisper.app
 ```
+
+## 自动发布
+
+发布 `vMAJOR.MINOR.PATCH` 格式的 GitHub Release 后，GitHub Actions 会自动构建、
+Developer ID 签名、公证并上传 macOS universal ZIP 与 SHA-256 文件。首次启用前需
+配置签名与 Apple 公证 Secrets，详见
+[`docs/GITHUB_RELEASE.md`](docs/GITHUB_RELEASE.md)。
