@@ -71,8 +71,10 @@ bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
     if (!composing) {
         return false;
     }
-    if (virtual_key >= '1' && virtual_key <= '9') {
-        mapped->key = static_cast<uint32_t>(virtual_key);
+    if (virtual_key >= '0' && virtual_key <= '9') {
+        static constexpr char shifted[] = ")!@#$%^&*(";
+        mapped->key = shift ? shifted[virtual_key - '0']
+                            : static_cast<uint32_t>(virtual_key);
         return true;
     }
 
@@ -108,29 +110,38 @@ bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
         mapped->key = 0xFF54;
         return true;
     case VK_OEM_MINUS:
-        if (!shift) {
-            mapped->key = '-';
-            return true;
-        }
-        return false;
+        mapped->key = shift ? '_' : '-';
+        return true;
     case VK_OEM_PLUS:
-        if (!shift) {
-            mapped->key = '=';
-            return true;
-        }
-        return false;
+        mapped->key = shift ? '+' : '=';
+        return true;
+    case VK_OEM_1:
+        mapped->key = shift ? ':' : ';';
+        return true;
+    case VK_OEM_COMMA:
+        mapped->key = shift ? '<' : ',';
+        return true;
+    case VK_OEM_PERIOD:
+        mapped->key = shift ? '>' : '.';
+        return true;
+    case VK_OEM_2:
+        mapped->key = shift ? '?' : '/';
+        return true;
     case VK_OEM_3:
-        if (shift) {
-            mapped->key = '~';
-            return true;
-        }
-        return false;
+        mapped->key = shift ? '~' : '`';
+        return true;
+    case VK_OEM_4:
+        mapped->key = shift ? '{' : '[';
+        return true;
+    case VK_OEM_5:
+        mapped->key = shift ? '|' : '\\';
+        return true;
+    case VK_OEM_6:
+        mapped->key = shift ? '}' : ']';
+        return true;
     case VK_OEM_7:
-        if (!shift) {
-            mapped->key = '\'';
-            return true;
-        }
-        return false;
+        mapped->key = shift ? '"' : '\'';
+        return true;
     default:
         return false;
     }

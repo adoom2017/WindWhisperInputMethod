@@ -48,6 +48,13 @@ int main() {
     CHECK(key.key == '3');
     CHECK(FyMapVirtualKey(VK_OEM_3, true, false, false, false, true, &key));
     CHECK(key.key == '~');
-    CHECK(!FyMapVirtualKey(VK_OEM_3, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_3, false, false, false, false, true, &key));
+    CHECK(key.key == '`');
+    CHECK(FyMapVirtualKey('1', true, false, false, false, true, &key));
+    CHECK(key.key == '!');
+    CHECK(FyMapVirtualKey(VK_OEM_COMMA, false, false, false, false, true, &key));
+    CHECK(key.key == ',');
+    CHECK(FyMapVirtualKey(VK_OEM_2, true, false, false, false, true, &key));
+    CHECK(key.key == '?');
     return 0;
 }

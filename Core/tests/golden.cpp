@@ -75,9 +75,27 @@ int main() {
     fy_session_reset(session);
     CHECK(type(session, "haishiyiyang"));
     CHECK(fy_session_set_option(session, "traditional", 11, 1));
+    CHECK(fy_session_snapshot(session, &snapshot));
+    CHECK(snapshot.candidate_count > 0);
+    CHECK(equals(snapshot.candidates[0].text,
+                 snapshot.candidates[0].text_len, "還是一樣"));
     CHECK(fy_session_select_candidate(session, 0));
     CHECK(fy_session_snapshot(session, &snapshot));
     CHECK(equals(snapshot.commit, snapshot.commit_len, "還是一樣"));
+
+    fy_session_reset(session);
+    CHECK(fy_session_set_option(session, "traditional", 11, 0));
+    CHECK(fy_session_set_option(session, "full_shape", 10, 1));
+    CHECK(fy_session_process_key(session, ',', 0));
+    CHECK(fy_session_snapshot(session, &snapshot));
+    CHECK(equals(snapshot.commit, snapshot.commit_len, "，"));
+    CHECK(fy_session_process_key(session, '1', 0));
+    CHECK(fy_session_snapshot(session, &snapshot));
+    CHECK(equals(snapshot.commit, snapshot.commit_len, "１"));
+    CHECK(type(session, "nihao"));
+    CHECK(fy_session_process_key(session, '!', 0));
+    CHECK(fy_session_snapshot(session, &snapshot));
+    CHECK(equals(snapshot.commit, snapshot.commit_len, "你好！"));
 
     fy_session_destroy(other);
     fy_session_destroy(session);

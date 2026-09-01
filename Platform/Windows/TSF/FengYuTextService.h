@@ -43,6 +43,8 @@ private:
     bool MapKey(ITfContext*, WPARAM, uint32_t*, uint32_t*) const;
     HRESULT ToggleInputMode(ITfContext*);
     HRESULT ToggleInputModeFromLanguageBar();
+    HRESULT SetFullWidthFromLanguageBar(bool);
+    HRESULT SetTraditionalFromLanguageBar(bool);
     void RemoveContext(ITfContext*);
     void RemoveDocumentManager(ITfDocumentMgr*);
     void ConfigureInputMode(ITfContext*);
@@ -60,6 +62,8 @@ private:
     DWORD thread_event_sink_cookie_ = TF_INVALID_COOKIE;
     bool key_sink_advised_ = false;
     bool ascii_mode_ = false;
+    bool full_width_ = true;
+    bool traditional_ = false;
     FyShiftTapState shift_tap_;
     std::unique_ptr<FengYuTextServiceState> state_;
 };

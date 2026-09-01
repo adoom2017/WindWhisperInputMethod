@@ -23,6 +23,37 @@ volatile LONG g_server_lock_count = 0;
 
 constexpr wchar_t kSettingsPath[] = L"Software\\WindWhisper\\InputMethod";
 constexpr wchar_t kSchemaValue[] = L"Schema";
+constexpr wchar_t kFullWidthValue[] = L"FullWidth";
+constexpr wchar_t kTraditionalValue[] = L"Traditional";
+
+bool ReadConfiguredBool(const wchar_t *name, bool fallback) {
+    HKEY key = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, kSettingsPath, 0, KEY_READ, &key) !=
+        ERROR_SUCCESS) {
+        return fallback;
+    }
+    DWORD value = fallback ? 1 : 0;
+    DWORD type = 0;
+    DWORD bytes = sizeof(value);
+    const LONG result = RegQueryValueExW(
+        key, name, nullptr, &type, reinterpret_cast<BYTE *>(&value), &bytes);
+    RegCloseKey(key);
+    return result == ERROR_SUCCESS && type == REG_DWORD ? value != 0 : fallback;
+}
+
+bool WriteConfiguredBool(const wchar_t *name, bool value) {
+    HKEY key = nullptr;
+    if (RegCreateKeyExW(HKEY_CURRENT_USER, kSettingsPath, 0, nullptr, 0,
+                        KEY_WRITE, nullptr, &key, nullptr) != ERROR_SUCCESS) {
+        return false;
+    }
+    const DWORD stored = value ? 1 : 0;
+    const LONG result = RegSetValueExW(
+        key, name, 0, REG_DWORD, reinterpret_cast<const BYTE *>(&stored),
+        sizeof(stored));
+    RegCloseKey(key);
+    return result == ERROR_SUCCESS;
+}
 
 std::string ReadConfiguredSchema() {
     HKEY key = nullptr;
@@ -239,6 +270,16 @@ public:
     }
     void ReloadSchema() { schema_ = ReadConfiguredSchema(); }
     const char *schema() const { return schema_.c_str(); }
+    void SetPreferences(bool full_width, bool traditional) {
+        full_width_ = full_width;
+        traditional_ = traditional;
+        for (const auto &entry : sessions_) {
+            fy_session_set_option(entry.second->session, "full_shape", 10,
+                                  full_width_ ? 1 : 0);
+            fy_session_set_option(entry.second->session, "traditional", 11,
+                                  traditional_ ? 1 : 0);
+        }
+    }
 
     ~FengYuTextServiceState() {
         candidate_window_.Hide();
@@ -260,6 +301,10 @@ public:
         if (!created->session) {
             return nullptr;
         }
+        fy_session_set_option(created->session, "full_shape", 10,
+                              full_width_ ? 1 : 0);
+        fy_session_set_option(created->session, "traditional", 11,
+                              traditional_ ? 1 : 0);
         sessions_.emplace(context, created);
         return created;
     }
@@ -289,6 +334,8 @@ private:
     std::unordered_map<ITfContext *, std::shared_ptr<FengYuContextSession>> sessions_;
     CandidateWindow candidate_window_;
     std::string schema_ = "flypyShape";
+    bool full_width_ = true;
+    bool traditional_ = false;
 };
 
 class FengYuConfigureFunction final : public ITfFnConfigure {
@@ -523,7 +570,11 @@ public:
 
         HMENU menu = CreatePopupMenu();
         HMENU schemes = CreatePopupMenu();
-        if (!menu || !schemes) {
+        HMENU widths = CreatePopupMenu();
+        HMENU scripts = CreatePopupMenu();
+        if (!menu || !schemes || !widths || !scripts) {
+            if (scripts) DestroyMenu(scripts);
+            if (widths) DestroyMenu(widths);
             if (schemes) DestroyMenu(schemes);
             if (menu) DestroyMenu(menu);
             return E_OUTOFMEMORY;
@@ -543,8 +594,20 @@ public:
                     102, L"全拼");
         AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(schemes),
                     L"输入方案");
-        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuW(menu, MF_STRING, 200, L"输入法设置...");
+        const bool full_width = service_ && service_->full_width_;
+        AppendMenuW(widths, MF_STRING | (full_width ? MF_CHECKED : 0),
+                    110, L"全角");
+        AppendMenuW(widths, MF_STRING | (!full_width ? MF_CHECKED : 0),
+                    111, L"半角");
+        AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(widths),
+                    L"字符宽度");
+        const bool traditional = service_ && service_->traditional_;
+        AppendMenuW(scripts, MF_STRING | (!traditional ? MF_CHECKED : 0),
+                    120, L"简体中文");
+        AppendMenuW(scripts, MF_STRING | (traditional ? MF_CHECKED : 0),
+                    121, L"繁体中文");
+        AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scripts),
+                    L"繁简切换");
         if (point.x == 0 && point.y == 0) GetCursorPos(&point);
         const UINT command = TrackPopupMenu(
             menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
@@ -552,11 +615,14 @@ public:
         HRESULT result = S_OK;
         if (command >= 100 && command <= 102) {
             result = OnMenuSelect(command);
-        } else if (command == 200) {
-            FengYuConfigureFunction function;
-            result = function.Show(GetForegroundWindow(),
-                                   LANGID_FengYuChineseSimplified,
-                                   GUID_FengYuLanguageProfile);
+        } else if (command == 110 || command == 111) {
+            result = service_
+                         ? service_->SetFullWidthFromLanguageBar(command == 110)
+                         : E_FAIL;
+        } else if (command == 120 || command == 121) {
+            result = service_
+                         ? service_->SetTraditionalFromLanguageBar(command == 121)
+                         : E_FAIL;
         }
         DestroyMenu(menu);
         return result;
@@ -578,6 +644,14 @@ public:
         return add(102, L"全拼", "fullPinyin");
     }
     HRESULT STDMETHODCALLTYPE OnMenuSelect(UINT id) override {
+        if (id == 110 || id == 111) {
+            return service_ ? service_->SetFullWidthFromLanguageBar(id == 110)
+                            : E_FAIL;
+        }
+        if (id == 120 || id == 121) {
+            return service_ ? service_->SetTraditionalFromLanguageBar(id == 121)
+                            : E_FAIL;
+        }
         const char *schema = id == 100 ? "flypyShape"
                              : id == 101 ? "flypyPhonetic"
                                          : id == 102 ? "fullPinyin" : nullptr;
@@ -1075,6 +1149,9 @@ HRESULT FengYuTextService::ActivateEx(
     }
     if (SUCCEEDED(result)) {
         state_->ReloadSchema();
+        full_width_ = ReadConfiguredBool(kFullWidthValue, true);
+        traditional_ = ReadConfiguredBool(kTraditionalValue, false);
+        state_->SetPreferences(full_width_, traditional_);
         DebugLog("schema-loaded");
     }
     if (FAILED(result)) {
@@ -1144,7 +1221,7 @@ bool FengYuTextService::MapKey(
     if (!FyMapVirtualKey(
             virtual_key, KeyStateDown(VK_SHIFT),
             (GetKeyState(VK_CAPITAL) & 1) != 0, KeyStateDown(VK_CONTROL),
-            KeyStateDown(VK_MENU), composing, &mapped)) {
+            KeyStateDown(VK_MENU), composing || full_width_, &mapped)) {
         return false;
     }
     *key = mapped.key;
@@ -1262,6 +1339,11 @@ HRESULT FengYuTextService::ToggleInputMode(ITfContext *context) {
         }
     }
     ascii_mode_ = !ascii_mode_;
+    // Chinese mode defaults to full-width characters; English mode must pass
+    // normal half-width ASCII through to the host application.
+    full_width_ = !ascii_mode_;
+    state_->SetPreferences(full_width_, traditional_);
+    WriteConfiguredBool(kFullWidthValue, full_width_);
     if (language_bar_button_) language_bar_button_->NotifyModeChanged();
     DebugLog(ascii_mode_ ? "input-mode-english" : "input-mode-chinese");
     return S_OK;
@@ -1280,6 +1362,26 @@ HRESULT FengYuTextService::ToggleInputModeFromLanguageBar() {
     if (context) context->Release();
     DebugLog("language-bar-toggle-mode", result, ascii_mode_ ? 1 : 0);
     return result;
+}
+
+HRESULT FengYuTextService::SetFullWidthFromLanguageBar(bool enabled) {
+    full_width_ = enabled;
+    state_->SetPreferences(full_width_, traditional_);
+    const bool saved = WriteConfiguredBool(kFullWidthValue, enabled);
+    if (language_bar_button_) language_bar_button_->NotifyModeChanged();
+    DebugLog(enabled ? "character-width-full" : "character-width-half",
+             saved ? S_OK : E_FAIL);
+    return saved ? S_OK : E_FAIL;
+}
+
+HRESULT FengYuTextService::SetTraditionalFromLanguageBar(bool enabled) {
+    traditional_ = enabled;
+    state_->SetPreferences(full_width_, traditional_);
+    const bool saved = WriteConfiguredBool(kTraditionalValue, enabled);
+    if (language_bar_button_) language_bar_button_->NotifyModeChanged();
+    DebugLog(enabled ? "script-traditional" : "script-simplified",
+             saved ? S_OK : E_FAIL);
+    return saved ? S_OK : E_FAIL;
 }
 
 HRESULT FengYuTextService::OnPreservedKey(ITfContext *, REFGUID, BOOL *eaten) {

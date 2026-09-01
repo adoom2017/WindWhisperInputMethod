@@ -58,6 +58,7 @@ struct fy_session {
     std::string exported_commit;
     std::string schema = "fullPinyin";
     bool traditional = false;
+    bool full_shape = false;
     size_t page = 0;
     size_t highlighted = 0;
     std::vector<Entry> matches;
@@ -66,6 +67,33 @@ struct fy_session {
 };
 
 namespace {
+std::string width_character(uint32_t key, bool full_shape) {
+    if (key < 0x20 || key > 0x7E) return {};
+    if (!full_shape) return std::string(1, static_cast<char>(key));
+    switch (key) {
+    case ',': return "，";
+    case '.': return "。";
+    case '/': return "、";
+    case '?': return "？";
+    case ';': return "；";
+    case ':': return "：";
+    case '!': return "！";
+    case '(': return "（";
+    case ')': return "）";
+    case '[': return "【";
+    case ']': return "】";
+    case ' ': return "　";
+    default:
+        break;
+    }
+    const uint32_t scalar = key + 0xFEE0;
+    std::string result;
+    result.push_back(static_cast<char>(0xE0 | (scalar >> 12)));
+    result.push_back(static_cast<char>(0x80 | ((scalar >> 6) & 0x3F)));
+    result.push_back(static_cast<char>(0x80 | (scalar & 0x3F)));
+    return result;
+}
+
 size_t kind_index(Entry::Kind kind) {
     return kind == Entry::Kind::Shape ? 0 : kind == Entry::Kind::Pinyin ? 1 : 2;
 }
@@ -423,6 +451,10 @@ void refresh(fy_session *session) {
                                                 ? lhs.weight > rhs.weight
                                                 : lhs.order < rhs.order;
         });
+    for (Entry &entry : session->matches) {
+        entry.text = session->traditional ? traditionalize_text(entry.text)
+                                          : simplify_text(entry.text);
+    }
     if (session->page * kPageSize >= session->matches.size()) {
         session->page = 0;
     }
@@ -602,6 +634,10 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
         return fy_session_select_candidate(session, key - '1');
     }
     if (key == 0x20 || is_key(key, 0x0D, kKeyReturn)) {
+        if (key == 0x20 && session->code.empty() && session->full_shape) {
+            session->commit = width_character(key, true);
+            return 1;
+        }
         return session->matches.empty()
                    ? 0
                    : fy_session_select_candidate(
@@ -612,6 +648,24 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
             if (session->code.empty() || session->matches.empty()) {
                 return 0;
             }
+        }
+        const bool letter = (key >= 'a' && key <= 'z') ||
+                            (key >= 'A' && key <= 'Z');
+        const bool pinyin_separator = key == '\'' &&
+                                      session->schema == "fullPinyin";
+        if (!letter && !pinyin_separator && key != '~') {
+            if (!session->code.empty()) {
+                if (session->matches.empty() ||
+                    !fy_session_select_candidate(
+                        session, session->highlighted % kPageSize)) {
+                    return 0;
+                }
+                session->commit += width_character(key, session->full_shape);
+                return 1;
+            }
+            if (!session->full_shape) return 0;
+            session->commit = width_character(key, true);
+            return 1;
         }
         session->code.push_back(static_cast<char>(key));
         refresh(session);
@@ -675,10 +729,17 @@ int fy_session_set_option(
         return 0;
     }
     const std::string option(name, name_length);
-    if (option != "traditional") {
+    if (option == "traditional") {
+        session->traditional = value != 0;
+        for (Entry &entry : session->matches) {
+            entry.text = session->traditional ? traditionalize_text(entry.text)
+                                              : simplify_text(entry.text);
+        }
+    } else if (option == "full_shape") {
+        session->full_shape = value != 0;
+    } else {
         return 0;
     }
-    session->traditional = value != 0;
     return 1;
 }
 
