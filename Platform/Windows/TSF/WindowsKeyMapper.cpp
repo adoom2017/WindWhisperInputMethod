@@ -10,6 +10,42 @@ constexpr uint32_t kModifierControl = 1u << 2;
 constexpr uint32_t kModifierAlt = 1u << 3;
 }
 
+bool FyShiftTapState::IsShiftKey(WPARAM virtual_key) {
+    return virtual_key == VK_SHIFT || virtual_key == VK_LSHIFT ||
+           virtual_key == VK_RSHIFT;
+}
+
+bool FyShiftTapState::TestKeyDown(WPARAM virtual_key) {
+    if (!IsShiftKey(virtual_key)) {
+        pending_ = false;
+    }
+    return IsShiftKey(virtual_key);
+}
+
+void FyShiftTapState::KeyDown(
+    WPARAM virtual_key, bool repeat, bool other_modifier_down) {
+    if (IsShiftKey(virtual_key) && !repeat) {
+        pending_ = !other_modifier_down;
+    }
+}
+
+bool FyShiftTapState::TestKeyUp(WPARAM virtual_key) const {
+    return IsShiftKey(virtual_key) && pending_;
+}
+
+bool FyShiftTapState::KeyUp(WPARAM virtual_key) {
+    if (!IsShiftKey(virtual_key)) {
+        return false;
+    }
+    const bool toggle = pending_;
+    pending_ = false;
+    return toggle;
+}
+
+void FyShiftTapState::Reset() {
+    pending_ = false;
+}
+
 bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
                      bool control, bool alt, bool composing,
                      FyMappedKey *mapped) {

@@ -1048,6 +1048,8 @@ HRESULT FengYuTextService::Deactivate() {
         thread_manager_ = nullptr;
     }
     client_id_ = TF_CLIENTID_NULL;
+    ascii_mode_ = false;
+    shift_tap_.Reset();
     DebugLog("deactivate-result");
     return S_OK;
 }
@@ -1055,7 +1057,8 @@ HRESULT FengYuTextService::Deactivate() {
 bool FengYuTextService::MapKey(
     ITfContext *context, WPARAM virtual_key, uint32_t *key,
     uint32_t *modifiers) const {
-    if (!context || !key || !modifiers || client_id_ == TF_CLIENTID_NULL) {
+    if (!context || !key || !modifiers || client_id_ == TF_CLIENTID_NULL ||
+        ascii_mode_) {
         return false;
     }
     ITfContextComposition *composition_manager = nullptr;
@@ -1089,6 +1092,11 @@ HRESULT FengYuTextService::OnTestKeyDown(
     if (!eaten) {
         return E_POINTER;
     }
+    if (shift_tap_.TestKeyDown(virtual_key)) {
+        *eaten = TRUE;
+        DebugLog("test-shift-down", S_OK, virtual_key, *eaten);
+        return S_OK;
+    }
     uint32_t key = 0;
     uint32_t modifiers = 0;
     *eaten = MapKey(context, virtual_key, &key, &modifiers) ? TRUE : FALSE;
@@ -1096,20 +1104,33 @@ HRESULT FengYuTextService::OnTestKeyDown(
     return S_OK;
 }
 
-HRESULT FengYuTextService::OnTestKeyUp(ITfContext *, WPARAM, LPARAM, BOOL *eaten) {
+HRESULT FengYuTextService::OnTestKeyUp(
+    ITfContext *, WPARAM virtual_key, LPARAM, BOOL *eaten) {
     if (!eaten) {
         return E_POINTER;
     }
-    *eaten = FALSE;
+    *eaten = shift_tap_.TestKeyUp(virtual_key) ? TRUE : FALSE;
+    DebugLog("test-key-up", S_OK, virtual_key, *eaten);
     return S_OK;
 }
 
 HRESULT FengYuTextService::OnKeyDown(
-    ITfContext *context, WPARAM virtual_key, LPARAM, BOOL *eaten) {
+    ITfContext *context, WPARAM virtual_key, LPARAM flags, BOOL *eaten) {
     if (!eaten) {
         return E_POINTER;
     }
     *eaten = FALSE;
+    if (FyShiftTapState::IsShiftKey(virtual_key)) {
+        const bool repeat =
+            (static_cast<ULONG_PTR>(flags) & (1ull << 30)) != 0;
+        shift_tap_.KeyDown(
+            virtual_key, repeat,
+            KeyStateDown(VK_CONTROL) || KeyStateDown(VK_MENU) ||
+                KeyStateDown(VK_LWIN) || KeyStateDown(VK_RWIN));
+        *eaten = TRUE;
+        DebugLog("shift-down", S_OK, virtual_key, *eaten);
+        return S_OK;
+    }
     uint32_t key = 0;
     uint32_t modifiers = 0;
     if (!MapKey(context, virtual_key, &key, &modifiers)) {
@@ -1144,8 +1165,34 @@ HRESULT FengYuTextService::OnKeyDown(
 }
 
 HRESULT FengYuTextService::OnKeyUp(
-    ITfContext *context, WPARAM key, LPARAM flags, BOOL *eaten) {
-    return OnTestKeyUp(context, key, flags, eaten);
+    ITfContext *context, WPARAM key, LPARAM, BOOL *eaten) {
+    if (!eaten) {
+        return E_POINTER;
+    }
+    *eaten = FALSE;
+    if (!shift_tap_.KeyUp(key)) {
+        return S_OK;
+    }
+
+    const auto session = state_->GetOrCreate(context);
+    if (!session) {
+        return S_OK;
+    }
+    fy_snapshot snapshot{};
+    std::wstring literal;
+    if (fy_session_snapshot(session->session, &snapshot)) {
+        literal = Utf8ToWide(snapshot.composition, snapshot.composition_len);
+    }
+    fy_session_reset(session->session);
+    ascii_mode_ = !ascii_mode_;
+    if (!QueueEditSession(session, client_id_, L"", literal)) {
+        state_->Remove(context);
+        return S_OK;
+    }
+    *eaten = TRUE;
+    DebugLog(ascii_mode_ ? "shift-mode-english" : "shift-mode-chinese",
+             S_OK, key, *eaten);
+    return S_OK;
 }
 
 HRESULT FengYuTextService::OnPreservedKey(ITfContext *, REFGUID, BOOL *eaten) {

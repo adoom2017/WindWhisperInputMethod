@@ -8,6 +8,28 @@
     } while (false)
 
 int main() {
+    FyShiftTapState shift;
+    CHECK(shift.TestKeyDown(VK_SHIFT));
+    shift.KeyDown(VK_SHIFT, false, false);
+    CHECK(shift.TestKeyUp(VK_SHIFT));
+    CHECK(shift.KeyUp(VK_SHIFT));
+
+    CHECK(shift.TestKeyDown(VK_LSHIFT));
+    shift.KeyDown(VK_LSHIFT, false, false);
+    CHECK(!shift.TestKeyDown('A'));
+    CHECK(!shift.TestKeyUp(VK_LSHIFT));
+    CHECK(!shift.KeyUp(VK_LSHIFT));
+
+    CHECK(shift.TestKeyDown(VK_RSHIFT));
+    shift.KeyDown(VK_RSHIFT, false, true);
+    CHECK(!shift.TestKeyUp(VK_RSHIFT));
+    CHECK(!shift.KeyUp(VK_RSHIFT));
+
+    CHECK(shift.TestKeyDown(VK_SHIFT));
+    shift.KeyDown(VK_SHIFT, false, false);
+    shift.Reset();
+    CHECK(!shift.TestKeyUp(VK_SHIFT));
+
     FyMappedKey key{};
     CHECK(FyMapVirtualKey('N', false, false, false, false, false, &key));
     CHECK(key.key == 'n');

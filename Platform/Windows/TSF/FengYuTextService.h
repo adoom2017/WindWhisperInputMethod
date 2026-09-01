@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "FengYuGuids.h"
+#include "WindowsKeyMapper.h"
 
 class FengYuTextServiceState;
 
@@ -53,6 +54,8 @@ private:
     TfClientId client_id_ = TF_CLIENTID_NULL;
     DWORD thread_event_sink_cookie_ = TF_INVALID_COOKIE;
     bool key_sink_advised_ = false;
+    bool ascii_mode_ = false;
+    FyShiftTapState shift_tap_;
     std::unique_ptr<FengYuTextServiceState> state_;
 };
 #endif
