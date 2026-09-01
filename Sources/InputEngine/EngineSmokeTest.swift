@@ -13,6 +13,7 @@ enum EngineSmokeTest {
             print("flypyShape=passed")
             print("flypyFourKeyAutoCommit=passed")
             print("flypyFourKeyMultipleCandidates=passed")
+            print("flypyFourKeyContinuationCommit=passed")
             print("candidatePageAliases=passed")
             print("flypyCodeReverseLookup=passed")
             print("customWords=passed")
@@ -66,6 +67,7 @@ enum EngineSmokeTest {
             code: "ufme",
             expected: ["什么", "𬳽"]
         )
+        try verifyFlypyContinuationCommit(service: service)
         for (code, expected) in [("w", ["我", "位"]), ("d", ["的", "打"]), ("u", ["是", "时"])] {
             try verifyOrderedCandidates(service: service, schema: .flypy, code: code, expected: expected)
         }
@@ -129,6 +131,26 @@ enum EngineSmokeTest {
             try session.readSnapshot().menu.pageNumber == 0
         else {
             throw InputEngineError.smokeAssertion("-/= did not page through candidates")
+        }
+    }
+
+    private static func verifyFlypyContinuationCommit(service: InputService) throws {
+        let session = try service.makeSession()
+        guard session.selectSchema(identifier: FengYuSchema.flypy.rawValue),
+            session.simulate(sequence: "biru")
+        else {
+            throw InputEngineError.smokeAssertion("could not prepare ambiguous four-key continuation")
+        }
+        let before = try session.readSnapshot()
+        guard before.menu.candidates.count > 1,
+            before.menu.candidates.first?.text == "比如",
+            session.process(keyCode: Int32(Character("n").asciiValue!))
+        else {
+            throw InputEngineError.smokeAssertion("biru did not expose the expected ambiguous candidates")
+        }
+        let after = try session.readSnapshot()
+        guard after.commitText == "比如", after.composition?.text == "n" else {
+            throw InputEngineError.smokeAssertion("continuation did not commit the first four-key candidate")
         }
     }
 

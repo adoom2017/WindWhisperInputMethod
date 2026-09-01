@@ -763,6 +763,14 @@ final class InputSession: @unchecked Sendable {
             }
             if character.isASCII, character.isLetter {
                 guard modifierMask & KeyMapper.ModifierMask.shift == 0 else { return false }
+                // A complete Flypy code with ambiguous candidates is committed
+                // when the user starts the next syllable, matching the normal
+                // continuous-input behavior without requiring Space.
+                if schema == .flypy, reverseLookupMarkerOffset == nil,
+                    buffer.count >= 4, candidates.count > 1
+                {
+                    commitSelectedCandidate()
+                }
                 buffer.append(Character(String(character).lowercased()))
                 updateCandidates()
                 if schema == .flypy, reverseLookupMarkerOffset == nil,
