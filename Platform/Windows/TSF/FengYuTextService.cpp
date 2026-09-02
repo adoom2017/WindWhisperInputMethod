@@ -25,6 +25,7 @@ constexpr wchar_t kSettingsPath[] = L"Software\\WindWhisper\\InputMethod";
 constexpr wchar_t kSchemaValue[] = L"Schema";
 constexpr wchar_t kFullWidthValue[] = L"FullWidth";
 constexpr wchar_t kTraditionalValue[] = L"Traditional";
+constexpr wchar_t kFlypyShapeDisplayName[] = L"小鹤音形";
 
 bool ReadConfiguredBool(const wchar_t *name, bool fallback) {
     HKEY key = nullptr;
@@ -101,6 +102,72 @@ bool WriteConfiguredSchema(const char *schema) {
         static_cast<DWORD>(wide.size() * sizeof(wchar_t)));
     RegCloseKey(key);
     return result == ERROR_SUCCESS;
+}
+
+HICON CreateInputModeIcon(bool ascii_mode) {
+    const int width = (std::max)(16, GetSystemMetrics(SM_CXSMICON));
+    const int height = (std::max)(16, GetSystemMetrics(SM_CYSMICON));
+    BITMAPINFO bitmap_info{};
+    bitmap_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmap_info.bmiHeader.biWidth = width;
+    bitmap_info.bmiHeader.biHeight = -height;
+    bitmap_info.bmiHeader.biPlanes = 1;
+    bitmap_info.bmiHeader.biBitCount = 32;
+    bitmap_info.bmiHeader.biCompression = BI_RGB;
+
+    void *pixels = nullptr;
+    HDC screen = GetDC(nullptr);
+    HDC memory = screen ? CreateCompatibleDC(screen) : nullptr;
+    HBITMAP color = screen ? CreateDIBSection(
+        screen, &bitmap_info, DIB_RGB_COLORS, &pixels, nullptr, 0) : nullptr;
+    HBITMAP mask = screen ? CreateCompatibleBitmap(screen, width, height) : nullptr;
+    if (!screen || !memory || !color || !mask || !pixels) {
+        if (mask) DeleteObject(mask);
+        if (color) DeleteObject(color);
+        if (memory) DeleteDC(memory);
+        if (screen) ReleaseDC(nullptr, screen);
+        return nullptr;
+    }
+
+    HGDIOBJ old_bitmap = SelectObject(memory, color);
+    RECT bounds{0, 0, width, height};
+    FillRect(memory, &bounds, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    HFONT font = CreateFontW(
+        -(height - 2), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+        ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
+        L"Microsoft YaHei UI");
+    HGDIOBJ old_font = font ? SelectObject(memory, font) : nullptr;
+    SetBkMode(memory, TRANSPARENT);
+    SetTextColor(memory, RGB(255, 255, 255));
+    DrawTextW(memory, ascii_mode ? L"英" : L"中", 1, &bounds,
+              DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+    auto *rgba = static_cast<BYTE *>(pixels);
+    for (int index = 0; index < width * height; ++index) {
+        const BYTE alpha = rgba[index * 4];
+        rgba[index * 4] = 255;
+        rgba[index * 4 + 1] = 255;
+        rgba[index * 4 + 2] = 255;
+        rgba[index * 4 + 3] = alpha;
+    }
+
+    if (old_font) SelectObject(memory, old_font);
+    if (font) DeleteObject(font);
+    SelectObject(memory, old_bitmap);
+    HGDIOBJ old_mask = SelectObject(memory, mask);
+    PatBlt(memory, 0, 0, width, height, BLACKNESS);
+    SelectObject(memory, old_mask);
+    ICONINFO icon_info{};
+    icon_info.fIcon = TRUE;
+    icon_info.hbmColor = color;
+    icon_info.hbmMask = mask;
+    HICON icon = CreateIconIndirect(&icon_info);
+    DeleteObject(mask);
+    DeleteObject(color);
+    DeleteDC(memory);
+    ReleaseDC(nullptr, screen);
+    return icon;
 }
 
 void DebugLog(const char *event, HRESULT result = S_OK, WPARAM virtual_key = 0,
@@ -451,7 +518,7 @@ private:
                       WS_CHILD | WS_VISIBLE, 20, 18, 370, 24, window, nullptr,
                       GetModuleHandleW(nullptr), nullptr);
         for (const auto &option : {
-                 std::pair<int, const wchar_t *>{100, L"小鹤音形（四码自动上屏）"},
+                 std::pair<int, const wchar_t *>{100, kFlypyShapeDisplayName},
                  std::pair<int, const wchar_t *>{101, L"小鹤双拼"},
                  std::pair<int, const wchar_t *>{102, L"全拼"}}) {
             const HWND button = CreateWindowW(
@@ -536,7 +603,8 @@ public:
         // Use a command button so OnClick receives both left and right clicks.
         // A pure BTN_MENU item routes every click to InitMenu and therefore
         // cannot use left click for the Chinese/English mode switch.
-        info->dwStyle = TF_LBI_STYLE_SHOWNINTRAY | TF_LBI_STYLE_BTN_BUTTON;
+        info->dwStyle = TF_LBI_STYLE_SHOWNINTRAY | TF_LBI_STYLE_BTN_BUTTON |
+                        TF_LBI_STYLE_TEXTCOLORICON;
         info->ulSort = 0;
         StringCchCopyW(info->szDescription, TF_LBI_DESC_MAXLEN,
                        L"风语输入法中英文切换与设置");
@@ -585,7 +653,7 @@ public:
         const std::string schema = ReadConfiguredSchema();
         AppendMenuW(schemes, MF_STRING |
                                  (schema == "flypyShape" ? MF_CHECKED : 0),
-                    100, L"小鹤音形（四码自动上屏）");
+                    100, kFlypyShapeDisplayName);
         AppendMenuW(schemes, MF_STRING |
                                  (schema == "flypyPhonetic" ? MF_CHECKED : 0),
                     101, L"小鹤双拼");
@@ -637,7 +705,7 @@ public:
             return menu->AddMenuItem(id, flags, nullptr, nullptr, text,
                                      static_cast<ULONG>(wcslen(text)), nullptr);
         };
-        HRESULT result = add(100, L"小鹤音形（四码自动上屏）", "flypyShape");
+        HRESULT result = add(100, kFlypyShapeDisplayName, "flypyShape");
         if (FAILED(result)) return result;
         result = add(101, L"小鹤双拼", "flypyPhonetic");
         if (FAILED(result)) return result;
@@ -671,13 +739,9 @@ public:
     }
     HRESULT STDMETHODCALLTYPE GetIcon(HICON *icon) override {
         if (!icon) return E_POINTER;
-        // The modern input indicator requires an icon for its mode item.
-        HMODULE module = nullptr;
-        GetModuleHandleExW(
-            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
-                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
-            reinterpret_cast<LPCWSTR>(&DebugLog), &module);
-        *icon = module ? LoadIconW(module, MAKEINTRESOURCEW(101)) : nullptr;
+        // The registered profile owns the windwhisper brand icon. The
+        // clickable mode button states its current mode directly.
+        *icon = CreateInputModeIcon(IsAsciiMode());
         DebugLog("language-bar-get-icon", *icon ? S_OK : E_FAIL);
         return *icon ? S_OK : E_FAIL;
     }

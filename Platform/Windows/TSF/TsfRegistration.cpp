@@ -177,7 +177,7 @@ bool RegisterTsf(const std::filesystem::path &dll_path) {
                 GUID_FengYuLanguageProfile, kDisplayName,
                 static_cast<ULONG>(std::size(kDisplayName) - 1),
                 dll_path.c_str(),
-                static_cast<ULONG>(dll_path.native().size()), 101,
+                static_cast<ULONG>(dll_path.native().size()), 0,
                 nullptr, 0, TRUE, 0);
             manager->Release();
         }
@@ -269,14 +269,22 @@ int SetCurrentUserProfileEnabled(bool enabled, bool activate_session = false) {
     return 0;
 }
 
-int RegisterCurrentUserProfile() {
+int RegisterCurrentUserProfile(const std::filesystem::path &dll_path) {
+    std::error_code error;
+    const auto absolute_path = std::filesystem::weakly_canonical(dll_path, error);
+    if (error || !std::filesystem::is_regular_file(absolute_path)) {
+        std::wcerr << L"fy_tsf.dll not found: " << dll_path.wstring() << L'\n';
+        return 2;
+    }
     ITfInputProcessorProfileMgr *manager = nullptr;
     HRESULT result = CreateProfileManager(&manager);
     if (SUCCEEDED(result)) {
         result = manager->RegisterProfile(
             CLSID_FengYuTextService, LANGID_FengYuChineseSimplified,
             GUID_FengYuLanguageProfile, kDisplayName,
-            static_cast<ULONG>(std::size(kDisplayName) - 1), nullptr, 0, 0,
+            static_cast<ULONG>(std::size(kDisplayName) - 1),
+            absolute_path.c_str(),
+            static_cast<ULONG>(absolute_path.native().size()), 0,
             nullptr, 0, TRUE, 0);
         manager->Release();
     }
@@ -416,7 +424,7 @@ int Unregister() {
 int wmain(int argc, wchar_t **argv) {
     if (argc < 2) {
         std::wcerr << L"Usage: fy_tsf_registration register <fy_tsf.dll> | "
-                      L"unregister | register-profile | enable | activate | disable | "
+                      L"unregister | register-profile <fy_tsf.dll> | enable | activate | disable | "
                       L"status <fy_tsf.dll>\n";
         return 1;
     }
@@ -432,8 +440,8 @@ int wmain(int argc, wchar_t **argv) {
     if (command == L"unregister") {
         return Unregister();
     }
-    if (command == L"register-profile") {
-        return RegisterCurrentUserProfile();
+    if (command == L"register-profile" && argc == 3) {
+        return RegisterCurrentUserProfile(argv[2]);
     }
     if (command == L"enable") {
         return SetCurrentUserProfileEnabled(true);

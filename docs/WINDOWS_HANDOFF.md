@@ -46,7 +46,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File Installer/Windows/Install-And-Test
 
 2026-08-31 回归更新：Windows C++ 核心已读取同一份 `Resources/fy.dict.yaml`，并覆盖全拼、小鹤双拼、小鹤音形、长句分词、候选排序、反查辅码、四键自动提交、方向键/分页和简繁转换；MSI 同时携带词库与用户词典覆盖。Release 自动化通过 `golden`、`dictionary_smoke`、`tsf_factory` 和 `windows_key_mapper`。输入指示器兼容性已注册 `GUID_TFCAT_TIPCAP_IMMERSIVESUPPORT` 与 `GUID_TFCAT_TIPCAP_SYSTRAYSUPPORT`，并从 `fy_tsf.dll` 提供品牌/模式图标资源。
 
-候选窗目前是 Win32/GDI 非激活实现，鼠标选词、DPI 自适应和多屏边界仍需在真实 Windows 桌面按下方人工矩阵确认。Windows 只注册一个“风语输入法” profile；通过输入指示器旁的模式按钮（`GUID_LBI_INPUTMODE`）选择小鹤音形（默认，四码自动上屏）、小鹤双拼或全拼，选项保存到当前用户注册表。Windows 11 会忽略自定义 GUID 的语言栏项目，因此不能再注册三个独立 profile 来模拟模式。
+候选窗目前是 Win32/GDI 非激活实现，固定使用单行横向布局；鼠标选词、DPI 自适应和多屏边界仍需在真实 Windows 桌面按下方人工矩阵确认。Windows 只注册一个“风语输入法” profile；通过输入指示器旁的模式按钮（`GUID_LBI_INPUTMODE`）选择小鹤音形（默认）、小鹤双拼或全拼，选项保存到当前用户注册表。Windows 11 会忽略自定义 GUID 的语言栏项目，因此不能再注册三个独立 profile 来模拟模式。
 
 ## 环境准备
 
@@ -95,8 +95,9 @@ ctest --test-dir build/windows -C Release --output-on-failure
 5. 处理 context 销毁、输入源切换、应用退出和 edit-session 拒绝，保证没有残留 marked text 或重复 commit。
 6. 支持 Space/Return/数字选词、Backspace/Escape、PageUp/PageDown、`-`/`=` 和小鹤音形 `~` 反查。
 7. 单独按下并释放 Shift 切换中/英文；已有组合先将编码原样上屏，Shift+字母以及 Ctrl/Alt/Win+Shift 不得误切换。
-8. 任务栏风语按钮左键直接切换中/英文，右键显示原生设置菜单；键盘 Shift 与按钮必须共享同一个模式状态。
+8. 任务栏保留风语输入法的品牌图标；旁边的可点击模式按钮在中文模式显示“中”，在英文模式显示“英”。左键直接切换中/英文，右键显示原生设置菜单；键盘 Shift 与按钮必须共享同一个模式状态。
 9. 右键菜单提供输入方案、全角/半角和简体/繁体，移除额外设置窗口入口；切到中文自动全角，切到英文自动半角。
+10. 候选窗使用深色单行横排布局，当前项同时使用背景高亮和风语强调色竖条；多页时在右侧显示上一页/下一页状态。
 
 ## 共享核心差距
 
