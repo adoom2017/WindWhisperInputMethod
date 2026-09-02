@@ -114,7 +114,7 @@ enum M7SmokeTest {
         try verifyLayouts()
         try verifyMenu(store: store)
         try verifyDiagnostics(settings: store.snapshot)
-        try verifyUserFacingEngineError()
+        try verifyRuntimeErrorDescription()
 
         guard let resources = Bundle.main.resourceURL else {
             throw InputEngineError.missingBundledData
@@ -390,11 +390,11 @@ enum M7SmokeTest {
         }
     }
 
-    private static func verifyUserFacingEngineError() throws {
+    private static func verifyRuntimeErrorDescription() throws {
         let error = InputEngineError.runtime(code: -1, message: "input engine internal sentinel")
         let message = error.localizedDescription
-        guard message.contains("Input engine"), !message.localizedCaseInsensitiveContains("input engine") else {
-            throw InputEngineError.smokeAssertion("user-facing engine errors expose an internal name")
+        guard message.contains("Input engine error -1"), message.contains("input engine internal sentinel") else {
+            throw InputEngineError.smokeAssertion("runtime errors discarded their code or diagnostic message")
         }
     }
 

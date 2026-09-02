@@ -105,7 +105,7 @@
 				A20000000000000000000002 /* ApplicationDelegate.swift */,
 				A20000000000000000000015 /* NativeRuntime.swift */,
 			);
-			path = App;
+			path = Platform/macOS/App;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000003 /* Sources */ = {
@@ -117,7 +117,7 @@
 				A40000000000000000000005 /* Installer */,
 				A40000000000000000000009 /* InputEngine */,
 			);
-			path = Sources;
+			path = Platform/macOS;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000004 /* InputController */ = {
@@ -126,8 +126,10 @@
 				A20000000000000000000003 /* WindWhisperInputController.swift */,
 				A20000000000000000000016 /* KeyMapper.swift */,
 				A20000000000000000000017 /* M3SmokeTest.swift */,
+				A20000000000000000000011 /* EngineSmokeTest.swift */,
+				A20000000000000000000026 /* M8SmokeTest.swift */,
 			);
-			path = InputController;
+			path = InputMethod;
 			sourceTree = "<group>";
 		};
 		A40000000000000000000005 /* Installer */ = {
@@ -167,10 +169,8 @@
 			children = (
 				A2000000000000000000000F /* InputModels.swift */,
 				A20000000000000000000010 /* InputService.swift */,
-				A20000000000000000000011 /* EngineSmokeTest.swift */,
-				A20000000000000000000026 /* M8SmokeTest.swift */,
 			);
-			path = InputEngine;
+			path = ../../Core/SwiftAdapter;
 			sourceTree = "<group>";
 		};
 		A4000000000000000000000D /* CandidateWindow */ = {

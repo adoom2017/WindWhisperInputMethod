@@ -1,6 +1,6 @@
 # 风语
 
-风语（`windwhisper`）是一个原生 macOS 中文输入法，基于 Swift、AppKit 与 InputMethodKit 构建。它内置专用输入引擎，支持全拼、小鹤双拼纯音码和小鹤双拼音形，并提供原生毛玻璃候选窗。
+风语（`windwhisper`）是一个双平台中文输入法工程。macOS 版本基于 Swift、AppKit 与 InputMethodKit，Windows x64 版本正在迁移到 C++17、TSF 与 Win32/DirectWrite。
 
 ## 主要功能
 
@@ -27,6 +27,20 @@
 ./Scripts/verify-project.sh
 ./Scripts/build.sh Debug
 ```
+
+### Windows (x64 preview)
+
+共享输入核心和 TSF 适配层位于 `Core/` 与 `Platform/Windows/`，使用 CMake
+和 Visual Studio 2022 生成 x64 工程：
+
+```text
+cmake -S . -B build/windows -A x64
+cmake --build build/windows --config Release
+ctest --test-dir build/windows -C Release
+```
+
+Windows 端目前是开发骨架，尚不能安装使用。迁移环境、未完成项和验证顺序见
+[`docs/WINDOWS_HANDOFF.md`](docs/WINDOWS_HANDOFF.md)。
 
 编译 Release 通用版本：
 

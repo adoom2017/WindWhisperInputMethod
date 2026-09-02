@@ -1,0 +1,9 @@
+Windows Registry Editor Version 5.00
+
+; Registration is completed by the MSI custom action. This file documents the
+; per-machine COM and Text Service Profile values used by the installer.
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{D0FEC5A8-1E35-4B8C-B0C0-9D5F7E0F4B21}]
+@="WindWhisper Text Service"
+[HKEY_LOCAL_MACHINE\SOFTWARE\Classes\CLSID\{D0FEC5A8-1E35-4B8C-B0C0-9D5F7E0F4B21}\InprocServer32]
+@="fy_tsf.dll"
+"ThreadingModel"="Both"
