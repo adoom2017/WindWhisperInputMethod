@@ -8,6 +8,29 @@ constexpr uint32_t kModifierShift = 1u << 0;
 constexpr uint32_t kModifierCapsLock = 1u << 1;
 constexpr uint32_t kModifierControl = 1u << 2;
 constexpr uint32_t kModifierAlt = 1u << 3;
+
+bool IsFullWidthPrintableKey(WPARAM virtual_key) {
+    if ((virtual_key >= '0' && virtual_key <= '9') ||
+        virtual_key == VK_SPACE) {
+        return true;
+    }
+    switch (virtual_key) {
+    case VK_OEM_MINUS:
+    case VK_OEM_PLUS:
+    case VK_OEM_1:
+    case VK_OEM_COMMA:
+    case VK_OEM_PERIOD:
+    case VK_OEM_2:
+    case VK_OEM_3:
+    case VK_OEM_4:
+    case VK_OEM_5:
+    case VK_OEM_6:
+    case VK_OEM_7:
+        return true;
+    default:
+        return false;
+    }
+}
 }
 
 bool FyShiftTapState::IsShiftKey(WPARAM virtual_key) {
@@ -47,8 +70,8 @@ void FyShiftTapState::Reset() {
 }
 
 bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
-                     bool control, bool alt, bool composing,
-                     FyMappedKey *mapped) {
+                     bool control, bool alt, bool composing, bool full_width,
+                     FyMappedKey *mapped, bool system_shortcut) {
     if (!mapped) {
         return false;
     }
@@ -58,7 +81,7 @@ bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
                         (control ? kModifierControl : 0) |
                         (alt ? kModifierAlt : 0);
 
-    if (control || alt) {
+    if (control || alt || system_shortcut) {
         return false;
     }
     if (virtual_key >= 'A' && virtual_key <= 'Z') {
@@ -68,7 +91,10 @@ bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
         mapped->key = static_cast<uint32_t>(virtual_key - 'A' + 'a');
         return true;
     }
-    if (!composing) {
+    // Outside an active composition, only capture printable keys that need
+    // full-width conversion. Control/navigation keys must remain available to
+    // the host application (notably Backspace for deleting committed text).
+    if (!composing && (!full_width || !IsFullWidthPrintableKey(virtual_key))) {
         return false;
     }
     if (virtual_key >= '0' && virtual_key <= '9') {

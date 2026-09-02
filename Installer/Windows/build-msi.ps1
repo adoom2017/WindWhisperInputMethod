@@ -76,6 +76,7 @@ $outputPath = Join-Path $outputDirectory 'WindWhisperInputMethod-x64.msi'
 & $wix build (Join-Path $PSScriptRoot 'Product.wxs') `
     -arch x64 `
     -d "SourceDir=$sourceDirectory" `
+    -d "RepositoryRoot=$repositoryRoot" `
     -o $outputPath
 if ($LASTEXITCODE -ne 0) {
     throw "WiX failed with exit code $LASTEXITCODE"

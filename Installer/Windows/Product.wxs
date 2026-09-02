@@ -1,25 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package
-      Name="WindWhisper Input Method"
+      Name="风语输入法"
       Manufacturer="WindWhisper"
-    Version="1.0.29"
+      Version="1.0.33"
       Language="2052"
       UpgradeCode="9A4D32D6-6D4A-4C8D-9F2F-8A0B7D0E6D11"
       Scope="perMachine">
 
-    <SummaryInformation Description="WindWhisper Chinese input method" />
+    <SummaryInformation Description="风语中文输入法" />
     <MajorUpgrade
-        DowngradeErrorMessage="A newer WindWhisper Input Method is already installed."
+        DowngradeErrorMessage="已安装更高版本的风语输入法。"
         Schedule="afterInstallInitialize" />
     <MediaTemplate EmbedCab="yes" />
+    <Icon Id="ProductIcon" SourceFile="$(var.RepositoryRoot)\Resources\WindWhisperProfile.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ProductIcon" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="WindWhisper Input Method" />
     </StandardDirectory>
 
-    <Feature Id="Main" Title="WindWhisper Input Method" Level="1">
-    <ComponentRef Id="EngineComponent" />
+    <Feature Id="Main" Title="风语输入法" Level="1">
+      <ComponentRef Id="EngineComponent" />
       <ComponentRef Id="DictionaryComponent" />
       <ComponentRef Id="TsfComponent" />
       <ComponentRef Id="RegistrationComponent" />

@@ -31,30 +31,44 @@ int main() {
     CHECK(!shift.TestKeyUp(VK_SHIFT));
 
     FyMappedKey key{};
-    CHECK(FyMapVirtualKey('N', false, false, false, false, false, &key));
+    CHECK(FyMapVirtualKey('N', false, false, false, false, false, false, &key));
     CHECK(key.key == 'n');
-    CHECK(!FyMapVirtualKey('N', true, false, false, false, false, &key));
-    CHECK(!FyMapVirtualKey('N', false, false, true, false, false, &key));
-    CHECK(!FyMapVirtualKey(VK_SPACE, false, false, false, false, false, &key));
-    CHECK(FyMapVirtualKey(VK_SPACE, false, false, false, false, true, &key));
+    CHECK(!FyMapVirtualKey('N', true, false, false, false, false, false, &key));
+    CHECK(!FyMapVirtualKey('N', false, false, true, false, false, false, &key));
+    CHECK(!FyMapVirtualKey(VK_SPACE, false, false, false, false, false, false, &key));
+    CHECK(FyMapVirtualKey(VK_SPACE, false, false, false, false, true, false, &key));
     CHECK(key.key == 0x20);
-    CHECK(FyMapVirtualKey(VK_BACK, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_BACK, false, false, false, false, true, false, &key));
     CHECK(key.key == 0x08);
-    CHECK(FyMapVirtualKey(VK_NEXT, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_NEXT, false, false, false, false, true, false, &key));
     CHECK(key.key == 0xFF56);
-    CHECK(FyMapVirtualKey(VK_DOWN, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_DOWN, false, false, false, false, true, false, &key));
     CHECK(key.key == 0xFF54);
-    CHECK(FyMapVirtualKey('3', false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey('3', false, false, false, false, true, false, &key));
     CHECK(key.key == '3');
-    CHECK(FyMapVirtualKey(VK_OEM_3, true, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_3, true, false, false, false, true, false, &key));
     CHECK(key.key == '~');
-    CHECK(FyMapVirtualKey(VK_OEM_3, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_3, false, false, false, false, true, false, &key));
     CHECK(key.key == '`');
-    CHECK(FyMapVirtualKey('1', true, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey('1', true, false, false, false, true, false, &key));
     CHECK(key.key == '!');
-    CHECK(FyMapVirtualKey(VK_OEM_COMMA, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_COMMA, false, false, false, false, true, false, &key));
     CHECK(key.key == ',');
-    CHECK(FyMapVirtualKey(VK_OEM_2, true, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_2, true, false, false, false, true, false, &key));
     CHECK(key.key == '?');
+
+    // Full-width Chinese mode may capture printable punctuation while idle,
+    // but Backspace and other editing keys must pass through to the app.
+    CHECK(FyMapVirtualKey(VK_SPACE, false, false, false, false, false, true, &key));
+    CHECK(key.key == 0x20);
+    CHECK(FyMapVirtualKey('3', false, false, false, false, false, true, &key));
+    CHECK(key.key == '3');
+    CHECK(!FyMapVirtualKey(VK_BACK, false, false, false, false, false, true, &key));
+    CHECK(!FyMapVirtualKey(VK_RETURN, false, false, false, false, false, true, &key));
+    CHECK(!FyMapVirtualKey(VK_LEFT, false, false, false, false, false, true, &key));
+    CHECK(!FyMapVirtualKey('R', false, false, false, false, false, true,
+                           &key, true));
+    CHECK(!FyMapVirtualKey('R', false, false, false, false, true, true,
+                           &key, true));
     return 0;
 }

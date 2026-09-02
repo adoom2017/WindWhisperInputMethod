@@ -19,6 +19,9 @@ if(WIN32)
   add_executable(fy_windows_key_mapper_test TSF/WindowsKeyMapper.cpp TSF/WindowsKeyMapperTest.cpp)
   add_test(NAME windows_key_mapper COMMAND fy_windows_key_mapper_test)
 
-  add_executable(fy_tsf_registration TSF/TsfRegistration.cpp)
-  target_link_libraries(fy_tsf_registration PRIVATE ole32 advapi32 uuid)
+  # The registration helper is invoked several times by Windows Installer.
+  # Build it as a GUI-subsystem executable so those background custom actions
+  # never flash console windows during install, upgrade, or uninstall.
+  add_executable(fy_tsf_registration WIN32 TSF/TsfRegistration.cpp)
+  target_link_libraries(fy_tsf_registration PRIVATE ole32 advapi32 shell32 uuid)
 endif()

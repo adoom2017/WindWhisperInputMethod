@@ -2,6 +2,7 @@
 
 #include <msctf.h>
 #include <objbase.h>
+#include <shellapi.h>
 #include <windows.h>
 
 #include <filesystem>
@@ -421,7 +422,7 @@ int Unregister() {
 }
 }
 
-int wmain(int argc, wchar_t **argv) {
+int RunRegistrationCommand(int argc, wchar_t **argv) {
     if (argc < 2) {
         std::wcerr << L"Usage: fy_tsf_registration register <fy_tsf.dll> | "
                       L"unregister | register-profile <fy_tsf.dll> | enable | activate | disable | "
@@ -457,4 +458,15 @@ int wmain(int argc, wchar_t **argv) {
     }
     std::wcerr << L"Invalid command.\n";
     return 1;
+}
+
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    int argument_count = 0;
+    wchar_t **arguments = CommandLineToArgvW(GetCommandLineW(), &argument_count);
+    if (!arguments) {
+        return 1;
+    }
+    const int result = RunRegistrationCommand(argument_count, arguments);
+    LocalFree(arguments);
+    return result;
 }

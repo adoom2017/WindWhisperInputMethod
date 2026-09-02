@@ -24,6 +24,6 @@ private:
 };
 
 bool FyMapVirtualKey(WPARAM virtual_key, bool shift, bool caps_lock,
-                     bool control, bool alt, bool composing,
-                     FyMappedKey *mapped);
+                     bool control, bool alt, bool composing, bool full_width,
+                     FyMappedKey *mapped, bool system_shortcut = false);
 #endif

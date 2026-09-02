@@ -60,6 +60,12 @@ int main() {
     CHECK(fy_session_snapshot(session, &snapshot));
     CHECK(!snapshot.is_composing);
 
+    CHECK(fy_session_process_key(session, 'n', 0));
+    CHECK(fy_session_process_key(session, 0x08, 0));
+    CHECK(fy_session_snapshot(session, &snapshot));
+    CHECK(!snapshot.is_composing);
+    CHECK(snapshot.candidate_count == 0);
+
     fy_session *other = fy_session_create(engine);
     CHECK(other != nullptr);
     CHECK(type(session, "nihao"));

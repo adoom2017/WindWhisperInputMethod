@@ -10,6 +10,7 @@
 #include <cstring>
 #include <fstream>
 #include <filesystem>
+#include <future>
 #include <memory>
 #include <string>
 #include <strsafe.h>
@@ -173,6 +174,7 @@ HICON CreateInputModeIcon(bool ascii_mode) {
 
 void DebugLog(const char *event, HRESULT result = S_OK, WPARAM virtual_key = 0,
               BOOL eaten = FALSE) {
+#if !defined(NDEBUG)
     wchar_t local_app_data[32768]{};
     const DWORD length = GetEnvironmentVariableW(
         L"LOCALAPPDATA", local_app_data,
@@ -201,6 +203,14 @@ void DebugLog(const char *event, HRESULT result = S_OK, WPARAM virtual_key = 0,
     WriteFile(file, line, static_cast<DWORD>(std::strlen(line)), &written,
               nullptr);
     CloseHandle(file);
+#else
+    // Per-keystroke file I/O is intentionally disabled in production builds.
+    // The debug build retains the detailed TSF trace for diagnostics.
+    (void)event;
+    (void)result;
+    (void)virtual_key;
+    (void)eaten;
+#endif
 }
 
 std::wstring Utf8ToWide(const char *text, size_t length) {
@@ -328,9 +338,16 @@ class FengYuTextServiceState {
 public:
     FengYuTextServiceState() {
         schema_ = ReadConfiguredSchema();
-        const std::string dictionary = LoadBundledDictionary();
-        engine_ = fy_engine_create(dictionary.data(), dictionary.size());
-        candidate_window_.Create(GetModuleHandleW(nullptr));
+        // TSF creates the text service while new UI (for example Win+R) is
+        // being opened. Parse the large dictionary away from that UI thread.
+        engine_future_ = std::async(std::launch::async, [] {
+            try {
+                const std::string dictionary = LoadBundledDictionary();
+                return fy_engine_create(dictionary.data(), dictionary.size());
+            } catch (...) {
+                return static_cast<fy_engine *>(nullptr);
+            }
+        });
     }
 
     void SetSchema(const char *schema) {
@@ -356,6 +373,7 @@ public:
     ~FengYuTextServiceState() {
         candidate_window_.Hide();
         sessions_.clear();
+        ResolveEngine();
         fy_engine_destroy(engine_);
     }
 
@@ -368,6 +386,10 @@ public:
         if (auto existing = Find(context)) {
             return existing;
         }
+        if (!ResolveEngine()) {
+            return nullptr;
+        }
+        candidate_window_.Create(GetModuleHandleW(nullptr));
         auto created = std::make_shared<FengYuContextSession>(
             context, engine_, &candidate_window_, schema_.c_str());
         if (!created->session) {
@@ -402,7 +424,19 @@ public:
     }
 
 private:
+    fy_engine *ResolveEngine() {
+        if (!engine_ && engine_future_.valid()) {
+            try {
+                engine_ = engine_future_.get();
+            } catch (...) {
+                engine_ = nullptr;
+            }
+        }
+        return engine_;
+    }
+
     fy_engine *engine_ = nullptr;
+    std::future<fy_engine *> engine_future_;
     std::unordered_map<ITfContext *, std::shared_ptr<FengYuContextSession>> sessions_;
     CandidateWindow candidate_window_;
     std::string schema_ = "flypyShape";
@@ -1292,6 +1326,15 @@ bool FengYuTextService::MapKey(
         ascii_mode_) {
         return false;
     }
+    const bool control = KeyStateDown(VK_CONTROL);
+    const bool alt = KeyStateDown(VK_MENU);
+    const bool system_shortcut = virtual_key == VK_LWIN || virtual_key == VK_RWIN ||
+                                 KeyStateDown(VK_LWIN) || KeyStateDown(VK_RWIN);
+    // System shortcuts must never enter COM context probing or engine state.
+    // This keeps Win+R/Win+E/Ctrl+Esc on the operating system's fast path.
+    if (control || alt || system_shortcut) {
+        return false;
+    }
     ITfContextComposition *composition_manager = nullptr;
     if (FAILED(context->QueryInterface(
             IID_ITfContextComposition,
@@ -1309,8 +1352,8 @@ bool FengYuTextService::MapKey(
     FyMappedKey mapped{};
     if (!FyMapVirtualKey(
             virtual_key, KeyStateDown(VK_SHIFT),
-            (GetKeyState(VK_CAPITAL) & 1) != 0, KeyStateDown(VK_CONTROL),
-            KeyStateDown(VK_MENU), composing || full_width_, &mapped)) {
+            (GetKeyState(VK_CAPITAL) & 1) != 0, control, alt, composing,
+            full_width_, &mapped, system_shortcut)) {
         return false;
     }
     *key = mapped.key;

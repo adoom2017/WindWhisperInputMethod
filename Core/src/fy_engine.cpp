@@ -45,6 +45,7 @@ std::string lower_ascii(std::string text) {
 struct fy_engine {
     std::vector<Entry> entries;
     std::unordered_map<std::string, std::vector<size_t>> exact[3];
+    std::vector<size_t> prefix_order[3];
     std::unordered_map<std::string, float> bigram;
     std::unordered_map<std::string, float> trigram;
     std::unordered_map<std::string, std::string> preferred_character;
@@ -99,10 +100,19 @@ size_t kind_index(Entry::Kind kind) {
 }
 
 void rebuild_indexes(fy_engine *engine) {
-    for (auto &index : engine->exact) index.clear();
+    for (size_t kind = 0; kind < 3; ++kind) {
+        engine->exact[kind].clear();
+        engine->prefix_order[kind].clear();
+    }
     for (size_t i = 0; i < engine->entries.size(); ++i) {
-        engine->exact[kind_index(engine->entries[i].kind)]
-            [engine->entries[i].code].push_back(i);
+        const size_t kind = kind_index(engine->entries[i].kind);
+        engine->exact[kind][engine->entries[i].code].push_back(i);
+        engine->prefix_order[kind].push_back(i);
+    }
+    for (auto &index : engine->prefix_order) {
+        std::sort(index.begin(), index.end(), [&](size_t lhs, size_t rhs) {
+            return engine->entries[lhs].code < engine->entries[rhs].code;
+        });
     }
 }
 
@@ -405,6 +415,9 @@ void refresh(fy_session *session) {
     session->page = 0;
     session->highlighted = 0;
     const std::string raw_needle = lower_ascii(session->code);
+    if (raw_needle.empty()) {
+        return;
+    }
     const size_t marker = raw_needle.find('~');
     const std::string needle = marker == std::string::npos
                                    ? raw_needle
@@ -413,8 +426,19 @@ void refresh(fy_session *session) {
                                       ? std::string()
                                       : raw_needle.substr(marker + 1);
     auto collect = [&](Entry::Kind kind) {
-        for (const Entry &entry : session->engine->entries) {
-            bool matches = entry.kind == kind && entry.code.rfind(needle, 0) == 0;
+        const auto &entries = session->engine->entries;
+        const auto &index = session->engine->prefix_order[kind_index(kind)];
+        auto current = std::lower_bound(
+            index.begin(), index.end(), needle,
+            [&](size_t id, const std::string &value) {
+                return entries[id].code < value;
+            });
+        for (; current != index.end(); ++current) {
+            const Entry &entry = entries[*current];
+            if (entry.code.rfind(needle, 0) != 0) {
+                break;
+            }
+            bool matches = true;
             if (matches && marker != std::string::npos) {
                 const std::string suffix = entry.code.substr(needle.size());
                 matches = suffix.rfind(auxiliary, 0) == 0;
