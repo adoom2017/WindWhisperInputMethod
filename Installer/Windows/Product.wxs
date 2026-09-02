@@ -3,7 +3,7 @@
   <Package
       Name="WindWhisper Input Method"
       Manufacturer="WindWhisper"
-    Version="1.0.26"
+    Version="1.0.29"
       Language="2052"
       UpgradeCode="9A4D32D6-6D4A-4C8D-9F2F-8A0B7D0E6D11"
       Scope="perMachine">
@@ -78,13 +78,6 @@
         Impersonate="yes"
         Return="ignore" />
     <CustomAction
-        Id="RegisterCurrentUserProfile"
-        FileRef="RegistrationExe"
-        ExeCommand="register-profile &quot;[#TsfDll]&quot;"
-        Execute="deferred"
-        Impersonate="yes"
-        Return="check" />
-    <CustomAction
         Id="EnableCurrentUserProfile"
         FileRef="RegistrationExe"
         ExeCommand="enable"
@@ -111,9 +104,7 @@
               Condition="NOT Installed" />
       <Custom Action="RegisterTsf" After="RollbackTsfRegistration"
               Condition="NOT Installed" />
-      <Custom Action="RegisterCurrentUserProfile" After="RegisterTsf"
-              Condition="NOT Installed" />
-      <Custom Action="RollbackCurrentUserProfileEnable" After="RegisterCurrentUserProfile"
+      <Custom Action="RollbackCurrentUserProfileEnable" After="RegisterTsf"
               Condition="NOT Installed" />
       <Custom Action="EnableCurrentUserProfile" After="RollbackCurrentUserProfileEnable"
               Condition="NOT Installed" />

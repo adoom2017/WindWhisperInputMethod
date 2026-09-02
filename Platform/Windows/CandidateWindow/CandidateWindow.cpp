@@ -10,14 +10,25 @@
 
 namespace {
 constexpr wchar_t kWindowClass[] = L"WindWhisperCandidateWindow";
-constexpr COLORREF kBackground = RGB(43, 43, 43);
-constexpr COLORREF kHighlight = RGB(57, 57, 57);
-constexpr COLORREF kBorder = RGB(103, 103, 103);
-constexpr COLORREF kDivider = RGB(72, 72, 72);
-constexpr COLORREF kAccent = RGB(255, 112, 88);
-constexpr COLORREF kForeground = RGB(244, 244, 244);
-constexpr COLORREF kSecondary = RGB(196, 196, 196);
-constexpr COLORREF kDisabled = RGB(112, 112, 112);
+struct ThemePalette {
+    COLORREF background;
+    COLORREF highlight;
+    COLORREF border;
+    COLORREF divider;
+    COLORREF accent;
+    COLORREF foreground;
+    COLORREF secondary;
+    COLORREF disabled;
+};
+
+constexpr ThemePalette kDarkPalette{
+    RGB(43, 43, 43), RGB(57, 57, 57), RGB(103, 103, 103),
+    RGB(72, 72, 72), RGB(255, 112, 88), RGB(244, 244, 244),
+    RGB(196, 196, 196), RGB(112, 112, 112)};
+constexpr ThemePalette kLightPalette{
+    RGB(250, 250, 250), RGB(234, 236, 239), RGB(166, 169, 174),
+    RGB(218, 220, 224), RGB(224, 82, 62), RGB(28, 29, 31),
+    RGB(82, 85, 90), RGB(164, 167, 172)};
 
 int Scale(int value, UINT dpi) {
     return MulDiv(value, static_cast<int>(dpi), 96);
@@ -30,6 +41,13 @@ HFONT CreateCandidateFont(UINT dpi, int logical_height = 19,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
 }
+}
+
+void CandidateWindow::SetTheme(CandidateWindowTheme theme) {
+    theme_ = theme;
+    if (hwnd_ && IsWindowVisible(hwnd_)) {
+        InvalidateRect(hwnd_, nullptr, FALSE);
+    }
 }
 
 bool CandidateWindow::Create(HINSTANCE instance) {
@@ -125,6 +143,9 @@ void CandidateWindow::Hide() {
 }
 
 void CandidateWindow::Paint(HDC dc) {
+    const ThemePalette &palette = theme_ == CandidateWindowTheme::Light
+                                      ? kLightPalette
+                                      : kDarkPalette;
     RECT client{};
     GetClientRect(hwnd_, &client);
     HDC buffer = CreateCompatibleDC(dc);
@@ -132,10 +153,10 @@ void CandidateWindow::Paint(HDC dc) {
         dc, std::max<LONG>(1, client.right), std::max<LONG>(1, client.bottom));
     HGDIOBJ old_bitmap = SelectObject(buffer, bitmap);
 
-    HBRUSH background = CreateSolidBrush(kBackground);
+    HBRUSH background = CreateSolidBrush(palette.background);
     FillRect(buffer, &client, background);
     DeleteObject(background);
-    HPEN border = CreatePen(PS_SOLID, Scale(1, dpi_), kBorder);
+    HPEN border = CreatePen(PS_SOLID, Scale(1, dpi_), palette.border);
     HGDIOBJ old_pen = SelectObject(buffer, border);
     HGDIOBJ old_brush = SelectObject(buffer, GetStockObject(NULL_BRUSH));
     RoundRect(buffer, 0, 0, client.right, client.bottom,
@@ -172,13 +193,13 @@ void CandidateWindow::Paint(HDC dc) {
                        std::min<LONG>(client.right, x + item_width),
                        client.bottom - Scale(5, dpi_)};
         if (index == highlighted_) {
-            HBRUSH highlight = CreateSolidBrush(kHighlight);
+            HBRUSH highlight = CreateSolidBrush(palette.highlight);
             FillRect(buffer, &item_rect, highlight);
             DeleteObject(highlight);
             RECT accent{item_rect.left, item_rect.top + Scale(8, dpi_),
                         item_rect.left + Scale(4, dpi_),
                         item_rect.bottom - Scale(8, dpi_)};
-            HBRUSH accent_brush = CreateSolidBrush(kAccent);
+            HBRUSH accent_brush = CreateSolidBrush(palette.accent);
             FillRect(buffer, &accent, accent_brush);
             DeleteObject(accent_brush);
         }
@@ -186,20 +207,20 @@ void CandidateWindow::Paint(HDC dc) {
         RECT number_rect = item_rect;
         number_rect.left += horizontal_padding;
         number_rect.right = number_rect.left + number_size.cx;
-        SetTextColor(buffer, kSecondary);
+        SetTextColor(buffer, palette.secondary);
         DrawTextW(buffer, number.c_str(), -1, &number_rect,
                   DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
 
         RECT text_rect = item_rect;
         text_rect.left = number_rect.right + Scale(7, dpi_);
         text_rect.right = text_rect.left + text_size.cx;
-        SetTextColor(buffer, kForeground);
+        SetTextColor(buffer, palette.foreground);
         DrawTextW(buffer, items_[index].text.c_str(), -1, &text_rect,
                   DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
         if (!items_[index].comment.empty()) {
             RECT comment_rect = item_rect;
             comment_rect.left = text_rect.right + comment_gap;
-            SetTextColor(buffer, kSecondary);
+            SetTextColor(buffer, palette.secondary);
             DrawTextW(buffer, items_[index].comment.c_str(), -1, &comment_rect,
                       DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
         }
@@ -208,7 +229,7 @@ void CandidateWindow::Paint(HDC dc) {
 
     if (page_count_ > 1) {
         const int controls_left = client.right - Scale(92, dpi_);
-        HPEN divider = CreatePen(PS_SOLID, Scale(1, dpi_), kDivider);
+        HPEN divider = CreatePen(PS_SOLID, Scale(1, dpi_), palette.divider);
         HGDIOBJ previous_pen = SelectObject(buffer, divider);
         MoveToEx(buffer, controls_left, Scale(7, dpi_), nullptr);
         LineTo(buffer, controls_left, client.bottom - Scale(7, dpi_));
@@ -228,8 +249,9 @@ void CandidateWindow::Paint(HDC dc) {
                 triangle[1] = {center_x + radius, client.bottom / 2 + radius};
                 triangle[2] = {center_x - radius, client.bottom / 2};
             }
-            HBRUSH brush = CreateSolidBrush(enabled ? kForeground : kDisabled);
-            HPEN pen = CreatePen(PS_SOLID, 1, enabled ? kForeground : kDisabled);
+            const COLORREF color = enabled ? palette.foreground : palette.disabled;
+            HBRUSH brush = CreateSolidBrush(color);
+            HPEN pen = CreatePen(PS_SOLID, 1, color);
             HGDIOBJ saved_brush = SelectObject(buffer, brush);
             HGDIOBJ saved_pen = SelectObject(buffer, pen);
             Polygon(buffer, triangle, 3);

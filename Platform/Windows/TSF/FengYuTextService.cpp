@@ -25,6 +25,7 @@ constexpr wchar_t kSettingsPath[] = L"Software\\WindWhisper\\InputMethod";
 constexpr wchar_t kSchemaValue[] = L"Schema";
 constexpr wchar_t kFullWidthValue[] = L"FullWidth";
 constexpr wchar_t kTraditionalValue[] = L"Traditional";
+constexpr wchar_t kCandidateLightThemeValue[] = L"CandidateLightTheme";
 constexpr wchar_t kFlypyShapeDisplayName[] = L"小鹤音形";
 
 bool ReadConfiguredBool(const wchar_t *name, bool fallback) {
@@ -337,6 +338,10 @@ public:
     }
     void ReloadSchema() { schema_ = ReadConfiguredSchema(); }
     const char *schema() const { return schema_.c_str(); }
+    void SetCandidateTheme(bool light) {
+        candidate_window_.SetTheme(light ? CandidateWindowTheme::Light
+                                         : CandidateWindowTheme::Dark);
+    }
     void SetPreferences(bool full_width, bool traditional) {
         full_width_ = full_width;
         traditional_ = traditional;
@@ -640,7 +645,9 @@ public:
         HMENU schemes = CreatePopupMenu();
         HMENU widths = CreatePopupMenu();
         HMENU scripts = CreatePopupMenu();
-        if (!menu || !schemes || !widths || !scripts) {
+        HMENU themes = CreatePopupMenu();
+        if (!menu || !schemes || !widths || !scripts || !themes) {
+            if (themes) DestroyMenu(themes);
             if (scripts) DestroyMenu(scripts);
             if (widths) DestroyMenu(widths);
             if (schemes) DestroyMenu(schemes);
@@ -676,6 +683,13 @@ public:
                     121, L"繁体中文");
         AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(scripts),
                     L"繁简切换");
+        const bool light_theme = service_ && service_->light_candidate_theme_;
+        AppendMenuW(themes, MF_STRING | (!light_theme ? MF_CHECKED : 0),
+                    130, L"深色");
+        AppendMenuW(themes, MF_STRING | (light_theme ? MF_CHECKED : 0),
+                    131, L"浅色");
+        AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(themes),
+                    L"候选框配色");
         if (point.x == 0 && point.y == 0) GetCursorPos(&point);
         const UINT command = TrackPopupMenu(
             menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
@@ -690,6 +704,10 @@ public:
         } else if (command == 120 || command == 121) {
             result = service_
                          ? service_->SetTraditionalFromLanguageBar(command == 121)
+                         : E_FAIL;
+        } else if (command == 130 || command == 131) {
+            result = service_
+                         ? service_->SetCandidateThemeFromLanguageBar(command == 131)
                          : E_FAIL;
         }
         DestroyMenu(menu);
@@ -718,6 +736,10 @@ public:
         }
         if (id == 120 || id == 121) {
             return service_ ? service_->SetTraditionalFromLanguageBar(id == 121)
+                            : E_FAIL;
+        }
+        if (id == 130 || id == 131) {
+            return service_ ? service_->SetCandidateThemeFromLanguageBar(id == 131)
                             : E_FAIL;
         }
         const char *schema = id == 100 ? "flypyShape"
@@ -1215,7 +1237,10 @@ HRESULT FengYuTextService::ActivateEx(
         state_->ReloadSchema();
         full_width_ = ReadConfiguredBool(kFullWidthValue, true);
         traditional_ = ReadConfiguredBool(kTraditionalValue, false);
+        light_candidate_theme_ =
+            ReadConfiguredBool(kCandidateLightThemeValue, false);
         state_->SetPreferences(full_width_, traditional_);
+        state_->SetCandidateTheme(light_candidate_theme_);
         DebugLog("schema-loaded");
     }
     if (FAILED(result)) {
@@ -1444,6 +1469,15 @@ HRESULT FengYuTextService::SetTraditionalFromLanguageBar(bool enabled) {
     const bool saved = WriteConfiguredBool(kTraditionalValue, enabled);
     if (language_bar_button_) language_bar_button_->NotifyModeChanged();
     DebugLog(enabled ? "script-traditional" : "script-simplified",
+             saved ? S_OK : E_FAIL);
+    return saved ? S_OK : E_FAIL;
+}
+
+HRESULT FengYuTextService::SetCandidateThemeFromLanguageBar(bool light) {
+    light_candidate_theme_ = light;
+    state_->SetCandidateTheme(light_candidate_theme_);
+    const bool saved = WriteConfiguredBool(kCandidateLightThemeValue, light);
+    DebugLog(light ? "candidate-theme-light" : "candidate-theme-dark",
              saved ? S_OK : E_FAIL);
     return saved ? S_OK : E_FAIL;
 }

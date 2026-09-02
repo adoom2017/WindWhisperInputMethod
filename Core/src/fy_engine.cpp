@@ -455,6 +455,17 @@ void refresh(fy_session *session) {
         entry.text = session->traditional ? traditionalize_text(entry.text)
                                           : simplify_text(entry.text);
     }
+    // Prefix matching can return the same visible phrase through both its
+    // short code and full code (for example 为什么: wsm/wsme).  Keep the
+    // highest-ranked form only, after script conversion has produced the text
+    // that the user actually sees.
+    std::unordered_map<std::string, bool> seen_text;
+    session->matches.erase(
+        std::remove_if(session->matches.begin(), session->matches.end(),
+                       [&](const Entry &entry) {
+                           return !seen_text.emplace(entry.text, true).second;
+                       }),
+        session->matches.end());
     if (session->page * kPageSize >= session->matches.size()) {
         session->page = 0;
     }

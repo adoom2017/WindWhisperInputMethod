@@ -40,6 +40,20 @@ static bool Contains(fy_session *session, const char *expected) {
     return false;
 }
 
+static size_t Count(fy_session *session, const char *expected) {
+    fy_snapshot snapshot{};
+    if (!fy_session_snapshot(session, &snapshot)) return 0;
+    size_t count = 0;
+    for (size_t i = 0; i < snapshot.candidate_count; ++i) {
+        if (snapshot.candidates[i].text_len == std::strlen(expected) &&
+            std::memcmp(snapshot.candidates[i].text, expected,
+                        snapshot.candidates[i].text_len) == 0) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 static bool CommitIs(fy_session *session, const char *expected) {
     fy_snapshot snapshot{};
     if (!fy_session_snapshot(session, &snapshot)) return false;
@@ -77,6 +91,8 @@ int main() {
         ok = ok && Type(session, item[0]) &&
              (Contains(session, item[1]) || CommitIs(session, item[1]));
     }
+    fy_session_reset(session);
+    ok = ok && Type(session, "wsm") && Count(session, "为什么") == 1;
     fy_session_reset(session);
     ok = ok && Type(session, "ni") && fy_session_process_key(session, '~', 0);
     fy_snapshot reverse{};

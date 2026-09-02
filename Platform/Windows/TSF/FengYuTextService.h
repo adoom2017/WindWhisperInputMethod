@@ -45,6 +45,7 @@ private:
     HRESULT ToggleInputModeFromLanguageBar();
     HRESULT SetFullWidthFromLanguageBar(bool);
     HRESULT SetTraditionalFromLanguageBar(bool);
+    HRESULT SetCandidateThemeFromLanguageBar(bool light);
     void RemoveContext(ITfContext*);
     void RemoveDocumentManager(ITfDocumentMgr*);
     void ConfigureInputMode(ITfContext*);
@@ -64,6 +65,7 @@ private:
     bool ascii_mode_ = false;
     bool full_width_ = true;
     bool traditional_ = false;
+    bool light_candidate_theme_ = false;
     FyShiftTapState shift_tap_;
     std::unique_ptr<FengYuTextServiceState> state_;
 };
