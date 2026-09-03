@@ -243,6 +243,51 @@ WINDWHISPER_NOTARY_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db" \
 ~/Library/Input Methods/windwhisper.app
 ```
 
+### 生成正式签名并公证的 DMG
+
+`Scripts/package-release.sh` 当前直接生成 ZIP。发布 DMG 时，先用 `signed` 模式
+生成经过 Developer ID 签名的通用应用和发布目录，再将整个发布目录制作成 DMG。
+下面示例中的版本号、构建号、证书名称和公证 profile 应替换为实际值：
+
+```bash
+WW_VERSION="0.1.0"
+WW_BUILD_NUMBER="2026090301"
+WW_IDENTITY="Developer ID Application: Your Name (TEAMID)"
+WW_RELEASE_NAME="windwhisper-$WW_VERSION-$WW_BUILD_NUMBER-macos-universal"
+WW_STAGING_ROOT="$PWD/dist/$WW_RELEASE_NAME"
+WW_DMG_PATH="$PWD/dist/$WW_RELEASE_NAME.dmg"
+
+WINDWHISPER_CODE_SIGN_IDENTITY="$WW_IDENTITY" \
+  Scripts/package-release.sh signed "$WW_VERSION" "$WW_BUILD_NUMBER"
+
+/usr/bin/hdiutil create \
+  -volname "WindWhisper $WW_VERSION" \
+  -srcfolder "$WW_STAGING_ROOT" \
+  -ov -format UDZO \
+  "$WW_DMG_PATH"
+
+/usr/bin/codesign \
+  --force --timestamp --sign "$WW_IDENTITY" \
+  "$WW_DMG_PATH"
+
+/usr/bin/xcrun notarytool submit "$WW_DMG_PATH" \
+  --keychain-profile "windwhisper-notary" \
+  --wait
+
+/usr/bin/xcrun stapler staple "$WW_DMG_PATH"
+/usr/bin/xcrun stapler validate "$WW_DMG_PATH"
+/usr/sbin/spctl --assess --type open \
+  --context context:primary-signature --verbose=2 \
+  "$WW_DMG_PATH"
+/usr/bin/shasum -a 256 "$WW_DMG_PATH" > "$WW_DMG_PATH.sha256"
+```
+
+若公证凭据存放在非默认钥匙串，为 `notarytool submit` 增加
+`--keychain /path/to/keychain-db`。只有 `notarytool` 返回 `Accepted`，并且
+`stapler validate` 与 `spctl` 均通过后，DMG 才可作为正式对外发布产物。
+最终应同时发布 `.dmg` 和对应的 `.dmg.sha256` 文件。仅签名但未公证的 DMG
+可用于内部测试，不应作为面向普通用户的正式下载包。
+
 不要将 `.p12`、证书密码、Apple ID app-specific password 或公证凭据提交到
 Git。GitHub Actions 中的证书与公证凭据应保存为 Repository Secrets，详见
 [`docs/GITHUB_RELEASE.md`](docs/GITHUB_RELEASE.md)。
