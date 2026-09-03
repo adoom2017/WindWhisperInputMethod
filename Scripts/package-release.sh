@@ -58,8 +58,13 @@ fi
 /bin/rm -f "$archive_path" "$submission_archive" "$archive_path.sha256"
 
 if [[ "${WINDWHISPER_SKIP_BUILD:-0}" != "1" ]]; then
+    ad_hoc_signing=0
+    if [[ "$mode" == "local" ]]; then
+        ad_hoc_signing=1
+    fi
     WINDWHISPER_VERSION="$version" \
     WINDWHISPER_BUILD_NUMBER="$build_number" \
+    WINDWHISPER_AD_HOC_SIGNING="$ad_hoc_signing" \
         "$project_root/Scripts/build.sh" Release
 fi
 
@@ -68,7 +73,9 @@ release_app="$staging_root/windwhisper.app"
 /bin/mkdir -p "$staging_root"
 /usr/bin/ditto "$built_app" "$release_app"
 
-if [[ "$mode" != "local" ]]; then
+if [[ "$mode" == "local" ]]; then
+    /usr/bin/codesign --force --sign - "$release_app"
+else
     /usr/bin/codesign \
         --force --options runtime --timestamp --sign "$identity" \
         "$release_app/Contents/MacOS/windwhisper"
@@ -99,7 +106,7 @@ dictionary_sha="$(/usr/bin/shasum -a 256 "$project_root/Resources/fy.dict.yaml" 
 manifest="$staging_root/VERSION_MANIFEST.json"
 /usr/bin/plutil -create xml1 "$manifest"
 /usr/bin/plutil -insert product -string windwhisper "$manifest"
-/usr/bin/plutil -insert bundleIdentifier -string com.shendongchun.inputmethod.windwhisper.local "$manifest"
+/usr/bin/plutil -insert bundleIdentifier -string com.shendongchun.inputmethod.windwhisper "$manifest"
 /usr/bin/plutil -insert version -string "$version" "$manifest"
 /usr/bin/plutil -insert build -string "$build_number" "$manifest"
 /usr/bin/plutil -insert architectures -json '["arm64","x86_64"]' "$manifest"

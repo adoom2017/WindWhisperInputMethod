@@ -51,7 +51,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - User data：用户可写配置、用户词典、安装信息与覆盖文件。
 - Logs：独立目录并可清理；默认不含输入明文。
 
-当前路径：shared data 为应用包的 `Contents/Resources`；user data 为 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/User`；日志为 `~/Library/Logs/com.shendongchun.inputmethod.windwhisper.local`。命令行集成测试使用 `/private/tmp` 隔离根目录，不读写正式用户数据。
+当前路径：shared data 为应用包的 `Contents/Resources`；user data 为 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper/User`；日志为 `~/Library/Logs/com.shendongchun.inputmethod.windwhisper`。命令行集成测试使用 `/private/tmp` 隔离根目录，不读写正式用户数据。
 
 ## 输入引擎所有权
 

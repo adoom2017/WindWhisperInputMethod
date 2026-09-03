@@ -7,11 +7,20 @@ configuration="${1:-Debug}"
 derived_data_path="$project_root/build/DerivedData"
 build_number="${WINDWHISPER_BUILD_NUMBER:-$(date +%s)}"
 marketing_version="${WINDWHISPER_VERSION:-0.1.0}"
+build_overrides=(MARKETING_VERSION="$marketing_version")
+
+if [[ "${WINDWHISPER_AD_HOC_SIGNING:-0}" == "1" ]]; then
+    build_overrides+=(
+        CODE_SIGN_IDENTITY=-
+        CODE_SIGN_STYLE=Manual
+        DEVELOPMENT_TEAM=
+    )
+fi
 
 case "$configuration" in
-    Debug|Release) ;;
+    Debug|Release|AppStore) ;;
     *)
-        echo "Usage: $0 [Debug|Release]" >&2
+        echo "Usage: $0 [Debug|Release|AppStore]" >&2
         exit 64
         ;;
 esac
@@ -35,9 +44,9 @@ if [[ "$configuration" == "Debug" ]]; then
         -destination "$destination" \
         -derivedDataPath "$derived_data_path" \
         CURRENT_PROJECT_VERSION="$build_number" \
-        MARKETING_VERSION="$marketing_version" \
         ARCHS=arm64 \
         ONLY_ACTIVE_ARCH=YES \
+        "${build_overrides[@]}" \
         build
 else
     xcodebuild \
@@ -47,7 +56,7 @@ else
         -destination "$destination" \
         -derivedDataPath "$derived_data_path" \
         CURRENT_PROJECT_VERSION="$build_number" \
-        MARKETING_VERSION="$marketing_version" \
+        "${build_overrides[@]}" \
         build
 fi
 

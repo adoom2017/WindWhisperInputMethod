@@ -4,7 +4,7 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 info_plist="$project_root/Resources/Info.plist"
-expected_bundle_id="com.shendongchun.inputmethod.windwhisper.local"
+expected_bundle_id="com.shendongchun.inputmethod.windwhisper"
 expected_mode_id="$expected_bundle_id.Hans"
 expected_display_name="windwhisper"
 
@@ -30,6 +30,24 @@ fi
 
 if ! grep -q "PRODUCT_BUNDLE_IDENTIFIER = $expected_bundle_id;" "$project_root/WindWhisperInputMethod.xcodeproj/project.pbxproj"; then
     echo "Project bundle ID does not match Info.plist input mode namespace." >&2
+    exit 65
+fi
+
+project_file="$project_root/WindWhisperInputMethod.xcodeproj/project.pbxproj"
+for required_signing_setting in \
+    'CODE_SIGN_IDENTITY = "Apple Development";' \
+    'CODE_SIGN_IDENTITY = "Developer ID Application";' \
+    'DEVELOPMENT_TEAM = YH6JCRN97J;' \
+    'CODE_SIGN_ENTITLEMENTS = Resources/AppStore.entitlements;'; do
+    if ! grep -qF "$required_signing_setting" "$project_file"; then
+        echo "Required signing setting is missing: $required_signing_setting" >&2
+        exit 65
+    fi
+done
+
+app_store_entitlements="$project_root/Resources/AppStore.entitlements"
+if [[ "$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' "$app_store_entitlements")" != true ]]; then
+    echo "Mac App Store configuration must enable App Sandbox." >&2
     exit 65
 fi
 

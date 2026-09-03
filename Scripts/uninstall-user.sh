@@ -3,7 +3,7 @@
 set -euo pipefail
 
 installed_app="$HOME/Library/Input Methods/windwhisper.app"
-expected_bundle_id="com.shendongchun.inputmethod.windwhisper.local"
+expected_bundle_id="com.shendongchun.inputmethod.windwhisper"
 lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 
 if [[ ! -d "$installed_app" ]]; then

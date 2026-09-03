@@ -75,6 +75,7 @@
 		A20000000000000000000026 /* M8SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M8SmokeTest.swift; sourceTree = "<group>"; };
 		A20000000000000000000027 /* CustomWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWords.swift; sourceTree = "<group>"; };
 		A20000000000000000000028 /* CustomWordsEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWordsEditor.swift; sourceTree = "<group>"; };
+		A20000000000000000000029 /* AppStore.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AppStore.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -143,6 +144,7 @@
 		A40000000000000000000006 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				A20000000000000000000029 /* AppStore.entitlements */,
 				A20000000000000000000006 /* Info.plist */,
 				A20000000000000000000009 /* WindWhisperInputIcon-v1.pdf */,
 				A2000000000000000000000B /* Assets.xcassets */,
@@ -346,13 +348,35 @@
 			};
 			name = Release;
 		};
+		AA0000000000000000000005 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = "arm64 x86_64";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = AppStore;
+		};
 		AA0000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YH6JCRN97J;
 				ENABLE_DEBUG_DYLIB = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -363,7 +387,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.windwhisper.local;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.windwhisper;
 				PRODUCT_MODULE_NAME = windwhisper;
 				PRODUCT_NAME = windwhisper;
 				SKIP_INSTALL = NO;
@@ -375,11 +399,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "-";
+				CODE_SIGN_IDENTITY = "Developer ID Application";
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YH6JCRN97J;
 				ENABLE_DEBUG_DYLIB = NO;
-				ENABLE_HARDENED_RUNTIME = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				GENERATE_PKGINFO_FILE = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -388,13 +413,40 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 0.1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.windwhisper.local;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp";
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.windwhisper;
 				PRODUCT_MODULE_NAME = windwhisper;
 				PRODUCT_NAME = windwhisper;
 				SKIP_INSTALL = NO;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 			};
 			name = Release;
+		};
+		AA0000000000000000000006 /* AppStore */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/AppStore.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = YH6JCRN97J;
+				ENABLE_DEBUG_DYLIB = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				GENERATE_PKGINFO_FILE = YES;
+				INFOPLIST_FILE = Resources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.shendongchun.inputmethod.windwhisper;
+				PRODUCT_MODULE_NAME = windwhisper;
+				PRODUCT_NAME = windwhisper;
+				SKIP_INSTALL = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+			};
+			name = AppStore;
 		};
 /* End XCBuildConfiguration section */
 
@@ -404,6 +456,7 @@
 			buildConfigurations = (
 				AA0000000000000000000001 /* Debug */,
 				AA0000000000000000000002 /* Release */,
+				AA0000000000000000000005 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -413,6 +466,7 @@
 			buildConfigurations = (
 				AA0000000000000000000003 /* Debug */,
 				AA0000000000000000000004 /* Release */,
+				AA0000000000000000000006 /* AppStore */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

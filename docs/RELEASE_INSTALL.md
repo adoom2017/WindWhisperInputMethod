@@ -18,7 +18,7 @@ Developer ID 公证版应能通过 Gatekeeper。标记为 `local` 的候选包�
 先在系统设置中移除“风语”，再把 `~/Library/Input Methods/windwhisper.app` 移到废纸篓。默认保留以下用户数据：
 
 ```text
-~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/Data
+~/Library/Application Support/com.shendongchun.inputmethod.windwhisper/Data
 ```
 
 需要彻底删除数据时，应先备份自定义词典和 `.custom.yaml`，再由用户单独删除该明确目录。
