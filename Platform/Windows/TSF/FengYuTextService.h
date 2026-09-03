@@ -46,6 +46,8 @@ private:
     HRESULT SetFullWidthFromLanguageBar(bool);
     HRESULT SetTraditionalFromLanguageBar(bool);
     HRESULT SetCandidateThemeFromLanguageBar(bool light);
+    HRESULT ManageCustomPhrasesFromLanguageBar();
+    void ReloadCustomPhrases();
     void RemoveContext(ITfContext*);
     void RemoveDocumentManager(ITfDocumentMgr*);
     void ConfigureInputMode(ITfContext*);

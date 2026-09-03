@@ -1,5 +1,7 @@
 #include "FengYuTextService.h"
 #include "../CandidateWindow/CandidateWindow.h"
+#include "../Settings/CustomPhraseEditor.h"
+#include "../Settings/CustomPhraseStore.h"
 #include "WindowsKeyMapper.h"
 #include "fy_engine.h"
 
@@ -12,6 +14,7 @@
 #include <filesystem>
 #include <future>
 #include <memory>
+#include <optional>
 #include <string>
 #include <strsafe.h>
 #include <unordered_map>
@@ -279,9 +282,7 @@ std::string LoadBundledDictionary() {
     const DWORD local_length = GetEnvironmentVariableW(
         L"LOCALAPPDATA", local_app_data, static_cast<DWORD>(std::size(local_app_data)));
     if (local_length > 0 && local_length < std::size(local_app_data)) {
-        const std::filesystem::path custom_path =
-            std::filesystem::path(local_app_data, local_app_data + local_length) /
-            L"WindWhisper" / L"InputMethod" / L"custom_words.tsv";
+        const std::filesystem::path custom_path = fengyu::CustomPhraseFilePath();
         std::ifstream custom(custom_path, std::ios::binary);
         if (custom) {
             std::string line;
@@ -338,6 +339,11 @@ class FengYuTextServiceState {
 public:
     FengYuTextServiceState() {
         schema_ = ReadConfiguredSchema();
+        BeginEngineLoad();
+    }
+
+    void BeginEngineLoad() {
+        custom_phrase_timestamp_ = CustomPhraseTimestamp();
         // TSF creates the text service while new UI (for example Win+R) is
         // being opened. Parse the large dictionary away from that UI thread.
         engine_future_ = std::async(std::launch::async, [] {
@@ -348,6 +354,19 @@ public:
                 return static_cast<fy_engine *>(nullptr);
             }
         });
+    }
+
+    bool CustomPhrasesChanged() const {
+        return custom_phrase_timestamp_ != CustomPhraseTimestamp();
+    }
+
+    void ReloadDictionary() {
+        candidate_window_.Hide();
+        sessions_.clear();
+        ResolveEngine();
+        fy_engine_destroy(engine_);
+        engine_ = nullptr;
+        BeginEngineLoad();
     }
 
     void SetSchema(const char *schema) {
@@ -424,6 +443,18 @@ public:
     }
 
 private:
+    static std::optional<std::filesystem::file_time_type>
+    CustomPhraseTimestamp() {
+        std::error_code error;
+        const auto path = fengyu::CustomPhraseFilePath();
+        if (path.empty() || !std::filesystem::exists(path, error) || error) {
+            return std::nullopt;
+        }
+        const auto timestamp = std::filesystem::last_write_time(path, error);
+        return error ? std::nullopt
+                     : std::optional<std::filesystem::file_time_type>(timestamp);
+    }
+
     fy_engine *ResolveEngine() {
         if (!engine_ && engine_future_.valid()) {
             try {
@@ -437,6 +468,7 @@ private:
 
     fy_engine *engine_ = nullptr;
     std::future<fy_engine *> engine_future_;
+    std::optional<std::filesystem::file_time_type> custom_phrase_timestamp_;
     std::unordered_map<ITfContext *, std::shared_ptr<FengYuContextSession>> sessions_;
     CandidateWindow candidate_window_;
     std::string schema_ = "flypyShape";
@@ -724,6 +756,8 @@ public:
                     131, L"浅色");
         AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(themes),
                     L"候选框配色");
+        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuW(menu, MF_STRING, 140, L"管理自定义词组...");
         if (point.x == 0 && point.y == 0) GetCursorPos(&point);
         const UINT command = TrackPopupMenu(
             menu, TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
@@ -742,6 +776,10 @@ public:
         } else if (command == 130 || command == 131) {
             result = service_
                          ? service_->SetCandidateThemeFromLanguageBar(command == 131)
+                         : E_FAIL;
+        } else if (command == 140) {
+            result = service_
+                         ? service_->ManageCustomPhrasesFromLanguageBar()
                          : E_FAIL;
         }
         DestroyMenu(menu);
@@ -1525,6 +1563,20 @@ HRESULT FengYuTextService::SetCandidateThemeFromLanguageBar(bool light) {
     return saved ? S_OK : E_FAIL;
 }
 
+void FengYuTextService::ReloadCustomPhrases() {
+    for (const auto &context : state_->Drain()) {
+        QueueEditSession(context, client_id_, L"", L"");
+    }
+    state_->ReloadDictionary();
+}
+
+HRESULT FengYuTextService::ManageCustomPhrasesFromLanguageBar() {
+    const auto result = fengyu::ShowCustomPhraseEditor(GetForegroundWindow());
+    if (result != fengyu::CustomPhraseEditorResult::Saved) return S_FALSE;
+    ReloadCustomPhrases();
+    return S_OK;
+}
+
 HRESULT FengYuTextService::OnPreservedKey(ITfContext *, REFGUID, BOOL *eaten) {
     if (!eaten) {
         return E_POINTER;
@@ -1548,6 +1600,9 @@ HRESULT FengYuTextService::OnSetFocus(
     state_->ReloadSchema();
     if (previous && previous != focused) {
         RemoveDocumentManager(previous);
+    }
+    if (state_->CustomPhrasesChanged()) {
+        ReloadCustomPhrases();
     }
     if (focused) {
         ITfContext *context = nullptr;

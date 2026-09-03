@@ -3,7 +3,7 @@
   <Package
       Name="风语输入法"
       Manufacturer="WindWhisper"
-      Version="1.0.33"
+      Version="1.0.35"
       Language="2052"
       UpgradeCode="9A4D32D6-6D4A-4C8D-9F2F-8A0B7D0E6D11"
       Scope="perMachine">
