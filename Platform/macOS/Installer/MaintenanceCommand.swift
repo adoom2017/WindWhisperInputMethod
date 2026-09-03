@@ -72,7 +72,9 @@ enum MaintenanceCommand {
         case "--m6-smoke":
             return EngineSmokeTest.run(arguments: arguments)
         case "--m7-smoke":
-            return EngineSmokeTest.run(arguments: arguments)
+            return MainActor.assumeIsolated {
+                M7SmokeTest.run(arguments: arguments)
+            }
         case "--m8-smoke":
             return MainActor.assumeIsolated {
                 M8SmokeTest.run(arguments: arguments)

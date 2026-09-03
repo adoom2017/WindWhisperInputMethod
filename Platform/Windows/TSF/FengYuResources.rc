@@ -1,0 +1,5 @@
+#include <windows.h>
+
+#define IDI_FENGYU_IME 101
+
+IDI_FENGYU_IME ICON "../../../Resources/WindWhisperProfile.ico"

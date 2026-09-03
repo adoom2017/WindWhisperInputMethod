@@ -5,11 +5,18 @@
 - 状态：已接受
 - 使用 InputMethodKit 管理系统会话，候选窗使用非激活 AppKit 面板，保持宿主应用焦点。
 
-## ADR-002：原生 Swift 输入引擎
+## ADR-002：原生 Swift 输入引擎（已被 ADR-008 取代）
 
 - 状态：已接受
 - 输入组合、双拼转换、候选排序和用户词条均在 Swift 内完成，不依赖外部动态库、external runtime 或运行时部署工具。
 - `NativeRuntime` 负责进程级服务，`InputSession` 负责会话级状态。
+
+## ADR-008：双平台共享 C++ 核心
+
+- 状态：迁移中
+- macOS 与 Windows 的目标架构统一使用 `Core/` 中的 C++17 输入核心和稳定 C ABI。
+- macOS 当前仍由 `Core/SwiftAdapter` 中的既有 Swift 引擎提供生产行为；在 C++ golden 覆盖达到同等水平前不切换，避免 macOS 功能回退。
+- Windows TSF 只能依赖 C ABI，不复制输入算法。平台目录只负责生命周期、文本系统、窗口、设置和安装集成。
 
 ## ADR-003：单一合并词库
 

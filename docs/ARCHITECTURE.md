@@ -8,11 +8,19 @@
 4. 任何磁盘读取和配置解析都不进入按键热路径，任何 AppKit 更新都回到主线程。
 5. 前端不实现双拼或辅码算法，它们由输入引擎根据词库索引处理。
 
+## 双平台迁移边界
+
+- `Core/` 是跨平台 C++17 核心、C ABI、golden tests 与过渡期 Swift adapter 的唯一目录。
+- `Platform/macOS/` 只包含 InputMethodKit、AppKit、macOS 设置和安装集成。
+- `Platform/Windows/` 只包含 TSF、Win32/DirectWrite、Windows 设置和注册集成。
+- macOS 当前生产算法仍在 `Core/SwiftAdapter`；C++ 核心达到等价测试覆盖后再切换 C ABI。
+- Windows 不得依赖 Swift adapter，也不得复制另一套输入算法。
+
 ## 组件边界
 
 | 组件 | 输入 | 输出 | 明确不负责 |
 |---|---|---|---|
-| App/Server | 进程事件、IMK 连接 | controller、全局服务 | 候选布局、编码算法 |
+| Platform/macOS/App | 进程事件、IMK 连接 | controller、全局服务 | 候选布局、编码算法 |
 | InputController | NSEvent、client 状态 | commit、marked text、UI 快照 | 绘图、词库解析 |
 | InputEngine | 规范化按键、会话动作 | 值类型 context/status/commit | AppKit、窗口定位 |
 | CandidateWindow | 候选快照、光标矩形、主题 | 选择/翻页等语义动作 | 引擎访问、文本提交 |

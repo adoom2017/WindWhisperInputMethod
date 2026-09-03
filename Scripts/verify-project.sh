@@ -90,8 +90,8 @@ fi
 
 for required_file in \
     "$project_root/Resources/fy.dict.yaml" \
-    "$project_root/Sources/InputEngine/EngineSmokeTest.swift" \
-    "$project_root/Sources/InputEngine/InputService.swift"; do
+    "$project_root/Core/SwiftAdapter/InputService.swift" \
+    "$project_root/Platform/macOS/InputMethod/EngineSmokeTest.swift"; do
     if [[ ! -f "$required_file" ]]; then
         echo "Required M2 dependency file is missing: $required_file" >&2
         exit 66
