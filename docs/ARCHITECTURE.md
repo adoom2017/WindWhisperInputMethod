@@ -59,7 +59,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - User data：用户可写配置、用户词典、安装信息与覆盖文件。
 - Logs：独立目录并可清理；默认不含输入明文。
 
-当前路径：shared data 为应用包的 `Contents/Resources`；user data 为 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper.local/User`；日志为 `~/Library/Logs/com.shendongchun.inputmethod.windwhisper.local`。命令行集成测试使用 `/private/tmp` 隔离根目录，不读写正式用户数据。
+当前路径：shared data 为应用包的 `Contents/Resources`；user data 为 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper/User`；日志为 `~/Library/Logs/com.shendongchun.inputmethod.windwhisper`。命令行集成测试使用 `/private/tmp` 隔离根目录，不读写正式用户数据。
 
 ## 输入引擎所有权
 
@@ -113,7 +113,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 
 - `Scripts/lib/install-transaction.sh` 是用户级安装的原子替换边界，明确区分 source、installing、installed 和 previous 四个路径；完整失败和两个中间失败状态都能恢复旧应用与新构建。
 - `package-release.sh` 先构建固定版本/构建号的 universal Release，再按 local、Developer ID signed 或 notarized 模式处理签名。正式模式按 Frameworks、主程序、app 的顺序启用 Hardened Runtime 和可信时间戳。
-- 发布目录包含 app、许可证、安装/回滚/卸载说明、发布说明、已知问题和 JSON 版本清单；外层 ZIP 另有 SHA-256。
+- 发布目录包含 app、许可证、安装/回滚/卸载说明、发布说明、已知问题和 JSON 版本清单；外层 ZIP 和拖拽安装 DMG 各有 SHA-256。
 - `verify-release.sh` 从最终 ZIP 重新解包检查 Bundle ID、版本、arm64/x86_64、动态依赖、清单校验值、源码泄漏、签名链、Hardened Runtime，并在 notarized 模式执行 stapler 与 Gatekeeper。
 
 ## 错误降级

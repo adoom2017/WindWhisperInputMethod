@@ -108,11 +108,12 @@ Windows 设置 → 应用 → 已安装的应用 → 风语输入法 → 卸载
 
 ### 安装
 
-1. 解压发布包。
-2. 将 `windwhisper.app` 移到 `~/Library/Input Methods/`。
-3. 打开“系统设置 → 键盘 → 文本输入 → 编辑”。
-4. 在简体中文分类中添加并启用“风语”。
-5. 从菜单栏输入法菜单切换到风语。
+1. 双击下载的 DMG。
+2. 将 `windwhisper` 拖到右侧的“拖到这里安装”，并按 Finder 提示确认。
+3. 注销并重新登录。
+4. 打开“系统设置 → 键盘 → 文本输入 → 编辑”。
+5. 在简体中文分类中添加并启用“风语”。
+6. 从菜单栏输入法菜单切换到风语。
 
 首次安装新的输入法身份时，macOS 会要求用户手动授权。详细的升级、回滚和卸载说明见 [发布版安装说明](docs/RELEASE_INSTALL.md)。
 
@@ -174,6 +175,97 @@ Windows 架构、TSF 注册和测试说明见 [Windows 开发文档](docs/WINDOW
 build/DerivedData/Build/Products/<Configuration>/windwhisper.app
 ```
 
+## 正式签名与 Apple 公证
+
+对 Mac 外部分发需使用 Apple Developer 账号中的 `Developer ID Application`
+证书，`Apple Development` 证书仅适用于开发调试。先检查本机可用的签名身份：
+
+```bash
+security find-identity -v -p codesigning
+```
+
+输出中应包含类似下面的条目：
+
+```text
+Developer ID Application: Your Name (TEAMID)
+```
+
+如果显示 `0 valid identities found`，请在“钥匙串访问”中导入创建该证书时导出的
+`.p12`，并确认证书下方有对应的私钥。仅安装从 Apple 下载的 `.cer`
+不会构成可用 identity；如果私钥在另一台 Mac，需从那台 Mac 导出包含私钥的
+`.p12` 再导入本机。
+
+### 生成正式签名包
+
+将下面的 identity 替换为上一步查到的完整证书名称：
+
+```bash
+WINDWHISPER_CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+  Scripts/package-release.sh signed 0.1.0 2026090201
+```
+
+`signed` 模式会构建 arm64/x86_64 通用应用，启用 Hardened Runtime、时间戳并使用
+Developer ID 签名，然后在 `dist/` 下生成 ZIP、DMG 和各自的 SHA-256 文件。构建号必须为纯数字。
+可用以下命令查看和验证签名：
+
+```bash
+codesign -dvv dist/windwhisper-0.1.0-2026090201-macos-universal/windwhisper.app
+codesign --verify --deep --strict --verbose=2 \
+  dist/windwhisper-0.1.0-2026090201-macos-universal/windwhisper.app
+```
+
+仅完成 Developer ID 签名的包可用于内部验证；面向用户分发时应继续完成 Apple 公证。
+`Scripts/package-release.sh local ...` 只会使用 ad-hoc 签名，不是正式发布包。
+
+### 生成已公证发布包
+
+先在 Apple ID 账号页面创建 app-specific password，然后将公证凭据安全存入登录钥匙串：
+
+```bash
+xcrun notarytool store-credentials "windwhisper-notary" \
+  --apple-id "your-apple-id@example.com" \
+  --team-id "TEAMID" \
+  --password "app-specific-password"
+```
+
+提交公证并将 ticket staple 到应用：
+
+```bash
+WINDWHISPER_CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+WINDWHISPER_NOTARY_PROFILE="windwhisper-notary" \
+WINDWHISPER_NOTARY_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db" \
+  Scripts/package-release.sh notarized 0.1.0 2026090201
+```
+
+`notarized` 模式会完成签名、上传公证、等待 Apple 结果、staple、
+`stapler validate` 和最终发布包校验。DMG 拖拽安装后输入法位于：
+
+```text
+/Library/Input Methods/windwhisper.app
+```
+
+### 生成正式签名并公证的 DMG
+
+`Scripts/package-release.sh` 会同时生成 ZIP 和带拖拽安装界面的 DMG。DMG 中的
+目标快捷方式指向系统级 `/Library/Input Methods`，复制时 Finder 会请求管理员确认。
+下面示例中的版本号、构建号、证书名称和公证 profile 应替换为实际值：
+
+```bash
+WINDWHISPER_CODE_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+WINDWHISPER_NOTARY_PROFILE="windwhisper-notary" \
+  Scripts/package-release.sh notarized 0.1.0 2026090301
+```
+
+若公证凭据存放在非默认钥匙串，为 `notarytool submit` 增加
+`--keychain /path/to/keychain-db`。只有 `notarytool` 返回 `Accepted`，并且
+`stapler validate` 与 `spctl` 均通过后，DMG 才可作为正式对外发布产物。
+最终应同时发布 `.dmg` 和对应的 `.dmg.sha256` 文件。仅签名但未公证的 DMG
+可用于内部测试，不应作为面向普通用户的正式下载包。
+
+不要将 `.p12`、证书密码、Apple ID app-specific password 或公证凭据提交到
+Git。GitHub Actions 中的证书与公证凭据应保存为 Repository Secrets，详见
+[`docs/GITHUB_RELEASE.md`](docs/GITHUB_RELEASE.md)。
+
 ## 项目结构
 
 ```text
@@ -186,6 +278,9 @@ Scripts/            构建、安装、验证和发布脚本
 docs/               架构、发布与验收文档
 ```
 
-## 发布
+## 自动发布
 
-使用 `vMAJOR.MINOR.PATCH` 格式创建 GitHub Release 后，现有工作流会构建、签名并公证 macOS 通用版本。签名和公证配置见 [GitHub 发布说明](docs/GITHUB_RELEASE.md)。Windows MSI 可通过上述 Windows 构建命令生成。
+发布 `vMAJOR.MINOR.PATCH` 格式的 GitHub Release 后，GitHub Actions 会自动构建、
+Developer ID 签名、公证并上传 macOS universal ZIP、DMG 与各自的 SHA-256 文件。首次启用前需
+配置签名与 Apple 公证 Secrets，详见
+[`docs/GITHUB_RELEASE.md`](docs/GITHUB_RELEASE.md)。

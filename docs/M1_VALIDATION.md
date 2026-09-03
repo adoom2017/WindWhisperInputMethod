@@ -35,7 +35,7 @@ arch -x86_64 <Release app executable> --diagnose
 ## 安装测试状态
 
 - 早期不完整元数据与旧 Bundle ID 的测试副本未进入 TIS；相关副本和手工偏好修改已移走或从备份恢复。
-- 最终开发标识 `com.shendongchun.inputmethod.windwhisper.local` 使用 ad-hoc 本地签名后，首次调用注册即生成父输入法与 `.Hans` 子模式。
+- 正式标识 `com.shendongchun.inputmethod.windwhisper` 使用本地签名后，首次调用注册即生成父输入法与 `.Hans` 子模式。
 - 父输入法与子模式均达到 `enabled=true`，子模式达到 `selectCapable=true`，并成功切换为当前输入源。
 - 已执行第二次完整构建和热替换，注册、启用、临时选择、恢复原输入法全流程再次成功；未注销、未重启、未上传构建包。
 - 原生 `NSTextView` 测试宿主通过当前 `NSTextInputContext` 输入 `abc`，结果保持为 `abc`，证明 passthrough 不吞键。

@@ -53,7 +53,7 @@ done
 bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$application_path/Contents/Info.plist")"
 version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$application_path/Contents/Info.plist")"
 build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$application_path/Contents/Info.plist")"
-[[ "$bundle_id" == "com.shendongchun.inputmethod.windwhisper.local" ]] \
+[[ "$bundle_id" == "com.shendongchun.inputmethod.windwhisper" ]] \
     || fail "unexpected bundle identifier: $bundle_id"
 [[ "$(/usr/bin/plutil -extract version raw "$manifest")" == "$version" ]] \
     || fail "manifest version does not match Info.plist"

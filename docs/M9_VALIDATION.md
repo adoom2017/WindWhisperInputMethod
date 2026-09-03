@@ -3,7 +3,8 @@
 ## 已实现流程
 
 - `Scripts/lib/install-transaction.sh`：用户级原子替换、提交和回滚。
-- `Scripts/package-release.sh`：local、Developer ID signed、Developer ID + notarized 三种模式。
+- `Scripts/package-release.sh`：local、Developer ID signed、Developer ID + notarized 三种模式，同时生成 ZIP 和拖拽安装 DMG。
+- `Scripts/create-dmg.sh` / `Scripts/verify-dmg.sh`：生成标准 Finder 左右拖拽布局，并验证应用和 `/Library/Input Methods` 目标链接。
 - `Scripts/verify-release.sh`：从最终 ZIP 解包检查版本、校验值、通用架构、动态依赖、签名、许可证和发布文档。
 - `Scripts/test-m9.sh`：隔离验证升级提交、完整回滚、全新安装回滚、仅 staging 完成时回滚、旧版已移到 previous 时回滚、路径冲突拒绝，以及 local 发布包。
 
