@@ -11,6 +11,7 @@ enum EngineSmokeTest {
             print("statisticalLanguageModel=passed")
             print("simplifiedTraditionalConversion=passed")
             print("flypyShape=passed")
+            print("selectiveSchemaLoading=passed")
             print("flypyFourKeyAutoCommit=passed")
             print("flypyFourKeyMultipleCandidates=passed")
             print("flypyFourKeyContinuationCommit=passed")
@@ -74,6 +75,7 @@ enum EngineSmokeTest {
         try verifyCandidate(service: service, schema: .flypy, code: "fy", text: "风语输入法")
         try verifyCandidatePageAliases(service: service)
         try verifyFlypyCodeReverseLookup(service: service)
+        try verifySelectiveSchemaLoading(paths: paths)
 
         try "刷新配置\tsx\t9999999\n".write(
             to: paths.userData.appendingPathComponent("custom_words.tsv"),
@@ -114,6 +116,23 @@ enum EngineSmokeTest {
             throw InputEngineError.smokeAssertion("four-key Flypy auto commit failed")
         }
 
+    }
+
+    private static func verifySelectiveSchemaLoading(paths: InputServicePaths) throws {
+        let fixtures: [(schema: FengYuSchema, code: String, expected: String)] = [
+            (.flypy, "ubu", "是不是"),
+            (.flypyPhonetic, "nihc", "你好"),
+            (.fullPinyin, "nihao", "你好"),
+        ]
+        for fixture in fixtures {
+            let service = try InputService(paths: paths, enabledSchemas: [fixture.schema])
+            try verifyCandidate(
+                service: service,
+                schema: fixture.schema,
+                code: fixture.code,
+                text: fixture.expected
+            )
+        }
     }
 
     private static func verifyCandidatePageAliases(service: InputService) throws {

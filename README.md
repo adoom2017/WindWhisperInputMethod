@@ -1,6 +1,6 @@
 # 风语输入法
 
-风语（WindWhisper）是一款面向 Windows 和 macOS 的中文输入法，支持小鹤音形、小鹤双拼和全拼。项目使用同一份词典与输入规则，并针对 Windows TSF 和 macOS InputMethodKit 分别提供原生界面。
+风语（WindWhisper）是一款面向 Windows、macOS 和 iOS 的中文输入法，支持小鹤音形、小鹤双拼和全拼。项目使用同一份词典与输入规则，并通过 Windows TSF、macOS InputMethodKit 和 iOS Keyboard Extension 提供各平台原生集成。
 
 ## 功能概览
 
@@ -174,6 +174,36 @@ Windows 架构、TSF 注册和测试说明见 [Windows 开发文档](docs/WINDOW
 ```text
 build/DerivedData/Build/Products/<Configuration>/windwhisper.app
 ```
+
+## iOS 开发构建与测试
+
+iOS 版本由宿主 App 和 Keyboard Extension 组成，最低支持 iOS 17。需要 Xcode 26、
+iOS Simulator runtime 和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。在仓库根目录执行：
+
+```bash
+cd iOS
+xcodegen generate --spec project.yml
+xcodebuild \
+  -project WindWhisperiOS.xcodeproj \
+  -scheme WindWhisper \
+  -configuration Debug \
+  -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -derivedDataPath ../build/iOSDerivedData \
+  build CODE_SIGNING_ALLOWED=NO
+```
+
+模拟器产物位于：
+
+```text
+build/iOSDerivedData/Build/Products/Debug-iphonesimulator/WindWhisper.app
+```
+
+交互测试建议使用 Xcode 打开 `iOS/WindWhisperiOS.xcodeproj`，选择 `WindWhisper`
+scheme 和一个 iPhone 模拟器运行。安装宿主 App 后，在模拟器的“设置 → 通用 → 键盘 →
+键盘 → 添加新键盘”中启用“风语”，再到备忘录等普通文本框切换到风语键盘。
+
+完整的模拟器、真机、测试用例和故障排查说明见 [iOS 测试说明](iOS/README.md)。
 
 ## 正式签名与 Apple 公证
 

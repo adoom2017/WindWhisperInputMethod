@@ -35,17 +35,27 @@ struct InputServicePaths: Sendable {
             throw InputEngineError.missingBundledData
         }
 
-        let identifier = InputSourceMetadata.persistentDataIdentifier
+        let identifier = InputEnginePlatform.persistentDataIdentifier
+        #if os(macOS)
         let library = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library", isDirectory: true)
-        let root = library
-            .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent(identifier, isDirectory: true)
+        let applicationSupport = library.appendingPathComponent("Application Support", isDirectory: true)
+        let logsRoot = library.appendingPathComponent("Logs", isDirectory: true)
+        #else
+        let applicationSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let logsRoot = applicationSupport.appendingPathComponent("Logs", isDirectory: true)
+        #endif
+        let root = applicationSupport.appendingPathComponent(identifier, isDirectory: true)
         let userData = root.appendingPathComponent("User", isDirectory: true)
         return Self(
             sharedData: sharedData,
             userData: userData,
-            logs: library.appendingPathComponent("Logs", isDirectory: true)
+            logs: logsRoot
                 .appendingPathComponent(identifier, isDirectory: true)
         )
     }
@@ -153,22 +163,34 @@ private final class NativeDictionary: @unchecked Sendable {
     private let flypyPhoneticEntries: [NativeDictionaryEntry]
     private let languageModel: NativeStatisticalLanguageModel
 
-    init(sharedData: URL, userData: URL) throws {
+    init(sharedData: URL, userData: URL, enabledSchemas: Set<FengYuSchema>) throws {
         let dictionaryURL = sharedData.appendingPathComponent("fy.dict.yaml")
         guard FileManager.default.fileExists(atPath: dictionaryURL.path) else {
             throw InputEngineError.missingBundledData
         }
 
-        let allEntries = try Self.readConsolidatedEntries(at: dictionaryURL)
+        let needsShape = enabledSchemas.contains(.flypy)
+        let needsPinyin = enabledSchemas.contains(.fullPinyin)
+        let needsFlypyPhonetic = enabledSchemas.contains(.flypyPhonetic)
+        var includedSources = Set<ConsolidatedSource>()
+        if needsShape { includedSources.insert(.flypy) }
+        if needsPinyin || needsFlypyPhonetic {
+            includedSources.formUnion([.pinyin, .essay])
+        }
+
+        let allEntries = try Self.readConsolidatedEntries(
+            at: dictionaryURL,
+            includedSources: includedSources
+        )
         let shape = allEntries.filter { $0.source == .flypy }
         var languageModelBuilder = NativeStatisticalLanguageModel.Builder()
         let customURL = userData.appendingPathComponent("custom_words.tsv")
-        var shapeEntries = shape.map(\.entry)
-        if FileManager.default.fileExists(atPath: customURL.path) {
+        var shapeEntries = needsShape ? shape.map(\.entry) : []
+        if needsShape, FileManager.default.fileExists(atPath: customURL.path) {
             shapeEntries.insert(contentsOf: try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000), at: 0)
         }
         self.shapeEntries = Self.sortedForPrefixSearch(shapeEntries)
-        shapeCodesByText = Self.shapeCodesByText(shapeEntries)
+        shapeCodesByText = needsShape ? Self.shapeCodesByText(shapeEntries) : [:]
 
         let pinyinRows = allEntries.filter { $0.source == .pinyin }.map(\.entry)
         let essayRows = allEntries.filter { $0.source == .essay }.map(\.entry)
@@ -181,10 +203,10 @@ private final class NativeDictionary: @unchecked Sendable {
             }
         }
 
-        var pinyin = characterRows.map {
+        var pinyin = needsPinyin ? characterRows.map {
             NativeDictionaryEntry(text: $0.text, code: Self.normalizedPinyin($0.code), weight: $0.weight, order: $0.order)
-        }
-        var flypyPhonetic = characterRows.compactMap { entry -> NativeDictionaryEntry? in
+        } : []
+        var flypyPhonetic = needsFlypyPhonetic ? characterRows.compactMap { entry -> NativeDictionaryEntry? in
             guard let code = Self.flypySyllable(entry.code) else { return nil }
             return NativeDictionaryEntry(
                 text: entry.text,
@@ -192,7 +214,7 @@ private final class NativeDictionary: @unchecked Sendable {
                 weight: entry.weight,
                 order: entry.order
             )
-        }
+        } : []
 
         var order = pinyin.count
         var simplifiedCharacterCache = [Character: String]()
@@ -230,18 +252,22 @@ private final class NativeDictionary: @unchecked Sendable {
                 flypyCode += encodedSyllable
             }
             guard complete else { continue }
-            pinyin.append(NativeDictionaryEntry(
-                text: simplified,
-                code: code,
-                weight: entry.weight,
-                order: order
-            ))
-            flypyPhonetic.append(NativeDictionaryEntry(
-                text: simplified,
-                code: flypyCode,
-                weight: entry.weight,
-                order: order
-            ))
+            if needsPinyin {
+                pinyin.append(NativeDictionaryEntry(
+                    text: simplified,
+                    code: code,
+                    weight: entry.weight,
+                    order: order
+                ))
+            }
+            if needsFlypyPhonetic {
+                flypyPhonetic.append(NativeDictionaryEntry(
+                    text: simplified,
+                    code: flypyCode,
+                    weight: entry.weight,
+                    order: order
+                ))
+            }
             order += 1
         }
 
@@ -250,7 +276,7 @@ private final class NativeDictionary: @unchecked Sendable {
         languageModel = languageModelBuilder.build()
     }
 
-    private enum ConsolidatedSource {
+    private enum ConsolidatedSource: Hashable {
         case flypy
         case pinyin
         case essay
@@ -261,7 +287,10 @@ private final class NativeDictionary: @unchecked Sendable {
         let source: ConsolidatedSource
     }
 
-    private static func readConsolidatedEntries(at url: URL) throws -> [ConsolidatedEntry] {
+    private static func readConsolidatedEntries(
+        at url: URL,
+        includedSources: Set<ConsolidatedSource>
+    ) throws -> [ConsolidatedEntry] {
         let contents = try String(contentsOf: url, encoding: .utf8)
         var entries = [ConsolidatedEntry]()
         for line in contents.split(whereSeparator: \.isNewline) {
@@ -278,7 +307,7 @@ private final class NativeDictionary: @unchecked Sendable {
             case "essay": source = .essay
             default: source = nil
             }
-            guard let source else { continue }
+            guard let source, includedSources.contains(source) else { continue }
             let text = String(fields[0])
             let code = String(fields[1]).lowercased()
             guard !text.isEmpty, !code.isEmpty,
@@ -583,7 +612,11 @@ final class InputService: @unchecked Sendable {
     private let lock = NSLock()
     private var activeSessions = 0
 
-    init(paths: InputServicePaths, minLogLevel: Int32 = 2) throws {
+    init(
+        paths: InputServicePaths,
+        enabledSchemas: Set<FengYuSchema> = Set(FengYuSchema.allCases),
+        minLogLevel: Int32 = 2
+    ) throws {
         self.paths = paths
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
@@ -592,7 +625,11 @@ final class InputService: @unchecked Sendable {
         if !fileManager.fileExists(atPath: customWords.path) {
             try "# 词条<Tab>编码<Tab>可选权重\n".write(to: customWords, atomically: true, encoding: .utf8)
         }
-        dictionary = try NativeDictionary(sharedData: paths.sharedData, userData: paths.userData)
+        dictionary = try NativeDictionary(
+            sharedData: paths.sharedData,
+            userData: paths.userData,
+            enabledSchemas: enabledSchemas
+        )
         _ = minLogLevel
     }
 
@@ -677,7 +714,7 @@ final class InputSession: @unchecked Sendable {
         pendingCommit = nil
 
         if keyCode == Key.shiftLeft {
-            if modifierMask & KeyMapper.ModifierMask.release != 0 {
+            if modifierMask & InputEngineModifierMask.release != 0 {
                 defer { leftShiftPending = false }
                 guard leftShiftPending else { return false }
                 if !buffer.isEmpty {
@@ -696,7 +733,7 @@ final class InputSession: @unchecked Sendable {
         if keyCode != Key.shiftLeft { leftShiftPending = false }
 
         if handleOptionShortcut(keyCode: keyCode, modifierMask: modifierMask) { return true }
-        if modifierMask & (KeyMapper.ModifierMask.control | KeyMapper.ModifierMask.option) != 0 {
+        if modifierMask & (InputEngineModifierMask.control | InputEngineModifierMask.option) != 0 {
             return false
         }
         if options["ascii_mode"] == true { return false }
@@ -762,7 +799,7 @@ final class InputSession: @unchecked Sendable {
                 return true
             }
             if character.isASCII, character.isLetter {
-                guard modifierMask & KeyMapper.ModifierMask.shift == 0 else { return false }
+                guard modifierMask & InputEngineModifierMask.shift == 0 else { return false }
                 // A complete Flypy code with ambiguous candidates is committed
                 // when the user starts the next syllable, matching the normal
                 // continuous-input behavior without requiring Space.
@@ -947,8 +984,8 @@ final class InputSession: @unchecked Sendable {
     }
 
     private func handleOptionShortcut(keyCode: Int32, modifierMask: Int32) -> Bool {
-        let control = modifierMask & KeyMapper.ModifierMask.control != 0
-        let shift = modifierMask & KeyMapper.ModifierMask.shift != 0
+        let control = modifierMask & InputEngineModifierMask.control != 0
+        let shift = modifierMask & InputEngineModifierMask.shift != 0
         if control, keyCode == 106 {
             options["simplification", default: true].toggle()
             options["zh_simp"] = options["simplification"]
