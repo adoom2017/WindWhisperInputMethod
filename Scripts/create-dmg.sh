@@ -2,10 +2,11 @@
 
 set -euo pipefail
 
-application_path="${1:-}"
+pkg_path="${1:-}"
 output_path="${2:-}"
 version="${3:-}"
-installer_link_name="拖到这里安装"
+volume_icon="${4:-}"
+installer_name="安装风语.pkg"
 temporary_root=""
 
 fail() {
@@ -20,12 +21,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-[[ -d "$application_path" ]] || fail "application does not exist: $application_path"
+[[ -f "$pkg_path" ]] || fail "PKG installer does not exist: $pkg_path"
 [[ -n "$output_path" ]] || fail "output path is required"
 [[ "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] \
     || fail "version must use numeric dotted notation"
 
-application_path="$(cd "$(dirname "$application_path")" && pwd)/$(basename "$application_path")"
+pkg_path="$(cd "$(dirname "$pkg_path")" && pwd)/$(basename "$pkg_path")"
 /bin/mkdir -p "$(dirname "$output_path")"
 output_path="$(cd "$(dirname "$output_path")" && pwd)/$(basename "$output_path")"
 
@@ -36,12 +37,15 @@ create_dmg="$(command -v create-dmg || true)"
 temporary_root="$(mktemp -d /private/tmp/windwhisper-DMG.XXXXXX)"
 dmg_source="$temporary_root/source"
 /bin/mkdir -p "$dmg_source"
-/usr/bin/ditto "$application_path" "$dmg_source/windwhisper.app"
-/bin/ln -s "/Library/Input Methods" "$dmg_source/$installer_link_name"
+/bin/cp "$pkg_path" "$dmg_source/$installer_name"
 
 /bin/rm -f "$output_path"
 
 create_dmg_options=(--format UDZO)
+if [[ -n "$volume_icon" ]]; then
+    [[ -f "$volume_icon" ]] || fail "volume icon does not exist: $volume_icon"
+    create_dmg_options+=(--volicon "$volume_icon")
+fi
 if [[ "${WINDWHISPER_DMG_SANDBOX_SAFE:-0}" == "1" ]]; then
     create_dmg_options+=(--sandbox-safe)
 fi
@@ -51,14 +55,12 @@ fi
 
 "$create_dmg" "${create_dmg_options[@]}" \
     --volname "风语输入法 $version" \
-    --volicon "$application_path/Contents/Resources/AppIcon.icns" \
     --window-pos 200 120 \
-    --window-size 660 380 \
+    --window-size 540 360 \
     --text-size 14 \
     --icon-size 128 \
-    --icon "windwhisper.app" 170 185 \
-    --icon "$installer_link_name" 490 185 \
-    --hide-extension "windwhisper.app" \
+    --icon "$installer_name" 270 175 \
+    --hide-extension "$installer_name" \
     --no-internet-enable \
     --overwrite \
     "$output_path" \

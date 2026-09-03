@@ -50,3 +50,4 @@
 - 状态：已接受
 - 最低 macOS 13；Debug 使用本机架构，Release 构建 arm64 与 x86_64。
 - 发布包包含应用、许可证、安装说明、发布说明和版本校验清单；校验脚本拒绝源码泄漏和未声明外部依赖。
+- macOS 对外安装使用固定写入 `/Library/Input Methods/windwhisper.app` 的签名 PKG；preinstall 先切换输入源并停止旧进程，避免 Finder 无法覆盖正在运行的输入法。DMG 仅作为 PKG 的下载容器。

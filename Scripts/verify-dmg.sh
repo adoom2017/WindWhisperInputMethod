@@ -35,13 +35,9 @@ mount_point="$temporary_root/mount"
     -readonly -nobrowse -noautoopen -mountpoint "$mount_point" "$dmg_path" -quiet
 mounted=1
 
-application_path="$mount_point/windwhisper.app"
-installer_link="$mount_point/拖到这里安装"
-[[ -d "$application_path" ]] || fail "windwhisper.app is missing"
-[[ -L "$installer_link" ]] || fail "installer destination link is missing"
-[[ "$(/usr/bin/readlink "$installer_link")" == "/Library/Input Methods" ]] \
-    || fail "installer destination link has an unexpected target"
-/usr/bin/codesign --verify --deep --strict --verbose=2 "$application_path"
+installer_path="$mount_point/安装风语.pkg"
+[[ -f "$installer_path" ]] || fail "安装风语.pkg is missing"
+"$(cd "$(dirname "$0")" && pwd)/verify-pkg.sh" "$installer_path" "$mode"
 
 if [[ "$mode" == "signed" ]]; then
     /usr/bin/codesign --verify --verbose=2 "$dmg_path"
@@ -52,7 +48,6 @@ if [[ "$mode" == "notarized" ]]; then
         --context context:primary-signature --verbose=2 "$dmg_path"
 fi
 
-echo "application=present"
-echo "installTarget=/Library/Input Methods"
-echo "layout=drag-to-install"
+echo "installer=安装风语.pkg"
+echo "layout=package-installer"
 echo "DMG artifact verified."

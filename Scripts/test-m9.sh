@@ -70,7 +70,7 @@ echo "upgradeCommit=passed"
 
 if [[ "${WINDWHISPER_SKIP_PACKAGE:-0}" != "1" ]]; then
     "$project_root/Scripts/package-release.sh" local 0.1.0 9000001
-    "$project_root/Scripts/verify-release.sh" \
-        "$project_root/dist/windwhisper-0.1.0-9000001-macos-universal.zip" local
+    "$project_root/Scripts/verify-pkg.sh" \
+        "$project_root/dist/windwhisper-0.1.0-9000001-macos-universal.pkg" local
     echo "localReleaseCandidate=passed"
 fi
