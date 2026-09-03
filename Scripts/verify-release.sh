@@ -46,7 +46,11 @@ for required in \
     "$application_path" "$executable" "$manifest" \
     "$release_root/LICENSES/THIRD_PARTY_NOTICES.md" \
     "$release_root/INSTALL.md" "$release_root/RELEASE_NOTES.md" \
-    "$release_root/KNOWN_ISSUES.md"; do
+    "$release_root/KNOWN_ISSUES.md" \
+    "$application_path/Contents/Resources/Documentation/LICENSES/THIRD_PARTY_NOTICES.md" \
+    "$application_path/Contents/Resources/Documentation/INSTALL.md" \
+    "$application_path/Contents/Resources/Documentation/RELEASE_NOTES.md" \
+    "$application_path/Contents/Resources/Documentation/KNOWN_ISSUES.md"; do
     [[ -e "$required" ]] || fail "required release content is missing: $required"
 done
 
@@ -91,11 +95,6 @@ else
     [[ "$signature_details" == *"flags=0x10000(runtime)"* ]] \
         || fail "Hardened Runtime is not enabled"
 fi
-if [[ "$mode" == "notarized" ]]; then
-    /usr/bin/xcrun stapler validate "$application_path"
-    /usr/sbin/spctl --assess --type execute --verbose=2 "$application_path"
-fi
-
 echo "bundleIdentifier=$bundle_id"
 echo "version=$version"
 echo "build=$build"
@@ -103,4 +102,5 @@ echo "architectures=arm64,x86_64"
 echo "signingMode=$mode"
 echo "runtimeDependencies=portable"
 echo "licenses=present"
+echo "embeddedDocumentation=present"
 echo "Release artifact verified."

@@ -91,10 +91,23 @@ fi
 for required_file in \
     "$project_root/Resources/fy.dict.yaml" \
     "$project_root/Core/SwiftAdapter/InputService.swift" \
-    "$project_root/Platform/macOS/InputMethod/EngineSmokeTest.swift"; do
+    "$project_root/Platform/macOS/InputMethod/EngineSmokeTest.swift" \
+    "$project_root/Installer/macOS/Scripts/preinstall" \
+    "$project_root/Installer/macOS/Scripts/postinstall" \
+    "$project_root/Scripts/create-pkg.sh" \
+    "$project_root/Scripts/verify-pkg.sh"; do
     if [[ ! -f "$required_file" ]]; then
         echo "Required M2 dependency file is missing: $required_file" >&2
         exit 66
+    fi
+done
+
+for installer_script in \
+    "$project_root/Installer/macOS/Scripts/preinstall" \
+    "$project_root/Installer/macOS/Scripts/postinstall"; do
+    if [[ ! -x "$installer_script" ]]; then
+        echo "Installer script must be executable: $installer_script" >&2
+        exit 65
     fi
 done
 

@@ -113,8 +113,9 @@ Process Exit   ──► destroy sessions ──► finalize engine
 
 - `Scripts/lib/install-transaction.sh` 是用户级安装的原子替换边界，明确区分 source、installing、installed 和 previous 四个路径；完整失败和两个中间失败状态都能恢复旧应用与新构建。
 - `package-release.sh` 先构建固定版本/构建号的 universal Release，再按 local、Developer ID signed 或 notarized 模式处理签名。正式模式按 Frameworks、主程序、app 的顺序启用 Hardened Runtime 和可信时间戳。
-- 发布目录包含 app、许可证、安装/回滚/卸载说明、发布说明、已知问题和 JSON 版本清单；外层 ZIP 和拖拽安装 DMG 各有 SHA-256。
-- `verify-release.sh` 从最终 ZIP 重新解包检查 Bundle ID、版本、arm64/x86_64、动态依赖、清单校验值、源码泄漏、签名链、Hardened Runtime，并在 notarized 模式执行 stapler 与 Gatekeeper。
+- 发布暂存目录包含 app、许可证、安装/回滚/卸载说明、发布说明、已知问题和 JSON 版本清单；最终 PKG 与承载 PKG 的 DMG 各有 SHA-256。
+- PKG 的 preinstall 切换到 ABC 并停止旧输入法进程，postinstall 注册新应用并刷新输入法服务，避免 Finder 直接覆盖运行中应用的失败路径。
+- `verify-release.sh` 检查 Bundle ID、版本、arm64/x86_64、动态依赖、清单校验值、源码泄漏、签名链和 Hardened Runtime；`verify-pkg.sh` 与 `verify-dmg.sh` 继续检查 Installer 签名、公证和 Gatekeeper。
 
 ## 错误降级
 

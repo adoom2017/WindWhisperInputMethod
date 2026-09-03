@@ -3,36 +3,40 @@
 ## 已实现流程
 
 - `Scripts/lib/install-transaction.sh`：用户级原子替换、提交和回滚。
-- `Scripts/package-release.sh`：local、Developer ID signed、Developer ID + notarized 三种模式，同时生成 ZIP 和拖拽安装 DMG。
-- `Scripts/create-dmg.sh` / `Scripts/verify-dmg.sh`：生成标准 Finder 左右拖拽布局，并验证应用和 `/Library/Input Methods` 目标链接。
-- `Scripts/verify-release.sh`：从最终 ZIP 解包检查版本、校验值、通用架构、动态依赖、签名、许可证和发布文档。
+- `Scripts/package-release.sh`：local、Developer ID signed、Developer ID + notarized 三种模式，同时生成 PKG 和安装 DMG。
+- `Scripts/create-pkg.sh` / `Scripts/verify-pkg.sh`：生成系统安装器，验证 `/Library/Input Methods` payload、升级前停止进程、安装后注册服务和 Developer ID Installer 签名。
+- `Scripts/create-dmg.sh` / `Scripts/verify-dmg.sh`：生成包含 `安装风语.pkg` 的 Finder 界面，并验证内嵌 PKG。
+- `Scripts/verify-release.sh`：检查版本、校验值、通用架构、动态依赖、应用签名、许可证和发布文档。
 - `Scripts/test-m9.sh`：隔离验证升级提交、完整回滚、全新安装回滚、仅 staging 完成时回滚、旧版已移到 previous 时回滚、路径冲突拒绝，以及 local 发布包。
 
 ## 本机结果
 
 - universal Release 构建：通过，主程序与 input-engine 均含 arm64/x86_64。
 - 升级提交、全新安装与三种升级回滚状态：通过；不安全的路径冲突会在移动前拒绝。
-- local 0.1.0 build 9000001 发布包：通过。
-- 当前保留 ZIP SHA-256：`3b33b87f1ac0ee7aa2d22350644523e66e135aa9f7cd3ca20e40c6df065eefd1`。
+- local 1.0.0 build 2026090307 universal 构建与 PKG：通过；固定系统安装路径、禁止 relocation、升级脚本和嵌入许可证均通过。
+- 旧版 ZIP SHA-256 仅作为历史记录：`3b33b87f1ac0ee7aa2d22350644523e66e135aa9f7cd3ca20e40c6df065eefd1`。
 - 包内许可证、安装/回滚/卸载说明、发布说明、已知问题、JSON 版本清单：通过。
 - Homebrew/`/usr/local` 动态依赖、源码泄漏和已移除旧词库文件：未发现。
-- 缺少 `WINDWHISPER_CODE_SIGN_IDENTITY` 时 signed 模式会在构建前失败：通过。
+- 缺少 `WINDWHISPER_APP_SIGN_IDENTITY` 或 `WINDWHISPER_INSTALLER_SIGN_IDENTITY` 时 signed 模式会在构建前失败：通过。
 
-`dist/` 为忽略版本控制的本地产物目录，不提交 ZIP。
+`dist/` 为忽略版本控制的本地产物目录，不提交 PKG 或 DMG。
 
 ## 未执行的正式分发门禁
 
-`security find-identity -v -p codesigning` 在本机返回 `0 valid identities found`，因此以下项目未执行：
+本机已存在有效的 Developer ID Application 与 Developer ID Installer identity。当前执行环境访问 Apple timestamp 服务时 TLS 握手失败，因此以下正式分发门禁尚未完成：
 
-- Developer ID Application 对主程序和 app 的正式签名。
+- 带可信时间戳的 Developer ID Application 应用签名。
+- 带可信时间戳的 Developer ID Installer PKG 签名。
 - Hardened Runtime + trusted timestamp 的实际启动验证。
 - Apple notarization 提交、票据 staple 与 Gatekeeper 在线评估。
 - 干净用户账户、干净机器的首次授权、升级、回滚和卸载。
+- 最终 DMG 生成与挂载校验；受限沙箱无法配置 `hdiutil` 设备。
 
-获得证书和 notarytool keychain profile 后运行：
+在能够正常访问 Apple 时间戳与公证服务的环境中运行：
 
 ```bash
-WINDWHISPER_CODE_SIGN_IDENTITY="Developer ID Application: ..." \
+WINDWHISPER_APP_SIGN_IDENTITY="Developer ID Application: ..." \
+WINDWHISPER_INSTALLER_SIGN_IDENTITY="Developer ID Installer: ..." \
 WINDWHISPER_NOTARY_PROFILE="windwhisper-notary" \
   ./Scripts/package-release.sh notarized 0.1.0 1
 ```
