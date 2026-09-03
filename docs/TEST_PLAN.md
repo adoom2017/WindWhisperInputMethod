@@ -53,8 +53,8 @@
 - M7 人工门禁按 `docs/M7_VALIDATION.md` 执行，重点确认系统输入法菜单可见、修改后当前应用与新应用一致，以及菜单操作不显示或记录输入内容。
 - `Scripts/test-m8.sh Release [seconds]` 覆盖 UTF-8/UTF-16 边界、Command 透传、单次 commit、候选异步更新失效、session 生命周期，并记录引擎初始化、按键和候选布局延迟与 RSS 变化。
 - M8 的一小时参数为 `Scripts/test-m8.sh Release 3600`；跨应用、最低系统、Intel、多屏和 Secure Input 仍按 `docs/M8_VALIDATION.md` 人工矩阵执行。
-- `Scripts/test-m9.sh` 在隔离目录覆盖升级提交、全新安装回滚、完整升级回滚、两个中间失败回滚和路径冲突拒绝，生成 local 通用 ZIP，再从 ZIP 解包核验 Bundle ID、版本、架构、依赖、签名、许可证和 SHA-256 清单。
-- `Scripts/package-release.sh signed|notarized` 分别要求 Developer ID 和 notarytool profile；notarized 审计额外执行 stapler 与 Gatekeeper。没有发布凭据时必须失败，不能静默降级为 local。
+- `Scripts/test-m9.sh` 在隔离目录覆盖升级提交、全新安装回滚、完整升级回滚、两个中间失败回滚和路径冲突拒绝，生成 local 通用 ZIP 和拖拽安装 DMG；分别核验 Bundle ID、版本、架构、依赖、签名、许可证、DMG 安装目标和 SHA-256 清单。
+- `Scripts/package-release.sh signed|notarized` 分别要求 Developer ID 和 notarytool profile；notarized 审计额外对应用和 DMG 执行 stapler 与 Gatekeeper。没有发布凭据时必须失败，不能静默降级为 local。
 
 ## 性能记录
 

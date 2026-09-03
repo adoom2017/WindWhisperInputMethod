@@ -96,6 +96,9 @@ jobs:
       - name: Verify project metadata
         run: Scripts/verify-project.sh
 
+      - name: Install DMG packaging tool
+        run: brew install create-dmg
+
       - name: Build and package notarized release
         run: |
           set -euo pipefail
@@ -105,9 +108,12 @@ jobs:
         run: |
           set -euo pipefail
           shopt -s nullglob
-          assets=(dist/windwhisper-"$RELEASE_VERSION"-"$RELEASE_BUILD"-macos-universal.zip*)
-          if (( ${#assets[@]} != 2 )); then
-            echo "Expected release ZIP and SHA-256 file, found ${#assets[@]} assets" >&2
+          assets=(
+            dist/windwhisper-"$RELEASE_VERSION"-"$RELEASE_BUILD"-macos-universal.zip*
+            dist/windwhisper-"$RELEASE_VERSION"-"$RELEASE_BUILD"-macos-universal.dmg*
+          )
+          if (( ${#assets[@]} != 4 )); then
+            echo "Expected ZIP, DMG, and SHA-256 files, found ${#assets[@]} assets" >&2
             exit 1
           fi
           gh release upload "$TAG_NAME" "${assets[@]}" \
@@ -120,6 +126,7 @@ jobs:
           name: windwhisper-macos-release-${{ github.run_number }}
           path: |
             dist/*.zip
+            dist/*.dmg
             dist/*.sha256
           if-no-files-found: ignore
           retention-days: 7

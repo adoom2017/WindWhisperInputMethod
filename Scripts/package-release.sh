@@ -9,6 +9,7 @@ build_number="${3:-$(date +%Y%m%d%H%M)}"
 identity="${WINDWHISPER_CODE_SIGN_IDENTITY:-}"
 notary_profile="${WINDWHISPER_NOTARY_PROFILE:-}"
 notary_keychain="${WINDWHISPER_NOTARY_KEYCHAIN:-}"
+dmg_only="${WINDWHISPER_DMG_ONLY:-0}"
 dist_directory="$project_root/dist"
 
 usage() {
@@ -42,20 +43,28 @@ fi
 if [[ "$mode" == "notarized" && -z "$notary_profile" ]]; then
     fail "WINDWHISPER_NOTARY_PROFILE is required for notarized mode"
 fi
+if [[ "$dmg_only" != "0" && "$dmg_only" != "1" ]]; then
+    fail "WINDWHISPER_DMG_ONLY must be 0 or 1"
+fi
 
 release_name="windwhisper-$version-$build_number-macos-universal"
 staging_root="$dist_directory/$release_name"
 archive_path="$dist_directory/$release_name.zip"
+dmg_path="$dist_directory/$release_name.dmg"
 submission_archive="$dist_directory/$release_name.notary.zip"
 
 if [[ "$staging_root" != "$dist_directory"/* \
     || "$archive_path" != "$dist_directory"/* \
+    || "$dmg_path" != "$dist_directory"/* \
     || "$submission_archive" != "$dist_directory"/* ]]; then
     fail "resolved release paths escaped the dist directory"
 fi
 /bin/mkdir -p "$dist_directory"
 /bin/rm -rf "$staging_root"
-/bin/rm -f "$archive_path" "$submission_archive" "$archive_path.sha256"
+/bin/rm -f \
+    "$archive_path" "$archive_path.sha256" \
+    "$dmg_path" "$dmg_path.sha256" \
+    "$submission_archive"
 
 if [[ "${WINDWHISPER_SKIP_BUILD:-0}" != "1" ]]; then
     ad_hoc_signing=0
@@ -116,10 +125,39 @@ manifest="$staging_root/VERSION_MANIFEST.json"
 /usr/bin/plutil -insert dictionarySHA256 -string "$dictionary_sha" "$manifest"
 /usr/bin/plutil -convert json "$manifest"
 
-/usr/bin/ditto -c -k --keepParent "$staging_root" "$archive_path"
-archive_sha="$(/usr/bin/shasum -a 256 "$archive_path" | /usr/bin/awk '{print $1}')"
-echo "$archive_sha  $(basename "$archive_path")" > "$archive_path.sha256"
+archive_sha=""
+if [[ "$dmg_only" == "1" ]]; then
+    "$project_root/Scripts/verify-release.sh" "$staging_root" "$mode"
+else
+    /usr/bin/ditto -c -k --keepParent "$staging_root" "$archive_path"
+    archive_sha="$(/usr/bin/shasum -a 256 "$archive_path" | /usr/bin/awk '{print $1}')"
+    echo "$archive_sha  $(basename "$archive_path")" > "$archive_path.sha256"
+    "$project_root/Scripts/verify-release.sh" "$archive_path" "$mode"
+fi
 
-"$project_root/Scripts/verify-release.sh" "$archive_path" "$mode"
-echo "Release archive: $archive_path"
-echo "SHA-256: $archive_sha"
+"$project_root/Scripts/create-dmg.sh" "$release_app" "$dmg_path" "$version"
+if [[ "$mode" != "local" ]]; then
+    /usr/bin/codesign \
+        --force --timestamp --sign "$identity" \
+        "$dmg_path"
+fi
+if [[ "$mode" == "notarized" ]]; then
+    notary_arguments=(--keychain-profile "$notary_profile")
+    if [[ -n "$notary_keychain" ]]; then
+        notary_arguments+=(--keychain "$notary_keychain")
+    fi
+    /usr/bin/xcrun notarytool submit "$dmg_path" "${notary_arguments[@]}" --wait
+    /usr/bin/xcrun stapler staple "$dmg_path"
+fi
+"$project_root/Scripts/verify-dmg.sh" "$dmg_path" "$mode"
+dmg_sha="$(/usr/bin/shasum -a 256 "$dmg_path" | /usr/bin/awk '{print $1}')"
+echo "$dmg_sha  $(basename "$dmg_path")" > "$dmg_path.sha256"
+
+if [[ "$dmg_only" == "1" ]]; then
+    /bin/rm -rf "$staging_root"
+else
+    echo "Release archive: $archive_path"
+    echo "SHA-256: $archive_sha"
+fi
+echo "Release DMG: $dmg_path"
+echo "SHA-256: $dmg_sha"

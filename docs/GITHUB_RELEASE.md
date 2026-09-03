@@ -2,7 +2,7 @@
 
 `.github/workflows/release-macos.yml` 在 GitHub Release 发布后自动构建 macOS
 arm64/x86_64 通用应用，执行 Developer ID 签名、Apple 公证、staple 和发布包校验，
-最后将 ZIP 与 SHA-256 文件上传到该 Release。
+最后将 ZIP、拖拽安装 DMG 与各自的 SHA-256 文件上传到该 Release。
 
 ## 标签约定
 
@@ -36,7 +36,7 @@ base64 < DeveloperIDApplication.p12 | tr -d '\n'
 1. 将目标提交合并到默认分支，确保该分支包含 release workflow。
 2. 创建并推送标签，例如 `git tag v0.2.0 && git push origin v0.2.0`。
 3. 在 GitHub 创建该 tag 对应的 Release，并点击 **Publish release**。
-4. 在 Actions 中查看 `Release macOS`；成功后 Release 会出现 ZIP 和 `.sha256`。
+4. 在 Actions 中查看 `Release macOS`；成功后 Release 会出现 ZIP、DMG 和 `.sha256`。
 
 也可以在 Actions 页面手动运行 workflow，并填写已经存在的 GitHub Release tag。
 手动运行不会创建 Release，只会构建并上传到指定的现有 Release。
