@@ -267,6 +267,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func textWillChange(_ textInput: UITextInput?) {
         super.textWillChange(textInput)
+        textDocumentProxy.unmarkText()
         session?.clearComposition()
         if session != nil { compositionLabel.text = "" }
     }
@@ -788,11 +789,25 @@ final class KeyboardViewController: UIInputViewController {
 
         let composition = snapshot.composition?.text ?? ""
         let candidates = snapshot.menu.candidates.enumerated().map { (index: $0.offset, text: $0.element.text) }
+        if snapshot.status.isASCIIMode || composition.isEmpty {
+            textDocumentProxy.unmarkText()
+        } else {
+            // Mirror the uncommitted code in the host text field, like the
+            // native Chinese keyboards. The candidate strip below contains
+            // candidates only; it does not duplicate the raw code.
+            textDocumentProxy.setMarkedText(
+                composition,
+                selectedRange: NSRange(location: composition.utf16.count, length: 0)
+            )
+        }
         if composition.isEmpty && candidates.isEmpty {
             showQuickPunctuation()
         } else {
-            showCandidates(candidates, composition: composition)
+            showCandidates(candidates, composition: "")
         }
-        if let commit = snapshot.commitText { textDocumentProxy.insertText(commit) }
+        if let commit = snapshot.commitText {
+            textDocumentProxy.unmarkText()
+            textDocumentProxy.insertText(commit)
+        }
     }
 }
