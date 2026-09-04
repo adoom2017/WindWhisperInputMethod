@@ -10,17 +10,20 @@ private actor KeyboardInputRuntime {
     func makeSession(
         paths: InputServicePaths,
         schema: FengYuSchema
-    ) throws -> (service: InputService, session: InputSession) {
+    ) throws -> (service: InputService, session: InputSession, reusedService: Bool) {
         let service: InputService
+        let reusedService: Bool
         if let cachedService = self.service, loadedSchema == schema {
             service = cachedService
+            reusedService = true
         } else {
             let loadedService = try InputService(paths: paths, enabledSchemas: [schema])
             self.service = loadedService
             loadedSchema = schema
             service = loadedService
+            reusedService = false
         }
-        return (service, try service.makeSession())
+        return (service, try service.makeSession(), reusedService)
     }
 }
 
@@ -41,14 +44,80 @@ final class KeyboardViewController: UIInputViewController {
         static let suggestionHeight: CGFloat = 24
         static let keyCornerRadius: CGFloat = 8
         static let contentHeight: CGFloat = 239
+        static let inputViewHeight: CGFloat = contentHeight + 9
         static let suggestionVerticalOffset: CGFloat = 2
+    }
+
+    /// Gives the keyboard host a stable size before it lays out the extension's content.
+    private final class SelfSizingInputView: UIInputView {
+#if DEBUG
+        private static let sizingLogger = Logger(
+            subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard",
+            category: "Keyboard"
+        )
+#endif
+
+        override var intrinsicContentSize: CGSize {
+            CGSize(width: UIView.noIntrinsicMetric, height: Metrics.inputViewHeight)
+        }
+
+        override func sizeThatFits(_ size: CGSize) -> CGSize {
+            let fittingWidth = size.width > 0 ? size.width : frame.width
+            return CGSize(width: fittingWidth, height: Metrics.inputViewHeight)
+        }
+
+        override func systemLayoutSizeFitting(_ targetSize: CGSize) -> CGSize {
+            let fittedSize = super.systemLayoutSizeFitting(targetSize)
+#if DEBUG
+            SelfSizingInputView.sizingLogger.notice(
+                "One-argument systemLayoutSizeFitting target=\(String(describing: targetSize), privacy: .public) super=\(String(describing: fittedSize), privacy: .public) returnedHeight=\(Metrics.inputViewHeight, privacy: .public)"
+            )
+#endif
+            return CGSize(width: fittedSize.width, height: Metrics.inputViewHeight)
+        }
+
+        override func systemLayoutSizeFitting(
+            _ targetSize: CGSize,
+            withHorizontalFittingPriority horizontalFittingPriority: UILayoutPriority,
+            verticalFittingPriority: UILayoutPriority
+        ) -> CGSize {
+            let fittedSize = super.systemLayoutSizeFitting(
+                targetSize,
+                withHorizontalFittingPriority: horizontalFittingPriority,
+                verticalFittingPriority: verticalFittingPriority
+            )
+            return CGSize(width: fittedSize.width, height: Metrics.inputViewHeight)
+        }
+
+        init() {
+            super.init(
+                frame: CGRect(x: 0, y: 0, width: 0, height: Metrics.inputViewHeight),
+                // The keyboard style asks UIKit to add the system keyboard
+                // backdrop. That backdrop is hosted in a remote window and
+                // can be snapshotted at its temporary full-screen height
+                // during input-mode changes. The extension draws its own
+                // content, so use the plain input-view path instead.
+                inputViewStyle: .default
+            )
+            configureSelfSizing()
+        }
+
+        required init?(coder: NSCoder) {
+            super.init(coder: coder)
+            configureSelfSizing()
+        }
+
+        private func configureSelfSizing() {
+            allowsSelfSizing = true
+            setContentHuggingPriority(.required, for: .vertical)
+            setContentCompressionResistancePriority(.required, for: .vertical)
+        }
     }
 
     private let logger = Logger(
         subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard",
         category: "Keyboard"
     )
-    private let groupID = "group.com.shendongchun.windwhisper"
 
     private var session: InputSession?
     private var service: InputService?
@@ -56,6 +125,13 @@ final class KeyboardViewController: UIInputViewController {
     private var layoutMode = LayoutMode.letters
     private var isShifted = false
     private var startupTask: Task<Void, Never>?
+    private var inputViewHeightConstraint: NSLayoutConstraint?
+    private var hostPresentationVisible = false
+#if DEBUG
+    private var layoutLogSequence = 0
+    private var lastLoggedViewBounds = CGRect.null
+    private var lastLoggedRootFrame = CGRect.null
+#endif
 
     private let rootStack = UIStackView()
     private let keyboardRowsStack = UIStackView()
@@ -65,15 +141,125 @@ final class KeyboardViewController: UIInputViewController {
     private let shiftButton = UIButton(type: .system)
     private let modeButton = UIButton(type: .system)
     private let asciiButton = UIButton(type: .system)
+    private let keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+
+    override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
+        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
+        preferredContentSize = CGSize(width: 0, height: Metrics.inputViewHeight)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        preferredContentSize = CGSize(width: 0, height: Metrics.inputViewHeight)
+    }
+
+    override func loadView() {
+        let inputView = SelfSizingInputView()
+        let heightConstraint = inputView.heightAnchor.constraint(equalToConstant: Metrics.inputViewHeight)
+        // The remote keyboard host owns transient presentation heights. Keeping this
+        // below required lets the fixed-height content stay bottom-anchored while
+        // UIKit negotiates from its temporary full-screen frame to the final height.
+        heightConstraint.priority = .defaultHigh
+        heightConstraint.isActive = true
+        inputViewHeightConstraint = heightConstraint
+        view = inputView
+        self.inputView = inputView
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
+#if DEBUG
+        logger.notice(
+            "Self-sizing input view allowsSelfSizing=\((self.view as? UIInputView)?.allowsSelfSizing ?? false, privacy: .public) intrinsic=\(String(describing: self.view.intrinsicContentSize), privacy: .public) initialFrame=\(String(describing: self.view.frame), privacy: .public) preferredContentSize=\(String(describing: self.preferredContentSize), privacy: .public) heightConstraintActive=\(self.inputViewHeightConstraint?.isActive ?? false, privacy: .public) heightConstraintConstant=\(self.inputViewHeightConstraint?.constant ?? -1, privacy: .public) inputView=\(String(describing: self.inputView), privacy: .public) sameView=\(self.inputView === self.view, privacy: .public)"
+        )
+        logLayoutState("viewDidLoad.begin")
+#endif
+        inputView?.allowsSelfSizing = true
+        inputView?.invalidateIntrinsicContentSize()
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (controller: KeyboardViewController, _) in
             controller.applyColors()
         }
         buildView()
+#if DEBUG
+        logLayoutState("viewDidLoad.end")
+#endif
         startEngine()
     }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        updateHostPresentationVisibility()
+        updateContentVisibility()
+#if DEBUG
+        guard layoutLogSequence < 20,
+              view.bounds != lastLoggedViewBounds || rootStack.frame != lastLoggedRootFrame else { return }
+        lastLoggedViewBounds = view.bounds
+        lastLoggedRootFrame = rootStack.frame
+        logLayoutState("viewDidLayoutSubviews")
+#endif
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+#if DEBUG
+        logLayoutState("viewWillAppear animated=\(animated)")
+#endif
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        keyFeedbackGenerator.prepare()
+#if DEBUG
+        logLayoutState("viewDidAppear animated=\(animated)")
+#endif
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+#if DEBUG
+        logLayoutState("viewWillDisappear animated=\(animated)")
+#endif
+        super.viewWillDisappear(animated)
+    }
+
+    override func viewWillTransition(
+        to size: CGSize,
+        with coordinator: any UIViewControllerTransitionCoordinator
+    ) {
+#if DEBUG
+        logger.notice(
+            "Layout transition target=\(String(describing: size), privacy: .public) current=\(String(describing: self.view.frame), privacy: .public)"
+        )
+#endif
+        super.viewWillTransition(to: size, with: coordinator)
+    }
+
+#if DEBUG
+    private func logLayoutState(_ phase: String) {
+        layoutLogSequence += 1
+        let viewOnScreen = view.convert(view.bounds, to: nil)
+        let rootOnScreen = rootStack.convert(rootStack.bounds, to: nil)
+        let superviewDescription = view.superview.map {
+            "\(type(of: $0)) frame=\($0.frame) bounds=\($0.bounds)"
+        } ?? "nil"
+        var ancestorDescriptions: [String] = []
+        var ancestor = view.superview
+        while let current = ancestor, ancestorDescriptions.count < 6 {
+            ancestorDescriptions.append(
+                "\(type(of: current)){frame=\(current.frame),bg=\(String(describing: current.backgroundColor)),opaque=\(current.isOpaque),alpha=\(current.alpha),hidden=\(current.isHidden)}"
+            )
+            ancestor = current.superview
+        }
+        let ambiguityDescription: String
+        if view.window != nil, !view.bounds.isEmpty {
+            ambiguityDescription = String(view.hasAmbiguousLayout || rootStack.hasAmbiguousLayout)
+        } else {
+            ambiguityDescription = "not-checked-before-window"
+        }
+        logger.notice(
+            "Layout #\(self.layoutLogSequence) \(phase, privacy: .public) view=\(String(describing: self.view.frame), privacy: .public) viewOnScreen=\(String(describing: viewOnScreen), privacy: .public) root=\(String(describing: self.rootStack.frame), privacy: .public) rootOnScreen=\(String(describing: rootOnScreen), privacy: .public) heightConstraintActive=\(self.inputViewHeightConstraint?.isActive ?? false, privacy: .public) heightConstraintConstant=\(self.inputViewHeightConstraint?.constant ?? -1, privacy: .public) safeArea=\(String(describing: self.view.safeAreaInsets), privacy: .public) superview=\(superviewDescription, privacy: .public) ancestors=\(ancestorDescriptions.joined(separator: " -> "), privacy: .public) window=\(String(describing: self.view.window?.frame), privacy: .public) windowBG=\(String(describing: self.view.window?.backgroundColor), privacy: .public) ambiguous=\(ambiguityDescription, privacy: .public)"
+        )
+    }
+#endif
 
     deinit {
         startupTask?.cancel()
@@ -92,26 +278,18 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func startEngine() {
-        guard let resources = Bundle.main.resourceURL else {
-            showStartupError("找不到词库资源")
+        let paths: InputServicePaths
+        do {
+            paths = try InputServicePaths.applicationDefaults(bundle: .main)
+        } catch {
+            showStartupError(error.localizedDescription)
             return
         }
-        guard let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: groupID
-        ) else {
-            showStartupError("无法访问共享数据")
-            return
-        }
-        let paths = InputServicePaths(
-            sharedData: resources,
-            userData: container.appendingPathComponent("User"),
-            logs: container.appendingPathComponent("Logs")
-        )
-        let schemaIdentifier = UserDefaults(suiteName: groupID)?.string(forKey: "schema") ?? "flypyShape"
+        let schemaIdentifier = UserDefaults.standard.string(forKey: "schema") ?? "flypyShape"
         let schema = FengYuSchema(rawValue: schemaIdentifier) ?? .flypy
-        showStatus("正在加载")
         startupTask?.cancel()
         startupTask = Task { [weak self] in
+            let startedAt = ProcessInfo.processInfo.systemUptime
             do {
                 let result = try await KeyboardInputRuntime.shared.makeSession(paths: paths, schema: schema)
                 try Task.checkCancellation()
@@ -120,12 +298,20 @@ final class KeyboardViewController: UIInputViewController {
                 service = result.service
                 session = result.session
                 startupErrorDescription = nil
-                logger.notice("WindWhisper input engine is ready")
+                let elapsedMilliseconds = Int(
+                    (ProcessInfo.processInfo.systemUptime - startedAt) * 1_000
+                )
+                logger.notice(
+                    "Input engine ready in \(elapsedMilliseconds, privacy: .public) ms; reused=\(result.reusedService, privacy: .public)"
+                )
                 refresh()
             } catch is CancellationError {
                 return
             } catch {
                 guard !Task.isCancelled else { return }
+                self?.logger.error(
+                    "Input engine startup failed: \(error.localizedDescription, privacy: .public) paths.sharedData=\(paths.sharedData.path, privacy: .private) paths.userData=\(paths.userData.path, privacy: .private) paths.logs=\(paths.logs.path, privacy: .private)"
+                )
                 self?.showStartupError(error.localizedDescription)
             }
         }
@@ -139,6 +325,11 @@ final class KeyboardViewController: UIInputViewController {
 
     private func buildView() {
         view.backgroundColor = .clear
+        view.clipsToBounds = true
+        // Keep the input view itself in the host compositor during height
+        // negotiation. Only the keyboard content is hidden for transient
+        // expanded frames, which avoids changing the host layer's alpha.
+        rootStack.layer.opacity = 1
 
         rootStack.axis = .vertical
         rootStack.spacing = Metrics.suggestionToKeysSpacing
@@ -153,12 +344,45 @@ final class KeyboardViewController: UIInputViewController {
         NSLayoutConstraint.activate([
             rootStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Metrics.horizontalInset),
             rootStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Metrics.horizontalInset),
-            rootStack.topAnchor.constraint(greaterThanOrEqualTo: view.topAnchor, constant: 5),
             rootStack.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -4),
             rootStack.heightAnchor.constraint(equalToConstant: Metrics.contentHeight)
         ])
 
         applyColors()
+    }
+
+    private func updateContentVisibility() {
+        let heightDelta = abs(view.bounds.height - Metrics.inputViewHeight)
+#if DEBUG
+        let shouldShowContent = heightDelta < 1
+        logger.notice(
+            "Height negotiation hostHeight=\(self.view.bounds.height, privacy: .public) expectedHeight=\(Metrics.inputViewHeight, privacy: .public) settled=\(shouldShowContent, privacy: .public) constraintActive=\(self.inputViewHeightConstraint?.isActive ?? false, privacy: .public) constraintConstant=\(self.inputViewHeightConstraint?.constant ?? -1, privacy: .public)"
+        )
+#endif
+    }
+
+    private func updateHostPresentationVisibility() {
+        let hostHeight = view.bounds.height
+        guard hostHeight > 0 else { return }
+
+        // Heights substantially larger than the requested keyboard height are
+        // transient frames produced by _UIRemoteKeyboardWindow during a mode
+        // change. Keep the extension hidden until UIKit reaches the compact
+        // keyboard frame, while allowing legitimate nearby heights (for
+        // example iPad keyboard variants) to remain visible.
+        let isTransientExpandedFrame = hostHeight > Metrics.inputViewHeight + 100
+        let shouldBeVisible = !isTransientExpandedFrame
+        guard shouldBeVisible != hostPresentationVisible else { return }
+
+        hostPresentationVisible = shouldBeVisible
+        // Keep the controls interactive throughout host negotiation. The
+        // extension's view tree must remain hit-testable on physical devices.
+        rootStack.layer.opacity = 1
+#if DEBUG
+        logger.notice(
+            "Host presentation visibility visible=\(shouldBeVisible, privacy: .public) hostHeight=\(hostHeight, privacy: .public) expectedHeight=\(Metrics.inputViewHeight, privacy: .public)"
+        )
+#endif
     }
 
     private func configureSuggestionBar() {
@@ -417,6 +641,7 @@ final class KeyboardViewController: UIInputViewController {
             )
             button.accessibilityLabel = punctuation
             button.addAction(UIAction { [weak self] _ in
+                self?.performKeyFeedback(label: punctuation)
                 self?.insertPunctuation(punctuation)
             }, for: .touchUpInside)
             button.widthAnchor.constraint(greaterThanOrEqualToConstant: 54).isActive = true
@@ -444,6 +669,7 @@ final class KeyboardViewController: UIInputViewController {
             button.widthAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
             button.accessibilityLabel = "候选词 \(candidate.text)"
             button.addAction(UIAction { [weak self] _ in
+                self?.performKeyFeedback(label: "候选词 \(candidate.text)")
                 _ = self?.session?.selectCandidate(at: candidate.index)
                 self?.refresh()
             }, for: .touchUpInside)
@@ -478,6 +704,7 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func keyPressed(_ sender: UIButton) {
         guard let title = sender.currentTitle, let value = title.lowercased().first else { return }
+        performKeyFeedback(label: title)
         let output = isShifted ? String(value).uppercased() : String(value)
         guard layoutMode == .letters else {
             textDocumentProxy.insertText(output)
@@ -495,46 +722,63 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func space() {
+        performKeyFeedback(label: "空格")
         let handled = session?.process(keyCode: 0x20) ?? false
         if !handled { textDocumentProxy.insertText(" ") }
         refresh()
     }
 
     @objc private func backspace() {
+        performKeyFeedback(label: "删除")
         if session?.process(keyCode: 0xFF08) != true { textDocumentProxy.deleteBackward() }
         refresh()
     }
 
     @objc private func insertNewline() {
+        performKeyFeedback(label: "换行")
         textDocumentProxy.insertText("\n")
         refresh()
     }
 
     @objc private func toggleASCII() {
+        performKeyFeedback(label: "切换中英文")
         guard let session else { return }
         _ = session.setOption("ascii_mode", enabled: session.option("ascii_mode") != true)
         refresh()
     }
 
     @objc private func toggleShift() {
+        performKeyFeedback(label: "大写")
         isShifted.toggle()
         rebuildCharacterRows()
     }
 
     @objc private func toggleLayoutMode() {
+        performKeyFeedback(label: "切换键盘")
         layoutMode = layoutMode == .letters ? .numbers : .letters
         isShifted = false
         rebuildCharacterRows()
     }
 
     @objc private func toggleSymbolPage() {
+        performKeyFeedback(label: "切换符号")
         layoutMode = layoutMode == .numbers ? .symbols : .numbers
         rebuildCharacterRows()
     }
 
+    private func performKeyFeedback(label: String) {
+#if DEBUG
+        logger.notice("Key action label=\(label, privacy: .public) engineReady=\(self.session != nil, privacy: .public)")
+#endif
+        keyFeedbackGenerator.impactOccurred(intensity: 0.65)
+        keyFeedbackGenerator.prepare()
+    }
+
     private func refresh() {
         guard let session else {
-            showStatus(startupErrorDescription == nil ? "正在加载" : "引擎不可用")
+            if startupErrorDescription != nil {
+                showStatus("引擎不可用")
+            }
             asciiButton.setTitle("中", for: .normal)
             return
         }

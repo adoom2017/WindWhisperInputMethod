@@ -10,7 +10,7 @@ struct WindWhisperApp: App {
 }
 
 struct SettingsView: View {
-    @AppStorage("schema", store: UserDefaults(suiteName: "group.com.shendongchun.windwhisper"))
+    @AppStorage("schema")
     private var schema = "flypyShape"
 
     var body: some View {

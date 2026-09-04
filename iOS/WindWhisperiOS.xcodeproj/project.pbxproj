@@ -13,6 +13,7 @@
 		3E3C4C0F228D34C025469D5E /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686FC8C2E08FCB7D3707E5B2 /* KeyboardViewController.swift */; };
 		62D13AE28A1EA623127AA48C /* InputModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F76FD6BEEA28548083D2357 /* InputModels.swift */; };
 		6E537B3358D3B54954B760CE /* WindWhisperKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F26E7AA65F3C0C986572CDA7 /* WindWhisperKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8DD8F420040DD719CA5DC01E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B54DCB6B5537484BC645FFB8 /* Assets.xcassets */; };
 		BFA1B9D2CBA39D000BE8C371 /* WindWhisperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A537BA2A4E6D99ED16E2F5FD /* WindWhisperApp.swift */; };
 		BFAB557589ECEA023C34FA55 /* InputEnginePlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = D679FC226880EDAFF5777FD8 /* InputEnginePlatform.swift */; };
 /* End PBXBuildFile section */
@@ -51,6 +52,7 @@
 		8F76FD6BEEA28548083D2357 /* InputModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModels.swift; sourceTree = "<group>"; };
 		9B52AF4B6E1E48BCC2D53370 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A537BA2A4E6D99ED16E2F5FD /* WindWhisperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindWhisperApp.swift; sourceTree = "<group>"; };
+		B54DCB6B5537484BC645FFB8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D245C214A998F1B518A62AC6 /* WindWhisper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WindWhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D679FC226880EDAFF5777FD8 /* InputEnginePlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnginePlatform.swift; sourceTree = "<group>"; };
 		F26E7AA65F3C0C986572CDA7 /* WindWhisperKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WindWhisperKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -101,6 +103,7 @@
 		CC80E46A045671F7F53AB700 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				B54DCB6B5537484BC645FFB8 /* Assets.xcassets */,
 				9B52AF4B6E1E48BCC2D53370 /* Info.plist */,
 				0C5E12CFFF61D6F10DD55DDF /* WindWhisper.entitlements */,
 				A537BA2A4E6D99ED16E2F5FD /* WindWhisperApp.swift */,
@@ -145,6 +148,7 @@
 			buildConfigurationList = 5D5E677773F1B53AE1C5322A /* Build configuration list for PBXNativeTarget "WindWhisper" */;
 			buildPhases = (
 				B8DC2287B36966A43AAA6C6F /* Sources */,
+				3875D77DC81A4BF36ECED57B /* Resources */,
 				03074BD848EE5E01104E68AD /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -199,6 +203,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		3875D77DC81A4BF36ECED57B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8DD8F420040DD719CA5DC01E /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		973B8EEE839BFAF67D908AEF /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
