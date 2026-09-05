@@ -114,6 +114,48 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
+    /// Provides native-style immediate pressed appearance while the controller
+    /// handles haptics through the button's `.touchDown` control event.
+    private final class KeyboardButton: UIButton {
+        private var restingTransform = CGAffineTransform.identity
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+            super.touchesBegan(touches, with: event)
+            restingTransform = transform
+            let changes = {
+                self.transform = self.restingTransform.scaledBy(x: 1.08, y: 1.08)
+                self.layer.zPosition = 10
+            }
+            if UIAccessibility.isReduceMotionEnabled {
+                changes()
+            } else {
+                UIView.animate(withDuration: 0.06, animations: changes)
+            }
+        }
+
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+            super.touchesEnded(touches, with: event)
+            restorePressedAppearance()
+        }
+
+        override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+            super.touchesCancelled(touches, with: event)
+            restorePressedAppearance()
+        }
+
+        private func restorePressedAppearance() {
+            let changes = {
+                self.transform = self.restingTransform
+                self.layer.zPosition = 0
+            }
+            if UIAccessibility.isReduceMotionEnabled {
+                changes()
+            } else {
+                UIView.animate(withDuration: 0.1, animations: changes)
+            }
+        }
+    }
+
     private let logger = Logger(
         subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard",
         category: "Keyboard"
@@ -127,6 +169,7 @@ final class KeyboardViewController: UIInputViewController {
     private var startupTask: Task<Void, Never>?
     private var inputViewHeightConstraint: NSLayoutConstraint?
     private var hostPresentationVisible = false
+    private var keyFeedbackGenerator: UIImpactFeedbackGenerator?
 #if DEBUG
     private var layoutLogSequence = 0
     private var lastLoggedViewBounds = CGRect.null
@@ -138,10 +181,9 @@ final class KeyboardViewController: UIInputViewController {
     private let suggestionScrollView = UIScrollView()
     private let suggestionsStack = UIStackView()
     private let compositionLabel = UILabel()
-    private let shiftButton = UIButton(type: .system)
-    private let modeButton = UIButton(type: .system)
-    private let asciiButton = UIButton(type: .system)
-    private let keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+    private let shiftButton = KeyboardButton(type: .system)
+    private let modeButton = KeyboardButton(type: .system)
+    private let asciiButton = KeyboardButton(type: .system)
 
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
         super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
@@ -168,6 +210,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        configureKeyFeedback()
 #if DEBUG
         logger.notice(
             "Self-sizing input view allowsSelfSizing=\((self.view as? UIInputView)?.allowsSelfSizing ?? false, privacy: .public) intrinsic=\(String(describing: self.view.intrinsicContentSize), privacy: .public) initialFrame=\(String(describing: self.view.frame), privacy: .public) preferredContentSize=\(String(describing: self.preferredContentSize), privacy: .public) heightConstraintActive=\(self.inputViewHeightConstraint?.isActive ?? false, privacy: .public) heightConstraintConstant=\(self.inputViewHeightConstraint?.constant ?? -1, privacy: .public) inputView=\(String(describing: self.inputView), privacy: .public) sameView=\(self.inputView === self.view, privacy: .public)"
@@ -208,7 +251,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        keyFeedbackGenerator.prepare()
+        keyFeedbackGenerator?.prepare()
 #if DEBUG
         logLayoutState("viewDidAppear animated=\(animated)")
 #endif
@@ -267,7 +310,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func textWillChange(_ textInput: UITextInput?) {
         super.textWillChange(textInput)
-        textDocumentProxy.unmarkText()
+        clearMarkedComposition()
         session?.clearComposition()
         if session != nil { compositionLabel.text = "" }
     }
@@ -553,14 +596,14 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func makeActionKey(_ title: String, accessibilityLabel: String, action: Selector) -> UIButton {
-        let button = UIButton(type: .system)
+        let button = KeyboardButton(type: .system)
         configureTextButton(button, title: title, accessibilityLabel: accessibilityLabel)
         button.addTarget(self, action: action, for: .touchUpInside)
         return button
     }
 
     private func makeIconKey(_ symbol: String, accessibilityLabel: String, action: Selector) -> UIButton {
-        let button = UIButton(type: .system)
+        let button = KeyboardButton(type: .system)
         configureIconButton(button, symbol: symbol, accessibilityLabel: accessibilityLabel)
         button.addTarget(self, action: action, for: .touchUpInside)
         return button
@@ -585,6 +628,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func styleKey(_ button: UIButton) {
+        if let keyboardButton = button as? KeyboardButton {
+            configureTouchFeedback(for: keyboardButton)
+        }
         button.tintColor = keyForegroundColor
         button.setTitleColor(keyForegroundColor, for: .normal)
         button.backgroundColor = keyBackgroundColor
@@ -632,7 +678,8 @@ final class KeyboardViewController: UIInputViewController {
     private func showQuickPunctuation() {
         replaceSuggestions()
         ["，", "。", "？", "！", "、", "……"].forEach { punctuation in
-            let button = UIButton(type: .system)
+            let button = KeyboardButton(type: .system)
+            configureTouchFeedback(for: button)
             button.setTitle(punctuation, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 21)
             button.setTitleColor(keyForegroundColor, for: .normal)
@@ -659,7 +706,8 @@ final class KeyboardViewController: UIInputViewController {
             compositionLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
         }
         for candidate in candidates {
-            let button = UIButton(type: .system)
+            let button = KeyboardButton(type: .system)
+            configureTouchFeedback(for: button)
             button.setTitle(candidate.text, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 19)
             button.setTitleColor(keyForegroundColor, for: .normal)
@@ -771,8 +819,30 @@ final class KeyboardViewController: UIInputViewController {
 #if DEBUG
         logger.notice("Key action label=\(label, privacy: .public) engineReady=\(self.session != nil, privacy: .public)")
 #endif
-        keyFeedbackGenerator.impactOccurred(intensity: 0.65)
-        keyFeedbackGenerator.prepare()
+    }
+
+    private func configureKeyFeedback() {
+        if #available(iOS 17.5, *) {
+            keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .light, view: view)
+        } else {
+            keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+        }
+        keyFeedbackGenerator?.prepare()
+    }
+
+    private func configureTouchFeedback(for button: UIButton) {
+        button.removeTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
+    }
+
+    @objc private func keyTouchDown(_ sender: UIButton) {
+#if DEBUG
+        logger.notice(
+            "Haptic requested label=\(sender.accessibilityLabel ?? sender.currentTitle ?? "unknown", privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public)"
+        )
+#endif
+        keyFeedbackGenerator?.impactOccurred(intensity: 0.65)
+        keyFeedbackGenerator?.prepare()
     }
 
     private func refresh() {
@@ -790,7 +860,7 @@ final class KeyboardViewController: UIInputViewController {
         let composition = snapshot.composition?.text ?? ""
         let candidates = snapshot.menu.candidates.enumerated().map { (index: $0.offset, text: $0.element.text) }
         if snapshot.status.isASCIIMode || composition.isEmpty {
-            textDocumentProxy.unmarkText()
+            clearMarkedComposition()
         } else {
             // Mirror the uncommitted code in the host text field, like the
             // native Chinese keyboards. The candidate strip below contains
@@ -806,8 +876,19 @@ final class KeyboardViewController: UIInputViewController {
             showCandidates(candidates, composition: "")
         }
         if let commit = snapshot.commitText {
-            textDocumentProxy.unmarkText()
+            clearMarkedComposition()
             textDocumentProxy.insertText(commit)
         }
+    }
+
+    /// Removes the temporary marked string without committing it into the host
+    /// document. This is important when the final composing character is
+    /// deleted: `unmarkText()` would first commit/remove its underline, making
+    /// the user press Backspace twice.
+    private func clearMarkedComposition() {
+        textDocumentProxy.setMarkedText(
+            "",
+            selectedRange: NSRange(location: 0, length: 0)
+        )
     }
 }

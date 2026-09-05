@@ -24,7 +24,7 @@ struct SettingsView: View {
                     }
                 }
                 Section {
-                    Text("请在 设置 → 通用 → 键盘 → 键盘 → 添加新键盘 中启用“风语”。")
+                    Text("请在 设置 → 通用 → 键盘 → 键盘 中添加“风语”，并开启“允许完全访问”以使用按键触感反馈。风语仍在设备上离线处理输入。")
                         .foregroundStyle(.secondary)
                 }
             }
