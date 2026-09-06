@@ -157,11 +157,21 @@ private struct NativeStatisticalLanguageModel {
 }
 
 private final class NativeDictionary: @unchecked Sendable {
+    private struct CandidateCacheKey: Hashable {
+        let schemaIdentifier: String
+        let code: String
+        let limit: Int
+    }
+
     private let shapeEntries: [NativeDictionaryEntry]
     private let shapeCodesByText: [String: [String]]
     private let pinyinEntries: [NativeDictionaryEntry]
     private let flypyPhoneticEntries: [NativeDictionaryEntry]
     private let languageModel: NativeStatisticalLanguageModel
+    private let candidateCacheLock = NSLock()
+    private var candidateCache = [CandidateCacheKey: [String]]()
+    private var candidateCacheOrder = [CandidateCacheKey]()
+    private let candidateCacheCapacity = 128
 
     init(sharedData: URL, userData: URL, enabledSchemas: Set<FengYuSchema>) throws {
         let dictionaryURL = sharedData.appendingPathComponent("fy.dict.yaml")
@@ -322,6 +332,18 @@ private final class NativeDictionary: @unchecked Sendable {
     }
 
     func candidates(for code: String, schema: FengYuSchema, limit: Int = 100) -> [String] {
+        guard !code.isEmpty, limit > 0 else { return [] }
+        let normalized = schema == .fullPinyin ? Self.normalizedPinyin(code) : code.lowercased()
+        let cacheKey = CandidateCacheKey(
+            schemaIdentifier: schema.rawValue,
+            code: normalized,
+            limit: limit
+        )
+        candidateCacheLock.lock()
+        let cached = candidateCache[cacheKey]
+        candidateCacheLock.unlock()
+        if let cached { return cached }
+
         let entries: [NativeDictionaryEntry]
         switch schema {
         case .flypy:
@@ -331,9 +353,6 @@ private final class NativeDictionary: @unchecked Sendable {
         case .fullPinyin:
             entries = pinyinEntries
         }
-        guard !code.isEmpty else { return [] }
-
-        let normalized = schema == .fullPinyin ? Self.normalizedPinyin(code) : code.lowercased()
         let start = Self.lowerBound(in: entries, prefix: normalized)
         var matches = [NativeDictionaryEntry]()
         var index = start
@@ -386,6 +405,16 @@ private final class NativeDictionary: @unchecked Sendable {
             result.append(text)
             if result.count == limit { break }
         }
+        candidateCacheLock.lock()
+        if candidateCache[cacheKey] == nil {
+            if candidateCacheOrder.count >= candidateCacheCapacity {
+                let evictedKey = candidateCacheOrder.removeFirst()
+                candidateCache.removeValue(forKey: evictedKey)
+            }
+            candidateCache[cacheKey] = result
+            candidateCacheOrder.append(cacheKey)
+        }
+        candidateCacheLock.unlock()
         return result
     }
 
@@ -609,15 +638,18 @@ final class InputService: @unchecked Sendable {
     let paths: InputServicePaths
     let version = "native-1.0"
     fileprivate let dictionary: NativeDictionary
+    fileprivate let candidateLimit: Int
     private let lock = NSLock()
     private var activeSessions = 0
 
     init(
         paths: InputServicePaths,
         enabledSchemas: Set<FengYuSchema> = Set(FengYuSchema.allCases),
+        candidateLimit: Int = 100,
         minLogLevel: Int32 = 2
     ) throws {
         self.paths = paths
+        self.candidateLimit = max(1, candidateLimit)
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
@@ -935,7 +967,11 @@ final class InputSession: @unchecked Sendable {
             rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans"
         )
         var seen = Set<String>()
-        candidates = service.dictionary.candidates(for: buffer, schema: schema).compactMap { text in
+        candidates = service.dictionary.candidates(
+            for: buffer,
+            schema: schema,
+            limit: service.candidateLimit
+        ).compactMap { text in
             let converted = text.applyingTransform(transform, reverse: false) ?? text
             guard seen.insert(converted).inserted else { return nil }
             let comment = reverseLookupMarkerOffset == nil ? nil

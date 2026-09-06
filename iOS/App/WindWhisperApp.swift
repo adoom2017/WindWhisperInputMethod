@@ -1,7 +1,21 @@
 import SwiftUI
 
+private enum KeyboardPreferences {
+    static let schemaKey = "schema"
+    static let appGroupIdentifier = "group.com.shendongchun.windwhisper"
+}
+
 @main
 struct WindWhisperApp: App {
+    init() {
+        let sharedDefaults = UserDefaults(suiteName: KeyboardPreferences.appGroupIdentifier)
+            ?? .standard
+        if sharedDefaults.object(forKey: KeyboardPreferences.schemaKey) == nil,
+           let legacySchema = UserDefaults.standard.string(forKey: KeyboardPreferences.schemaKey) {
+            sharedDefaults.set(legacySchema, forKey: KeyboardPreferences.schemaKey)
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             SettingsView()
@@ -10,7 +24,10 @@ struct WindWhisperApp: App {
 }
 
 struct SettingsView: View {
-    @AppStorage("schema")
+    @AppStorage(
+        KeyboardPreferences.schemaKey,
+        store: UserDefaults(suiteName: KeyboardPreferences.appGroupIdentifier)
+    )
     private var schema = "flypyShape"
 
     var body: some View {
@@ -23,8 +40,19 @@ struct SettingsView: View {
                         Text("风语全拼").tag("fullPinyin")
                     }
                 }
+
                 Section {
-                    Text("请在 设置 → 通用 → 键盘 → 键盘 中添加“风语”，并开启“允许完全访问”以使用按键触感反馈。风语仍在设备上离线处理输入。")
+                    Label(
+                        "请前往“设置 → 通用 → 键盘 → 键盘 → 风语”开启完全访问。",
+                        systemImage: "gear"
+                    )
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("设置风语键盘")
+                }
+
+                Section("隐私") {
+                    Label("所有输入和词库查询均在设备本地完成", systemImage: "lock.shield")
                         .foregroundStyle(.secondary)
                 }
             }

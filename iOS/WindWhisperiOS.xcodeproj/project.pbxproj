@@ -96,8 +96,7 @@
 			children = (
 				37D354D8EE2AC7E4F746F944 /* fy.dict.yaml */,
 			);
-			name = Resources;
-			path = ../Resources;
+			path = Resources;
 			sourceTree = "<group>";
 		};
 		CC80E46A045671F7F53AB700 /* App */ = {

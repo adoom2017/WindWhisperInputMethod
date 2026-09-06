@@ -2,7 +2,7 @@
 
 iOS 版本包含两个目标：
 
-- `WindWhisper`：宿主 App，用于选择输入方案并承载键盘扩展。
+- `WindWhisper`：宿主 App，用于选择输入方案、显示安装说明并承载键盘扩展。
 - `WindWhisperKeyboard`：`com.apple.keyboard-service` 扩展，负责显示键盘、候选和向当前 App 提交文字。
 
 最低系统版本为 iOS 17。键盘词库随扩展离线打包，输入处理不依赖网络。为兼容第三方键盘
@@ -29,6 +29,15 @@ cd ..
 
 不要直接修改生成后的 `iOS/WindWhisperiOS.xcodeproj/project.pbxproj`；目标、资源或签名配置
 应写入 `iOS/project.yml` 后重新生成。
+
+iOS 扩展使用按移动端输入场景裁剪的 `iOS/Resources/fy.dict.yaml`，共享的完整词库不会被修改。
+更新完整词库后，先在仓库根目录执行以下命令，再重新生成 Xcode 工程：
+
+```bash
+./Scripts/generate-ios-dictionary.sh
+```
+
+裁剪词库保留全部拼音基础条目、四码以内的小鹤音形条目，以及权重不低于 500 的常用语料。
 
 ## 命令行编译验证
 

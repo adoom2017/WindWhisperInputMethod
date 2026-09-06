@@ -1,6 +1,16 @@
 import UIKit
 import OSLog
 
+private enum KeyboardPreferences {
+    static let schemaKey = "schema"
+    static let appGroupIdentifier = "group.com.shendongchun.windwhisper"
+
+    static var selectedSchemaIdentifier: String {
+        UserDefaults(suiteName: appGroupIdentifier)?.string(forKey: schemaKey)
+            ?? "flypyShape"
+    }
+}
+
 private actor KeyboardInputRuntime {
     static let shared = KeyboardInputRuntime()
 
@@ -17,7 +27,11 @@ private actor KeyboardInputRuntime {
             service = cachedService
             reusedService = true
         } else {
-            let loadedService = try InputService(paths: paths, enabledSchemas: [schema])
+            let loadedService = try InputService(
+                paths: paths,
+                enabledSchemas: [schema],
+                candidateLimit: 5
+            )
             self.service = loadedService
             loadedSchema = schema
             service = loadedService
@@ -34,6 +48,11 @@ final class KeyboardViewController: UIInputViewController {
         case symbols
     }
 
+    private enum SuggestionAction {
+        case punctuation(String)
+        case candidate(Int)
+    }
+
     private enum Metrics {
         static let horizontalInset: CGFloat = 6
         static let suggestionToKeysSpacing: CGFloat = 7
@@ -41,11 +60,10 @@ final class KeyboardViewController: UIInputViewController {
         static let keySpacing: CGFloat = 6
         static let keyHeight: CGFloat = 43
         static let utilityKeyHeight: CGFloat = 43
-        static let suggestionHeight: CGFloat = 24
+        static let suggestionHeight: CGFloat = 32
         static let keyCornerRadius: CGFloat = 8
-        static let contentHeight: CGFloat = 239
+        static let contentHeight: CGFloat = 247
         static let inputViewHeight: CGFloat = contentHeight + 9
-        static let suggestionVerticalOffset: CGFloat = 2
     }
 
     /// Gives the keyboard host a stable size before it lays out the extension's content.
@@ -118,6 +136,7 @@ final class KeyboardViewController: UIInputViewController {
     /// handles haptics through the button's `.touchDown` control event.
     private final class KeyboardButton: UIButton {
         private var restingTransform = CGAffineTransform.identity
+        var suggestionAction: SuggestionAction?
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
             super.touchesBegan(touches, with: event)
@@ -129,7 +148,12 @@ final class KeyboardViewController: UIInputViewController {
             if UIAccessibility.isReduceMotionEnabled {
                 changes()
             } else {
-                UIView.animate(withDuration: 0.06, animations: changes)
+                UIView.animate(
+                    withDuration: 0.06,
+                    delay: 0,
+                    options: [.allowUserInteraction, .beginFromCurrentState],
+                    animations: changes
+                )
             }
         }
 
@@ -151,7 +175,12 @@ final class KeyboardViewController: UIInputViewController {
             if UIAccessibility.isReduceMotionEnabled {
                 changes()
             } else {
-                UIView.animate(withDuration: 0.1, animations: changes)
+                UIView.animate(
+                    withDuration: 0.1,
+                    delay: 0,
+                    options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut],
+                    animations: changes
+                )
             }
         }
     }
@@ -164,12 +193,18 @@ final class KeyboardViewController: UIInputViewController {
     private var session: InputSession?
     private var service: InputService?
     private var startupErrorDescription: String?
+    private var requestedSchemaIdentifier: String?
     private var layoutMode = LayoutMode.letters
     private var isShifted = false
     private var startupTask: Task<Void, Never>?
     private var inputViewHeightConstraint: NSLayoutConstraint?
     private var hostPresentationVisible = false
     private var keyFeedbackGenerator: UIImpactFeedbackGenerator?
+    private var backspaceRepeatTimer: Timer?
+    private var backspaceHandledOnTouchDown = false
+    private var appliedKeyboardAppearance: UIKeyboardAppearance?
+    private var hasMarkedComposition = false
+    private var hasActiveEngineComposition = false
 #if DEBUG
     private var layoutLogSequence = 0
     private var lastLoggedViewBounds = CGRect.null
@@ -181,6 +216,7 @@ final class KeyboardViewController: UIInputViewController {
     private let suggestionScrollView = UIScrollView()
     private let suggestionsStack = UIStackView()
     private let compositionLabel = UILabel()
+    private var reusableSuggestionButtons = [KeyboardButton]()
     private let shiftButton = KeyboardButton(type: .system)
     private let modeButton = KeyboardButton(type: .system)
     private let asciiButton = KeyboardButton(type: .system)
@@ -244,6 +280,7 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        startEngine()
 #if DEBUG
         logLayoutState("viewWillAppear animated=\(animated)")
 #endif
@@ -258,6 +295,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     override func viewWillDisappear(_ animated: Bool) {
+        stopRepeatingBackspace()
 #if DEBUG
         logLayoutState("viewWillDisappear animated=\(animated)")
 #endif
@@ -310,26 +348,31 @@ final class KeyboardViewController: UIInputViewController {
 
     override func textWillChange(_ textInput: UITextInput?) {
         super.textWillChange(textInput)
+        guard hasActiveEngineComposition || hasMarkedComposition else { return }
         clearMarkedComposition()
         session?.clearComposition()
+        hasActiveEngineComposition = false
         if session != nil { compositionLabel.text = "" }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         applyColors()
-        refresh()
     }
 
     private func startEngine() {
+        let schemaIdentifier = KeyboardPreferences.selectedSchemaIdentifier
+        guard requestedSchemaIdentifier != schemaIdentifier else { return }
+        requestedSchemaIdentifier = schemaIdentifier
+
         let paths: InputServicePaths
         do {
             paths = try InputServicePaths.applicationDefaults(bundle: .main)
         } catch {
+            requestedSchemaIdentifier = nil
             showStartupError(error.localizedDescription)
             return
         }
-        let schemaIdentifier = UserDefaults.standard.string(forKey: "schema") ?? "flypyShape"
         let schema = FengYuSchema(rawValue: schemaIdentifier) ?? .flypy
         startupTask?.cancel()
         startupTask = Task { [weak self] in
@@ -353,6 +396,7 @@ final class KeyboardViewController: UIInputViewController {
                 return
             } catch {
                 guard !Task.isCancelled else { return }
+                self?.requestedSchemaIdentifier = nil
                 self?.logger.error(
                     "Input engine startup failed: \(error.localizedDescription, privacy: .public) paths.sharedData=\(paths.sharedData.path, privacy: .private) paths.userData=\(paths.userData.path, privacy: .private) paths.logs=\(paths.logs.path, privacy: .private)"
                 )
@@ -435,7 +479,7 @@ final class KeyboardViewController: UIInputViewController {
         suggestionScrollView.heightAnchor.constraint(equalToConstant: Metrics.suggestionHeight).isActive = true
 
         suggestionsStack.axis = .horizontal
-        suggestionsStack.alignment = .fill
+        suggestionsStack.alignment = .center
         suggestionsStack.spacing = 5
         suggestionsStack.translatesAutoresizingMaskIntoConstraints = false
         suggestionScrollView.addSubview(suggestionsStack)
@@ -449,10 +493,6 @@ final class KeyboardViewController: UIInputViewController {
 
         compositionLabel.font = .monospacedSystemFont(ofSize: 15, weight: .medium)
         compositionLabel.textAlignment = .left
-        compositionLabel.transform = CGAffineTransform(
-            translationX: 0,
-            y: Metrics.suggestionVerticalOffset
-        )
         compositionLabel.setContentHuggingPriority(.required, for: .horizontal)
         compositionLabel.accessibilityLabel = "正在输入"
         showQuickPunctuation()
@@ -533,7 +573,15 @@ final class KeyboardViewController: UIInputViewController {
         titles.forEach { characterStack.addArrangedSubview(makeCharacterKey($0)) }
         row.addArrangedSubview(characterStack)
 
-        let backspace = makeIconKey("delete.left", accessibilityLabel: "删除", action: #selector(backspace))
+        let backspace = makeIconKey(
+            "delete.left",
+            accessibilityLabel: "删除",
+            action: #selector(finishBackspace(_:))
+        )
+        backspace.addTarget(self, action: #selector(beginBackspace(_:)), for: .touchDown)
+        for event: UIControl.Event in [.touchUpOutside, .touchCancel, .touchDragExit] {
+            backspace.addTarget(self, action: #selector(stopRepeatingBackspace), for: event)
+        }
         row.addArrangedSubview(backspace)
         NSLayoutConstraint.activate([
             row.arrangedSubviews[0].widthAnchor.constraint(equalToConstant: 46),
@@ -643,15 +691,25 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func applyColors() {
+        let appearance = textDocumentProxy.keyboardAppearance
+        guard appearance != appliedKeyboardAppearance else { return }
+        appliedKeyboardAppearance = appearance
         view.backgroundColor = .clear
         compositionLabel.textColor = keyForegroundColor
         suggestionScrollView.backgroundColor = .clear
         findButtons(in: rootStack).forEach { button in
-            if button === asciiButton || button.superview === suggestionsStack {
+            if button === asciiButton {
                 button.tintColor = keyForegroundColor
                 button.setTitleColor(keyForegroundColor, for: .normal)
                 button.backgroundColor = .clear
                 button.layer.shadowOpacity = 0
+            } else if button.superview === suggestionsStack {
+                let isSelected = button.accessibilityTraits.contains(.selected)
+                button.tintColor = keyForegroundColor
+                button.setTitleColor(keyForegroundColor, for: .normal)
+                button.backgroundColor = isSelected ? selectedCandidateBackgroundColor : .clear
+                button.layer.cornerRadius = isSelected ? 12 : 0
+                button.layer.shadowOpacity = isSelected && appearance != .dark ? 0.1 : 0
             } else {
                 styleKey(button)
             }
@@ -677,52 +735,78 @@ final class KeyboardViewController: UIInputViewController {
 
     private func showQuickPunctuation() {
         replaceSuggestions()
-        ["，", "。", "？", "！", "、", "……"].forEach { punctuation in
-            let button = KeyboardButton(type: .system)
-            configureTouchFeedback(for: button)
+        ["，", "。", "？", "！", "、", "……"].enumerated().forEach { index, punctuation in
+            let button = suggestionButton(at: index)
             button.setTitle(punctuation, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 21)
+            button.titleLabel?.transform = CGAffineTransform(translationX: 0, y: -1)
             button.setTitleColor(keyForegroundColor, for: .normal)
-            button.transform = CGAffineTransform(
-                translationX: 0,
-                y: Metrics.suggestionVerticalOffset
-            )
+            button.backgroundColor = .clear
+            button.layer.cornerRadius = 0
+            button.layer.shadowOpacity = 0
+            button.accessibilityTraits = .button
             button.accessibilityLabel = punctuation
-            button.addAction(UIAction { [weak self] _ in
-                self?.performKeyFeedback(label: punctuation)
-                self?.insertPunctuation(punctuation)
-            }, for: .touchUpInside)
-            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 54).isActive = true
-            suggestionsStack.addArrangedSubview(button)
+            button.suggestionAction = .punctuation(punctuation)
         }
     }
 
-    private func showCandidates(_ candidates: [(index: Int, text: String)], composition: String) {
+    private func showCandidates(
+        _ candidates: [(index: Int, text: String, isSelected: Bool)],
+        composition: String
+    ) {
         replaceSuggestions()
         if !composition.isEmpty {
             compositionLabel.text = composition
             compositionLabel.accessibilityValue = composition
-            suggestionsStack.addArrangedSubview(compositionLabel)
+            suggestionsStack.insertArrangedSubview(compositionLabel, at: 0)
             compositionLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
         }
-        for candidate in candidates {
-            let button = KeyboardButton(type: .system)
-            configureTouchFeedback(for: button)
+        for (buttonIndex, candidate) in candidates.enumerated() {
+            let button = suggestionButton(at: buttonIndex)
             button.setTitle(candidate.text, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 19)
+            button.titleLabel?.transform = CGAffineTransform(translationX: 0, y: -1)
             button.setTitleColor(keyForegroundColor, for: .normal)
-            button.transform = CGAffineTransform(
-                translationX: 0,
-                y: Metrics.suggestionVerticalOffset
-            )
-            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
+            button.backgroundColor = candidate.isSelected ? selectedCandidateBackgroundColor : .clear
+            button.layer.cornerRadius = candidate.isSelected ? 12 : 0
+            button.layer.cornerCurve = .continuous
+            button.layer.shadowColor = UIColor.black.cgColor
+            button.layer.shadowOpacity = candidate.isSelected
+                && textDocumentProxy.keyboardAppearance != .dark ? 0.1 : 0
+            button.layer.shadowRadius = candidate.isSelected ? 1 : 0
+            button.layer.shadowOffset = CGSize(width: 0, height: 1)
+            button.accessibilityTraits = candidate.isSelected ? [.button, .selected] : .button
             button.accessibilityLabel = "候选词 \(candidate.text)"
-            button.addAction(UIAction { [weak self] _ in
-                self?.performKeyFeedback(label: "候选词 \(candidate.text)")
-                _ = self?.session?.selectCandidate(at: candidate.index)
-                self?.refresh()
-            }, for: .touchUpInside)
+            button.suggestionAction = .candidate(candidate.index)
+        }
+    }
+
+    private func suggestionButton(at index: Int) -> KeyboardButton {
+        while reusableSuggestionButtons.count <= index {
+            let button = KeyboardButton(type: .system)
+            configureTouchFeedback(for: button)
+            button.addTarget(self, action: #selector(suggestionPressed(_:)), for: .touchUpInside)
+            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
+            button.heightAnchor.constraint(equalToConstant: 28).isActive = true
+            button.contentVerticalAlignment = .center
+            reusableSuggestionButtons.append(button)
             suggestionsStack.addArrangedSubview(button)
+        }
+        let button = reusableSuggestionButtons[index]
+        button.isHidden = false
+        return button
+    }
+
+    @objc private func suggestionPressed(_ sender: UIButton) {
+        guard let button = sender as? KeyboardButton else { return }
+        switch button.suggestionAction {
+        case .punctuation(let punctuation):
+            insertPunctuation(punctuation)
+        case .candidate(let index):
+            _ = session?.selectCandidate(at: index)
+            refresh()
+        case nil:
+            break
         }
     }
 
@@ -732,15 +816,17 @@ final class KeyboardViewController: UIInputViewController {
         label.text = message
         label.textColor = keyForegroundColor
         label.font = .systemFont(ofSize: 15, weight: .medium)
-        label.transform = CGAffineTransform(
-            translationX: 0,
-            y: Metrics.suggestionVerticalOffset
-        )
         suggestionsStack.addArrangedSubview(label)
     }
 
     private func replaceSuggestions() {
         suggestionsStack.arrangedSubviews.forEach {
+            if let button = $0 as? KeyboardButton,
+               reusableSuggestionButtons.contains(where: { $0 === button }) {
+                button.isHidden = true
+                button.suggestionAction = nil
+                return
+            }
             suggestionsStack.removeArrangedSubview($0)
             $0.removeFromSuperview()
         }
@@ -748,16 +834,19 @@ final class KeyboardViewController: UIInputViewController {
 
     private func insertPunctuation(_ punctuation: String) {
         textDocumentProxy.insertText(punctuation)
-        refresh()
+    }
+
+    private var selectedCandidateBackgroundColor: UIColor {
+        textDocumentProxy.keyboardAppearance == .dark
+            ? UIColor.white.withAlphaComponent(0.16)
+            : .white
     }
 
     @objc private func keyPressed(_ sender: UIButton) {
         guard let title = sender.currentTitle, let value = title.lowercased().first else { return }
-        performKeyFeedback(label: title)
         let output = isShifted ? String(value).uppercased() : String(value)
         guard layoutMode == .letters else {
             textDocumentProxy.insertText(output)
-            refresh()
             return
         }
         let keyCode = Int32(output.utf8.first ?? 0)
@@ -767,65 +856,85 @@ final class KeyboardViewController: UIInputViewController {
             isShifted = false
             rebuildCharacterRows()
         }
-        refresh()
+        if handled { refresh() }
     }
 
     @objc private func space() {
-        performKeyFeedback(label: "空格")
         let handled = session?.process(keyCode: 0x20) ?? false
         if !handled { textDocumentProxy.insertText(" ") }
-        refresh()
+        if handled { refresh() }
     }
 
-    @objc private func backspace() {
-        performKeyFeedback(label: "删除")
-        if session?.process(keyCode: 0xFF08) != true { textDocumentProxy.deleteBackward() }
-        refresh()
+    @objc private func beginBackspace(_ sender: UIButton) {
+        _ = sender
+        stopRepeatingBackspace()
+        backspaceHandledOnTouchDown = true
+        deleteBackwardOnce()
+
+        let timer = Timer(timeInterval: 0.055, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.deleteBackwardOnce()
+            }
+        }
+        timer.fireDate = Date().addingTimeInterval(0.22)
+        RunLoop.main.add(timer, forMode: .common)
+        backspaceRepeatTimer = timer
+    }
+
+    @objc private func finishBackspace(_ sender: UIButton) {
+        _ = sender
+        if !backspaceHandledOnTouchDown {
+            deleteBackwardOnce()
+        }
+        stopRepeatingBackspace()
+        backspaceHandledOnTouchDown = false
+    }
+
+    @objc private func stopRepeatingBackspace() {
+        backspaceRepeatTimer?.invalidate()
+        backspaceRepeatTimer = nil
+    }
+
+    private func deleteBackwardOnce() {
+        if hasActiveEngineComposition,
+           session?.process(keyCode: 0xFF08) == true {
+            refresh()
+        } else {
+            textDocumentProxy.deleteBackward()
+        }
     }
 
     @objc private func insertNewline() {
-        performKeyFeedback(label: "换行")
         textDocumentProxy.insertText("\n")
-        refresh()
     }
 
     @objc private func toggleASCII() {
-        performKeyFeedback(label: "切换中英文")
         guard let session else { return }
         _ = session.setOption("ascii_mode", enabled: session.option("ascii_mode") != true)
         refresh()
     }
 
     @objc private func toggleShift() {
-        performKeyFeedback(label: "大写")
         isShifted.toggle()
         rebuildCharacterRows()
     }
 
     @objc private func toggleLayoutMode() {
-        performKeyFeedback(label: "切换键盘")
         layoutMode = layoutMode == .letters ? .numbers : .letters
         isShifted = false
         rebuildCharacterRows()
     }
 
     @objc private func toggleSymbolPage() {
-        performKeyFeedback(label: "切换符号")
         layoutMode = layoutMode == .numbers ? .symbols : .numbers
         rebuildCharacterRows()
     }
 
-    private func performKeyFeedback(label: String) {
-#if DEBUG
-        logger.notice("Key action label=\(label, privacy: .public) engineReady=\(self.session != nil, privacy: .public)")
-#endif
-    }
-
     private func configureKeyFeedback() {
         if #available(iOS 17.5, *) {
-            keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .light, view: view)
+            keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .medium, view: view)
         } else {
-            keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+            keyFeedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
         }
         keyFeedbackGenerator?.prepare()
     }
@@ -836,12 +945,8 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func keyTouchDown(_ sender: UIButton) {
-#if DEBUG
-        logger.notice(
-            "Haptic requested label=\(sender.accessibilityLabel ?? sender.currentTitle ?? "unknown", privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public)"
-        )
-#endif
-        keyFeedbackGenerator?.impactOccurred(intensity: 0.65)
+        _ = sender
+        keyFeedbackGenerator?.impactOccurred(intensity: 0.9)
         keyFeedbackGenerator?.prepare()
     }
 
@@ -858,7 +963,14 @@ final class KeyboardViewController: UIInputViewController {
         asciiButton.accessibilityValue = snapshot.status.isASCIIMode ? "英文模式" : "中文模式"
 
         let composition = snapshot.composition?.text ?? ""
-        let candidates = snapshot.menu.candidates.enumerated().map { (index: $0.offset, text: $0.element.text) }
+        hasActiveEngineComposition = !composition.isEmpty
+        let candidates = snapshot.menu.candidates.enumerated().map {
+            (
+                index: $0.offset,
+                text: $0.element.text,
+                isSelected: $0.offset == snapshot.menu.highlightedIndex
+            )
+        }
         if snapshot.status.isASCIIMode || composition.isEmpty {
             clearMarkedComposition()
         } else {
@@ -869,6 +981,7 @@ final class KeyboardViewController: UIInputViewController {
                 composition,
                 selectedRange: NSRange(location: composition.utf16.count, length: 0)
             )
+            hasMarkedComposition = true
         }
         if composition.isEmpty && candidates.isEmpty {
             showQuickPunctuation()
@@ -886,9 +999,11 @@ final class KeyboardViewController: UIInputViewController {
     /// deleted: `unmarkText()` would first commit/remove its underline, making
     /// the user press Backspace twice.
     private func clearMarkedComposition() {
+        guard hasMarkedComposition else { return }
         textDocumentProxy.setMarkedText(
             "",
             selectedRange: NSRange(location: 0, length: 0)
         )
+        hasMarkedComposition = false
     }
 }

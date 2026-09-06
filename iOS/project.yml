@@ -41,7 +41,7 @@ targets:
       - path: ../Core/SwiftAdapter/InputModels.swift
       - path: ../Core/SwiftAdapter/InputService.swift
       - path: ../Core/SwiftAdapter/InputEnginePlatform.swift
-      - path: ../Resources/fy.dict.yaml
+      - path: Resources/fy.dict.yaml
         buildPhase: resources
     settings:
       base:
