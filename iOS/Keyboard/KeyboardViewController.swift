@@ -197,7 +197,6 @@ final class KeyboardViewController: UIInputViewController {
     private var layoutMode = LayoutMode.letters
     private var isShifted = false
     private var startupTask: Task<Void, Never>?
-    private var inputViewHeightConstraint: NSLayoutConstraint?
     private var hostPresentationVisible = false
     private var keyFeedbackGenerator: UIImpactFeedbackGenerator?
     private var backspaceRepeatTimer: Timer?
@@ -233,13 +232,6 @@ final class KeyboardViewController: UIInputViewController {
 
     override func loadView() {
         let inputView = SelfSizingInputView()
-        let heightConstraint = inputView.heightAnchor.constraint(equalToConstant: Metrics.inputViewHeight)
-        // The remote keyboard host owns transient presentation heights. Keeping this
-        // below required lets the fixed-height content stay bottom-anchored while
-        // UIKit negotiates from its temporary full-screen frame to the final height.
-        heightConstraint.priority = .defaultHigh
-        heightConstraint.isActive = true
-        inputViewHeightConstraint = heightConstraint
         view = inputView
         self.inputView = inputView
     }
@@ -249,7 +241,7 @@ final class KeyboardViewController: UIInputViewController {
         configureKeyFeedback()
 #if DEBUG
         logger.notice(
-            "Self-sizing input view allowsSelfSizing=\((self.view as? UIInputView)?.allowsSelfSizing ?? false, privacy: .public) intrinsic=\(String(describing: self.view.intrinsicContentSize), privacy: .public) initialFrame=\(String(describing: self.view.frame), privacy: .public) preferredContentSize=\(String(describing: self.preferredContentSize), privacy: .public) heightConstraintActive=\(self.inputViewHeightConstraint?.isActive ?? false, privacy: .public) heightConstraintConstant=\(self.inputViewHeightConstraint?.constant ?? -1, privacy: .public) inputView=\(String(describing: self.inputView), privacy: .public) sameView=\(self.inputView === self.view, privacy: .public)"
+            "Self-sizing input view allowsSelfSizing=\((self.view as? UIInputView)?.allowsSelfSizing ?? false, privacy: .public) intrinsic=\(String(describing: self.view.intrinsicContentSize), privacy: .public) initialFrame=\(String(describing: self.view.frame), privacy: .public) preferredContentSize=\(String(describing: self.preferredContentSize), privacy: .public) inputView=\(String(describing: self.inputView), privacy: .public) sameView=\(self.inputView === self.view, privacy: .public)"
         )
         logLayoutState("viewDidLoad.begin")
 #endif
@@ -265,10 +257,17 @@ final class KeyboardViewController: UIInputViewController {
         startEngine()
     }
 
+    override func viewWillLayoutSubviews() {
+        let width = view.bounds.width
+        if width > 0 {
+            preferredContentSize = CGSize(width: width, height: Metrics.inputViewHeight)
+        }
+        super.viewWillLayoutSubviews()
+    }
+
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         updateHostPresentationVisibility()
-        updateContentVisibility()
 #if DEBUG
         guard layoutLogSequence < 20,
               view.bounds != lastLoggedViewBounds || rootStack.frame != lastLoggedRootFrame else { return }
@@ -280,6 +279,10 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        // A reused controller can still carry the previous presentation's
+        // compact bounds. Wait for this presentation's layout before revealing it.
+        setHostPresentationVisible(false)
+        view.setNeedsLayout()
         startEngine()
 #if DEBUG
         logLayoutState("viewWillAppear animated=\(animated)")
@@ -337,7 +340,7 @@ final class KeyboardViewController: UIInputViewController {
             ambiguityDescription = "not-checked-before-window"
         }
         logger.notice(
-            "Layout #\(self.layoutLogSequence) \(phase, privacy: .public) view=\(String(describing: self.view.frame), privacy: .public) viewOnScreen=\(String(describing: viewOnScreen), privacy: .public) root=\(String(describing: self.rootStack.frame), privacy: .public) rootOnScreen=\(String(describing: rootOnScreen), privacy: .public) heightConstraintActive=\(self.inputViewHeightConstraint?.isActive ?? false, privacy: .public) heightConstraintConstant=\(self.inputViewHeightConstraint?.constant ?? -1, privacy: .public) safeArea=\(String(describing: self.view.safeAreaInsets), privacy: .public) superview=\(superviewDescription, privacy: .public) ancestors=\(ancestorDescriptions.joined(separator: " -> "), privacy: .public) window=\(String(describing: self.view.window?.frame), privacy: .public) windowBG=\(String(describing: self.view.window?.backgroundColor), privacy: .public) ambiguous=\(ambiguityDescription, privacy: .public)"
+            "Layout #\(self.layoutLogSequence) \(phase, privacy: .public) view=\(String(describing: self.view.frame), privacy: .public) viewOnScreen=\(String(describing: viewOnScreen), privacy: .public) root=\(String(describing: self.rootStack.frame), privacy: .public) safeArea=\(String(describing: self.view.safeAreaInsets), privacy: .public) superview=\(superviewDescription, privacy: .public) ancestors=\(ancestorDescriptions.joined(separator: " -> "), privacy: .public) window=\(String(describing: self.view.window?.frame), privacy: .public) windowBG=\(String(describing: self.view.window?.backgroundColor), privacy: .public) ambiguous=\(ambiguityDescription, privacy: .public)"
         )
     }
 #endif
@@ -417,7 +420,7 @@ final class KeyboardViewController: UIInputViewController {
         // Keep the input view itself in the host compositor during height
         // negotiation. Only the keyboard content is hidden for transient
         // expanded frames, which avoids changing the host layer's alpha.
-        rootStack.layer.opacity = 1
+        rootStack.layer.opacity = 0
 
         rootStack.axis = .vertical
         rootStack.spacing = Metrics.suggestionToKeysSpacing
@@ -439,19 +442,8 @@ final class KeyboardViewController: UIInputViewController {
         applyColors()
     }
 
-    private func updateContentVisibility() {
-        let heightDelta = abs(view.bounds.height - Metrics.inputViewHeight)
-#if DEBUG
-        let shouldShowContent = heightDelta < 1
-        logger.notice(
-            "Height negotiation hostHeight=\(self.view.bounds.height, privacy: .public) expectedHeight=\(Metrics.inputViewHeight, privacy: .public) settled=\(shouldShowContent, privacy: .public) constraintActive=\(self.inputViewHeightConstraint?.isActive ?? false, privacy: .public) constraintConstant=\(self.inputViewHeightConstraint?.constant ?? -1, privacy: .public)"
-        )
-#endif
-    }
-
     private func updateHostPresentationVisibility() {
         let hostHeight = view.bounds.height
-        guard hostHeight > 0 else { return }
 
         // Heights substantially larger than the requested keyboard height are
         // transient frames produced by _UIRemoteKeyboardWindow during a mode
@@ -459,16 +451,26 @@ final class KeyboardViewController: UIInputViewController {
         // keyboard frame, while allowing legitimate nearby heights (for
         // example iPad keyboard variants) to remain visible.
         let isTransientExpandedFrame = hostHeight > Metrics.inputViewHeight + 100
-        let shouldBeVisible = !isTransientExpandedFrame
+        let shouldBeVisible = view.window != nil
+            && view.bounds.width > 0
+            && hostHeight >= Metrics.contentHeight
+            && !isTransientExpandedFrame
+        setHostPresentationVisible(shouldBeVisible)
+    }
+
+    private func setHostPresentationVisible(_ shouldBeVisible: Bool) {
         guard shouldBeVisible != hostPresentationVisible else { return }
 
         hostPresentationVisible = shouldBeVisible
-        // Keep the controls interactive throughout host negotiation. The
-        // extension's view tree must remain hit-testable on physical devices.
-        rootStack.layer.opacity = 1
+        // Change only the content layer, leaving the host view's alpha and
+        // hit-testing intact. Do not animate or capture the temporary frame.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        rootStack.layer.opacity = shouldBeVisible ? 1 : 0
+        CATransaction.commit()
 #if DEBUG
         logger.notice(
-            "Host presentation visibility visible=\(shouldBeVisible, privacy: .public) hostHeight=\(hostHeight, privacy: .public) expectedHeight=\(Metrics.inputViewHeight, privacy: .public)"
+            "Host presentation visibility visible=\(shouldBeVisible, privacy: .public) hostHeight=\(self.view.bounds.height, privacy: .public) expectedHeight=\(Metrics.inputViewHeight, privacy: .public)"
         )
 #endif
     }
