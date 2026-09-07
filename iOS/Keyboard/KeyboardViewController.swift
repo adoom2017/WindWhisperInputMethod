@@ -586,16 +586,24 @@ final class KeyboardViewController: UIInputViewController {
                 Array("zxcvbnm").map(String.init)
             ]
         case .numbers:
-            rows = [
+            rows = usesChineseSymbols ? [
+                Array("1234567890").map(String.init),
+                ["－", "／", "：", "；", "（", "）", "￥", "＆", "＠"],
+                ["。", "，", "？", "！", "‘’", "“”"]
+            ] : [
                 Array("1234567890").map(String.init),
                 ["-", "/", ":", ";", "(", ")", "$", "&", "@"],
                 [".", ",", "?", "!", "'", "\""]
             ]
         case .symbols:
-            rows = [
+            rows = usesChineseSymbols ? [
+                ["【", "】", "｛", "｝", "＃", "％", "＾", "＊", "＋", "＝"],
+                ["＿", "＼", "｜", "～", "《", "》", "€", "£", "￥"],
+                ["·", "……", "，", "。", "？", "！"]
+            ] : [
                 ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="],
                 ["_", "\\", "|", "~", "<", ">", "€", "£", "¥"],
-                ["·", "…", "，", "。", "？", "！"]
+                ["·", "…", ",", ".", "?", "!"]
             ]
         }
 
@@ -800,9 +808,16 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.keyboardAppearance == .dark ? .white : .black
     }
 
+    private var usesChineseSymbols: Bool {
+        session?.option("ascii_mode") != true
+    }
+
     private func showQuickPunctuation() {
         replaceSuggestions()
-        ["，", "。", "？", "！", "、", "……"].enumerated().forEach { index, punctuation in
+        let punctuationKeys = usesChineseSymbols
+            ? ["，", "。", "？", "！", "、", "……"]
+            : [",", ".", "?", "!", "\\", "…"]
+        punctuationKeys.enumerated().forEach { index, punctuation in
             let button = suggestionButton(at: index)
             button.setTitle(punctuation, for: .normal)
             button.titleLabel?.font = .systemFont(ofSize: 21)
@@ -911,12 +926,13 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func keyPressed(_ sender: UIButton) {
         reloadCustomWordsIfNeeded()
-        guard let title = sender.currentTitle, let value = title.lowercased().first else { return }
-        let output = isShifted ? String(value).uppercased() : String(value)
+        guard let title = sender.currentTitle else { return }
         guard layoutMode == .letters else {
-            textDocumentProxy.insertText(output)
+            textDocumentProxy.insertText(title)
             return
         }
+        guard let value = title.lowercased().first else { return }
+        let output = isShifted ? String(value).uppercased() : String(value)
         let keyCode = Int32(output.utf8.first ?? 0)
         let handled = session?.process(keyCode: keyCode) ?? false
         if !handled { textDocumentProxy.insertText(output) }
@@ -979,6 +995,7 @@ final class KeyboardViewController: UIInputViewController {
     @objc private func toggleASCII() {
         guard let session else { return }
         _ = session.setOption("ascii_mode", enabled: session.option("ascii_mode") != true)
+        if layoutMode != .letters { rebuildCharacterRows() }
         refresh()
     }
 
