@@ -163,8 +163,15 @@ private final class NativeDictionary: @unchecked Sendable {
         let limit: Int
     }
 
+#if os(iOS)
+    private let baseShapeEntries: [NativeDictionaryEntry]
+    private var shapeEntries: [NativeDictionaryEntry]
+    private var customShapeTextsByCode: [String: Set<String>]
+    private var shapeCodesByText: [String: [String]]
+#else
     private let shapeEntries: [NativeDictionaryEntry]
     private let shapeCodesByText: [String: [String]]
+#endif
     private let pinyinEntries: [NativeDictionaryEntry]
     private let flypyPhoneticEntries: [NativeDictionaryEntry]
     private let languageModel: NativeStatisticalLanguageModel
@@ -195,10 +202,25 @@ private final class NativeDictionary: @unchecked Sendable {
         let shape = allEntries.filter { $0.source == .flypy }
         var languageModelBuilder = NativeStatisticalLanguageModel.Builder()
         let customURL = userData.appendingPathComponent("custom_words.tsv")
+#if os(iOS)
+        baseShapeEntries = needsShape ? shape.map(\.entry) : []
+        var shapeEntries = baseShapeEntries
+        var customEntries = [NativeDictionaryEntry]()
+#else
         var shapeEntries = needsShape ? shape.map(\.entry) : []
+#endif
         if needsShape, FileManager.default.fileExists(atPath: customURL.path) {
+#if os(iOS)
+            customEntries = try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000)
+            shapeEntries.insert(contentsOf: customEntries, at: 0)
+#else
             shapeEntries.insert(contentsOf: try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000), at: 0)
+#endif
         }
+#if os(iOS)
+        customShapeTextsByCode = Dictionary(grouping: customEntries, by: \.code)
+            .mapValues { Set($0.map(\.text)) }
+#endif
         self.shapeEntries = Self.sortedForPrefixSearch(shapeEntries)
         shapeCodesByText = needsShape ? Self.shapeCodesByText(shapeEntries) : [:]
 
@@ -331,7 +353,28 @@ private final class NativeDictionary: @unchecked Sendable {
         return entries
     }
 
+#if os(iOS)
+    func reloadCustomWords(at url: URL) throws {
+        let custom = FileManager.default.fileExists(atPath: url.path)
+            ? try Self.readCodedEntries(at: url, baseWeight: 3_000_000) : []
+        let entries = Self.sortedForPrefixSearch(custom + baseShapeEntries)
+        let codes = Self.shapeCodesByText(entries)
+        let customTexts = Dictionary(grouping: custom, by: \.code).mapValues { Set($0.map(\.text)) }
+        candidateCacheLock.lock()
+        defer { candidateCacheLock.unlock() }
+        shapeEntries = entries
+        shapeCodesByText = codes
+        customShapeTextsByCode = customTexts
+        candidateCache.removeAll()
+        candidateCacheOrder.removeAll()
+    }
+
+#endif
     func candidates(for code: String, schema: FengYuSchema, limit: Int = 100) -> [String] {
+#if os(iOS)
+        candidateCacheLock.lock()
+        defer { candidateCacheLock.unlock() }
+#endif
         guard !code.isEmpty, limit > 0 else { return [] }
         let normalized = schema == .fullPinyin ? Self.normalizedPinyin(code) : code.lowercased()
         let cacheKey = CandidateCacheKey(
@@ -339,9 +382,13 @@ private final class NativeDictionary: @unchecked Sendable {
             code: normalized,
             limit: limit
         )
+#if !os(iOS)
         candidateCacheLock.lock()
+#endif
         let cached = candidateCache[cacheKey]
+#if !os(iOS)
         candidateCacheLock.unlock()
+#endif
         if let cached { return cached }
 
         let entries: [NativeDictionaryEntry]
@@ -362,6 +409,14 @@ private final class NativeDictionary: @unchecked Sendable {
             if matches.count >= 20_000 { break }
         }
         matches.sort {
+#if os(iOS)
+            if schema == .flypy {
+                let customTexts = customShapeTextsByCode[normalized] ?? []
+                let lhsCustom = $0.code == normalized && customTexts.contains($0.text)
+                let rhsCustom = $1.code == normalized && customTexts.contains($1.text)
+                if lhsCustom != rhsCustom { return lhsCustom }
+            }
+#endif
             if schema == .flypy, normalized.count < 4 {
                 let lhsSingleCharacter = $0.text.count == 1
                 let rhsSingleCharacter = $1.text.count == 1
@@ -405,7 +460,9 @@ private final class NativeDictionary: @unchecked Sendable {
             result.append(text)
             if result.count == limit { break }
         }
+#if !os(iOS)
         candidateCacheLock.lock()
+#endif
         if candidateCache[cacheKey] == nil {
             if candidateCacheOrder.count >= candidateCacheCapacity {
                 let evictedKey = candidateCacheOrder.removeFirst()
@@ -414,11 +471,17 @@ private final class NativeDictionary: @unchecked Sendable {
             candidateCache[cacheKey] = result
             candidateCacheOrder.append(cacheKey)
         }
+#if !os(iOS)
         candidateCacheLock.unlock()
+#endif
         return result
     }
 
     func shapeCodeComment(for text: String, matchingPrefix prefix: String) -> String? {
+#if os(iOS)
+        candidateCacheLock.lock()
+        defer { candidateCacheLock.unlock() }
+#endif
         guard !prefix.isEmpty, let codes = shapeCodesByText[text] else { return nil }
         let matches = codes.filter { $0.hasPrefix(prefix) }
         guard !matches.isEmpty else { return nil }
@@ -665,6 +728,12 @@ final class InputService: @unchecked Sendable {
         _ = minLogLevel
     }
 
+#if os(iOS)
+    func reloadCustomWords() throws {
+        try dictionary.reloadCustomWords(at: paths.userData.appendingPathComponent("custom_words.tsv"))
+    }
+
+#endif
     func makeSession() throws -> InputSession {
         lock.lock()
         activeSessions += 1
@@ -881,6 +950,14 @@ final class InputSession: @unchecked Sendable {
         return true
     }
 
+#if os(iOS)
+    func refreshCandidates() {
+        lock.lock()
+        defer { lock.unlock() }
+        updateCandidates()
+    }
+
+#endif
     func clearComposition() {
         lock.lock()
         clearComposition(keepingCommit: false)

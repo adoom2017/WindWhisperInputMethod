@@ -23,6 +23,8 @@ targets:
     platform: iOS
     sources:
       - path: App
+      - path: Shared
+      - path: ../Platform/macOS/Configuration/CustomWords.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.shendongchun.inputmethod.windwhisper.ios
@@ -37,6 +39,7 @@ targets:
     platform: iOS
     sources:
       - path: Keyboard
+      - path: Shared
       - path: Keyboard/FengYuSchema.swift
       - path: ../Core/SwiftAdapter/InputModels.swift
       - path: ../Core/SwiftAdapter/InputService.swift

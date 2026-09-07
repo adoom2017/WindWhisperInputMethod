@@ -7,15 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		038BB00BEF33CF0986120BDB /* KeyboardSharedStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835C6407840760192FE2753C /* KeyboardSharedStorage.swift */; };
 		112CAD903ECF4A8BF420F4BA /* FengYuSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE9EBF93011234D88C8F4F4 /* FengYuSchema.swift */; };
 		288F4E085C3D0EFD273D581A /* fy.dict.yaml in Resources */ = {isa = PBXBuildFile; fileRef = 37D354D8EE2AC7E4F746F944 /* fy.dict.yaml */; };
 		33B781B5920A8F079817C2EF /* InputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFC0E4E33BFFABC77BDCB23 /* InputService.swift */; };
+		3AD5A6BFA323B7ADD0500483 /* CustomPhrasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E56DFCFE7E3AAA70D3A3A34 /* CustomPhrasesView.swift */; };
 		3E3C4C0F228D34C025469D5E /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686FC8C2E08FCB7D3707E5B2 /* KeyboardViewController.swift */; };
 		62D13AE28A1EA623127AA48C /* InputModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F76FD6BEEA28548083D2357 /* InputModels.swift */; };
 		6E537B3358D3B54954B760CE /* WindWhisperKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F26E7AA65F3C0C986572CDA7 /* WindWhisperKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8DD8F420040DD719CA5DC01E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B54DCB6B5537484BC645FFB8 /* Assets.xcassets */; };
 		BFA1B9D2CBA39D000BE8C371 /* WindWhisperApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A537BA2A4E6D99ED16E2F5FD /* WindWhisperApp.swift */; };
 		BFAB557589ECEA023C34FA55 /* InputEnginePlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = D679FC226880EDAFF5777FD8 /* InputEnginePlatform.swift */; };
+		CF9A33C941EBD66733648122 /* CustomWords.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B149810274305ED5B8AD28 /* CustomWords.swift */; };
+		ECFD969D5CF6F31CF765903D /* KeyboardSharedStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 835C6407840760192FE2753C /* KeyboardSharedStorage.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -45,9 +49,12 @@
 /* Begin PBXFileReference section */
 		0C5E12CFFF61D6F10DD55DDF /* WindWhisper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WindWhisper.entitlements; sourceTree = "<group>"; };
 		37D354D8EE2AC7E4F746F944 /* fy.dict.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = fy.dict.yaml; sourceTree = "<group>"; };
+		3E56DFCFE7E3AAA70D3A3A34 /* CustomPhrasesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomPhrasesView.swift; sourceTree = "<group>"; };
+		49B149810274305ED5B8AD28 /* CustomWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWords.swift; sourceTree = "<group>"; };
 		686FC8C2E08FCB7D3707E5B2 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
 		6B688646DD0E2BDAD908F5A1 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		6FFC0E4E33BFFABC77BDCB23 /* InputService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputService.swift; sourceTree = "<group>"; };
+		835C6407840760192FE2753C /* KeyboardSharedStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardSharedStorage.swift; sourceTree = "<group>"; };
 		87353C1C61BD3E0021002045 /* WindWhisperKeyboard.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WindWhisperKeyboard.entitlements; sourceTree = "<group>"; };
 		8F76FD6BEEA28548083D2357 /* InputModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModels.swift; sourceTree = "<group>"; };
 		9B52AF4B6E1E48BCC2D53370 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -80,15 +87,34 @@
 			path = Keyboard;
 			sourceTree = "<group>";
 		};
+		388A1FB46CAD95110E5F6064 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				49B149810274305ED5B8AD28 /* CustomWords.swift */,
+			);
+			name = Configuration;
+			path = ../Platform/macOS/Configuration;
+			sourceTree = "<group>";
+		};
 		3AEE15FAE657D08316661C4F = {
 			isa = PBXGroup;
 			children = (
 				CC80E46A045671F7F53AB700 /* App */,
+				388A1FB46CAD95110E5F6064 /* Configuration */,
 				379B7390FD2EB4FD98381B06 /* Keyboard */,
 				AAA5A01EFBFC85ACEBC12D14 /* Resources */,
+				4A4C407AAA89F1A91F94C084 /* Shared */,
 				E89C3EE34F6557865F51E47F /* SwiftAdapter */,
 				29B19FAB1932D32B98B450EA /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		4A4C407AAA89F1A91F94C084 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				835C6407840760192FE2753C /* KeyboardSharedStorage.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 		AAA5A01EFBFC85ACEBC12D14 /* Resources */ = {
@@ -103,6 +129,7 @@
 			isa = PBXGroup;
 			children = (
 				B54DCB6B5537484BC645FFB8 /* Assets.xcassets */,
+				3E56DFCFE7E3AAA70D3A3A34 /* CustomPhrasesView.swift */,
 				9B52AF4B6E1E48BCC2D53370 /* Info.plist */,
 				0C5E12CFFF61D6F10DD55DDF /* WindWhisper.entitlements */,
 				A537BA2A4E6D99ED16E2F5FD /* WindWhisperApp.swift */,
@@ -229,6 +256,7 @@
 				BFAB557589ECEA023C34FA55 /* InputEnginePlatform.swift in Sources */,
 				62D13AE28A1EA623127AA48C /* InputModels.swift in Sources */,
 				33B781B5920A8F079817C2EF /* InputService.swift in Sources */,
+				038BB00BEF33CF0986120BDB /* KeyboardSharedStorage.swift in Sources */,
 				3E3C4C0F228D34C025469D5E /* KeyboardViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -237,6 +265,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3AD5A6BFA323B7ADD0500483 /* CustomPhrasesView.swift in Sources */,
+				CF9A33C941EBD66733648122 /* CustomWords.swift in Sources */,
+				ECFD969D5CF6F31CF765903D /* KeyboardSharedStorage.swift in Sources */,
 				BFA1B9D2CBA39D000BE8C371 /* WindWhisperApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

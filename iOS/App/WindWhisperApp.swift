@@ -42,6 +42,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink("自定义词组") {
+                        CustomPhrasesView()
+                    }
+                } footer: {
+                    Text("自定义词组仅在小鹤音形方案下生效。")
+                }
+
+                Section {
                     Label(
                         "请前往“设置 → 通用 → 键盘 → 键盘 → 风语”开启完全访问。",
                         systemImage: "gear"

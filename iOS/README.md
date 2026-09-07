@@ -100,6 +100,33 @@ build/iOSDerivedData/Build/Products/Debug-iphonesimulator/WindWhisper.app
 
 ## 基础验收用例
 
+### 自定义词组（仅小鹤音形）
+
+在宿主 App 打开“自定义词组”，点击右上角加号，填写词组及 1～4 个英文字母的快捷编码。
+编码保存时自动转为小写；相同词组和编码不能重复添加。点击已有词组可编辑，向左滑动可删除。
+保存后键盘自动加载更新，输入该编码即可选择词组；四码唯一候选遵循小鹤音形的自动上屏规则。
+未提交编码仍显示在正文中。键盘可见时每 0.5 秒检查自定义词库，点击字母键前也会检查；更新会保留当前组合并刷新候选，无需重启扩展。
+词库通过 App Group 保存在设备本地，键盘需开启“允许完全访问”。小鹤双拼和风语全拼不加载自定义词组。
+
+引擎回归必须针对 iOS Simulator 编译，并在已启动的模拟器内运行；直接在 macOS 执行不覆盖 iOS 条件代码。Apple Silicon Mac 示例（仓库根目录）：
+
+```bash
+xcrun --sdk iphonesimulator swiftc -target arm64-apple-ios17.0-simulator \
+  -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+  iOS/Keyboard/FengYuSchema.swift Core/SwiftAdapter/InputEnginePlatform.swift \
+  Core/SwiftAdapter/InputModels.swift Core/SwiftAdapter/InputService.swift \
+  Platform/macOS/Configuration/CustomWords.swift Scripts/ios-custom-phrases-smoke.swift \
+  -o /tmp/ios-custom-phrases-simulator
+xcrun simctl spawn booted /tmp/ios-custom-phrases-simulator "$PWD/iOS/Resources/fy.dict.yaml"
+```
+
+上述引擎测试不验证 Keyboard Extension 的触摸事件、App Group 权限、UIInputViewController 生命周期或正文代理；这些必须在安装后的 iOS 键盘界面验证，不能用编译成功或引擎测试通过代替。
+
+真机验收：添加词组后收起再打开键盘，验证候选和上屏；随后编辑、删除并重复验证。
+切换至小鹤双拼和风语全拼，确认不会出现该自定义词组。
+
+### 通用输入
+
 | 场景 | 操作 | 预期结果 |
 | --- | --- | --- |
 | 键盘加载 | 在普通文本框切换到风语 | 显示字母键、候选区域和中英切换键，无“引擎不可用” |

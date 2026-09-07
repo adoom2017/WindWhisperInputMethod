@@ -16,6 +16,7 @@ private actor KeyboardInputRuntime {
 
     private var service: InputService?
     private var loadedSchema: FengYuSchema?
+    private var loadedUserData: URL?
 
     func makeSession(
         paths: InputServicePaths,
@@ -23,8 +24,10 @@ private actor KeyboardInputRuntime {
     ) throws -> (service: InputService, session: InputSession, reusedService: Bool) {
         let service: InputService
         let reusedService: Bool
-        if let cachedService = self.service, loadedSchema == schema {
+        if let cachedService = self.service, loadedSchema == schema,
+           loadedUserData == paths.userData {
             service = cachedService
+            if schema == .flypy { try service.reloadCustomWords() }
             reusedService = true
         } else {
             let loadedService = try InputService(
@@ -34,6 +37,7 @@ private actor KeyboardInputRuntime {
             )
             self.service = loadedService
             loadedSchema = schema
+            loadedUserData = paths.userData
             service = loadedService
             reusedService = false
         }
@@ -194,6 +198,8 @@ final class KeyboardViewController: UIInputViewController {
     private var service: InputService?
     private var startupErrorDescription: String?
     private var requestedSchemaIdentifier: String?
+    private var requestedCustomWords: Data?
+    private var requestedUserData: URL?
     private var layoutMode = LayoutMode.letters
     private var isShifted = false
     private var startupTask: Task<Void, Never>?
@@ -203,6 +209,7 @@ final class KeyboardViewController: UIInputViewController {
     private var backspaceHandledOnTouchDown = false
     private var appliedKeyboardAppearance: UIKeyboardAppearance?
     private var hasMarkedComposition = false
+    private var customWordsRefreshTimer: Timer?
     private var hasActiveEngineComposition = false
 #if DEBUG
     private var layoutLogSequence = 0
@@ -291,6 +298,12 @@ final class KeyboardViewController: UIInputViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        startEngine()
+        customWordsRefreshTimer?.invalidate()
+        customWordsRefreshTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
+            guard self != nil else { timer.invalidate(); return }
+            MainActor.assumeIsolated { self?.reloadCustomWordsIfNeeded() }
+        }
         keyFeedbackGenerator?.prepare()
 #if DEBUG
         logLayoutState("viewDidAppear animated=\(animated)")
@@ -298,6 +311,8 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     override func viewWillDisappear(_ animated: Bool) {
+        customWordsRefreshTimer?.invalidate()
+        customWordsRefreshTimer = nil
         stopRepeatingBackspace()
 #if DEBUG
         logLayoutState("viewWillDisappear animated=\(animated)")
@@ -364,23 +379,57 @@ final class KeyboardViewController: UIInputViewController {
 
     private func startEngine() {
         let schemaIdentifier = KeyboardPreferences.selectedSchemaIdentifier
-        guard requestedSchemaIdentifier != schemaIdentifier else { return }
-        requestedSchemaIdentifier = schemaIdentifier
-
         let paths: InputServicePaths
         do {
-            paths = try InputServicePaths.applicationDefaults(bundle: .main)
+            let defaults = try InputServicePaths.applicationDefaults(bundle: .main)
+            paths = InputServicePaths(
+                sharedData: defaults.sharedData,
+                // The App Group is the sole source of custom words. Do not
+                // silently select an empty private dictionary based on an early
+                // hasFullAccess value; actual container access is authoritative.
+                userData: try KeyboardSharedStorage.userDataURL(),
+                logs: defaults.logs
+            )
         } catch {
             requestedSchemaIdentifier = nil
             showStartupError(error.localizedDescription)
             return
         }
         let schema = FengYuSchema(rawValue: schemaIdentifier) ?? .flypy
+        let customWords: Data?
+        do {
+            let url = paths.userData.appendingPathComponent("custom_words.tsv")
+            customWords = schema == .flypy && FileManager.default.fileExists(atPath: url.path)
+                ? try Data(contentsOf: url) : nil
+        } catch {
+            requestedSchemaIdentifier = nil
+            showStartupError(error.localizedDescription)
+            return
+        }
+        guard requestedSchemaIdentifier != schemaIdentifier
+            || requestedCustomWords != customWords || requestedUserData != paths.userData else { return }
+        if requestedSchemaIdentifier == schemaIdentifier, requestedUserData == paths.userData,
+           session != nil {
+            reloadCustomWordsIfNeeded()
+            return
+        }
+        requestedSchemaIdentifier = schemaIdentifier
+        requestedCustomWords = customWords
+        requestedUserData = paths.userData
+        logger.notice(
+            "Loading shared dictionary schema=\(schema.rawValue, privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public) customBytes=\(customWords?.count ?? 0, privacy: .public)"
+        )
+        clearMarkedComposition()
+        session?.clearComposition()
+        session = nil
+        hasActiveEngineComposition = false
         startupTask?.cancel()
         startupTask = Task { [weak self] in
             let startedAt = ProcessInfo.processInfo.systemUptime
             do {
-                let result = try await KeyboardInputRuntime.shared.makeSession(paths: paths, schema: schema)
+                let result = try await KeyboardInputRuntime.shared.makeSession(
+                    paths: paths, schema: schema
+                )
                 try Task.checkCancellation()
                 guard let self else { return }
                 _ = result.session.selectSchema(identifier: schema.rawValue)
@@ -409,8 +458,25 @@ final class KeyboardViewController: UIInputViewController {
 
     private func showStartupError(_ description: String) {
         startupErrorDescription = description
-        showStatus("引擎不可用")
+        showStatus("词库加载失败，请检查完全访问后重开键盘")
         logger.error("Input engine startup failed: \(description, privacy: .public)")
+    }
+
+    private func reloadCustomWordsIfNeeded() {
+        guard requestedSchemaIdentifier == FengYuSchema.flypy.rawValue,
+              let service, let session else { return }
+        do {
+            let url = service.paths.userData.appendingPathComponent("custom_words.tsv")
+            let data = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
+            guard data != requestedCustomWords else { return }
+            try service.reloadCustomWords()
+            requestedCustomWords = data
+            session.refreshCandidates()
+            refresh()
+            logger.notice("Custom words reloaded in active session; bytes=\(data?.count ?? 0, privacy: .public)")
+        } catch {
+            logger.error("Custom words reload failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func buildView() {
@@ -844,6 +910,7 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func keyPressed(_ sender: UIButton) {
+        reloadCustomWordsIfNeeded()
         guard let title = sender.currentTitle, let value = title.lowercased().first else { return }
         let output = isShifted ? String(value).uppercased() : String(value)
         guard layoutMode == .letters else {
