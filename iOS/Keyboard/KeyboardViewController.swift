@@ -321,7 +321,6 @@ final class KeyboardViewController: UIInputViewController {
     private func logLayoutState(_ phase: String) {
         layoutLogSequence += 1
         let viewOnScreen = view.convert(view.bounds, to: nil)
-        let rootOnScreen = rootStack.convert(rootStack.bounds, to: nil)
         let superviewDescription = view.superview.map {
             "\(type(of: $0)) frame=\($0.frame) bounds=\($0.bounds)"
         } ?? "nil"
