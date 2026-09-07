@@ -58,10 +58,12 @@ struct CustomWordsStore: Sendable {
 
     let fileURL: URL
 
+    #if !os(iOS)
     static func applicationDefaults() throws -> Self {
         let paths = try InputServicePaths.applicationDefaults()
         return Self(fileURL: paths.userData.appendingPathComponent("custom_words.tsv"))
     }
+    #endif
 
     func load() throws -> CustomWordsDocument {
         guard FileManager.default.fileExists(atPath: fileURL.path) else {

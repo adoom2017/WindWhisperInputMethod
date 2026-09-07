@@ -8,11 +8,11 @@ struct MappedKey: Equatable {
 
 enum KeyMapper {
     enum ModifierMask {
-        static let shift: Int32 = 1 << 0
+        static let shift: Int32 = InputEngineModifierMask.shift
         static let capsLock: Int32 = 1 << 1
-        static let control: Int32 = 1 << 2
-        static let option: Int32 = 1 << 3
-        static let release: Int32 = 1 << 30
+        static let control: Int32 = InputEngineModifierMask.control
+        static let option: Int32 = InputEngineModifierMask.option
+        static let release: Int32 = InputEngineModifierMask.release
     }
 
     private enum KeySymbol {

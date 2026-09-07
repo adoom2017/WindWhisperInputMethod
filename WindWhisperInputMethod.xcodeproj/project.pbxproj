@@ -18,6 +18,7 @@
 		A10000000000000000000009 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000B /* Assets.xcassets */; };
 		A1000000000000000000000B /* InputModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000F /* InputModels.swift */; };
 		A1000000000000000000000C /* InputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000010 /* InputService.swift */; };
+		A10000000000000000000029 /* InputEnginePlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000002A /* InputEnginePlatform.swift */; };
 		A1000000000000000000000D /* EngineSmokeTest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000011 /* EngineSmokeTest.swift */; };
 		A10000000000000000000010 /* fy.dict.yaml in Resources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000013 /* fy.dict.yaml */; };
 		A10000000000000000000011 /* NativeRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000015 /* NativeRuntime.swift */; };
@@ -76,6 +77,7 @@
 		A20000000000000000000027 /* CustomWords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWords.swift; sourceTree = "<group>"; };
 		A20000000000000000000028 /* CustomWordsEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomWordsEditor.swift; sourceTree = "<group>"; };
 		A20000000000000000000029 /* AppStore.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = AppStore.entitlements; sourceTree = "<group>"; };
+		A2000000000000000000002A /* InputEnginePlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnginePlatform.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -171,6 +173,7 @@
 			children = (
 				A2000000000000000000000F /* InputModels.swift */,
 				A20000000000000000000010 /* InputService.swift */,
+				A2000000000000000000002A /* InputEnginePlatform.swift */,
 			);
 			path = ../../Core/SwiftAdapter;
 			sourceTree = "<group>";
@@ -285,6 +288,7 @@
 				A10000000000000000000006 /* InputSourceManager.swift in Sources */,
 				A1000000000000000000000B /* InputModels.swift in Sources */,
 				A1000000000000000000000C /* InputService.swift in Sources */,
+				A10000000000000000000029 /* InputEnginePlatform.swift in Sources */,
 				A1000000000000000000000D /* EngineSmokeTest.swift in Sources */,
 				A10000000000000000000011 /* NativeRuntime.swift in Sources */,
 				A10000000000000000000012 /* KeyMapper.swift in Sources */,
