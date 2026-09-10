@@ -10,7 +10,11 @@
 
 int main() {
     CHECK(SUCCEEDED(CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED)));
-    const HMODULE module = LoadLibraryW(L"fy_tsf.dll");
+    wchar_t module_path[MAX_PATH]{};
+    CHECK(GetFullPathNameW(L"fy_tsf.dll", MAX_PATH, module_path, nullptr) > 0);
+    // Do not let the test working directory mask private DLL dependencies.
+    const HMODULE module = LoadLibraryExW(module_path, nullptr,
+                                          LOAD_LIBRARY_SEARCH_SYSTEM32);
     CHECK(module != nullptr);
     const auto get_class_object = reinterpret_cast<LPFNGETCLASSOBJECT>(
         GetProcAddress(module, "DllGetClassObject"));

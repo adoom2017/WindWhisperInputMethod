@@ -73,26 +73,41 @@ void CandidateWindow::SetTheme(CandidateWindowTheme theme) {
     }
 }
 
-bool CandidateWindow::Create(HINSTANCE instance) {
+bool CandidateWindow::Create(HINSTANCE instance, HWND owner) {
+    if (hwnd_ && !IsWindow(hwnd_)) hwnd_ = nullptr;
+    if (hwnd_ && GetWindow(hwnd_, GW_OWNER) != owner) {
+        // Establish ownership at creation, as in the Windows IME sample.
+        Hide();
+        DestroyWindow(hwnd_);
+        hwnd_ = nullptr;
+    }
     if (hwnd_) {
         return true;
     }
+    last_error_ = ERROR_SUCCESS;
     WNDCLASSW window_class{};
+    window_class.style = CS_IME;
     window_class.lpfnWndProc = &CandidateWindow::WndProc;
     window_class.hInstance = instance;
     window_class.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     window_class.hbrBackground = nullptr;
     window_class.lpszClassName = kWindowClass;
-    RegisterClassW(&window_class);
+    if (!RegisterClassW(&window_class) &&
+        GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
+        last_error_ = GetLastError();
+        return false;
+    }
     hwnd_ = CreateWindowExW(
         WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_TOPMOST, kWindowClass,
-        L"WindWhisper candidates", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr,
+        L"WindWhisper candidates", WS_POPUP | WS_CLIPSIBLINGS, 0, 0, 1, 1, owner, nullptr,
         instance, this);
+    if (!hwnd_) last_error_ = GetLastError();
     return hwnd_ != nullptr;
 }
 
 CandidateWindow::~CandidateWindow() {
     if (hwnd_) {
+        Hide();
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
     }
@@ -102,8 +117,11 @@ void CandidateWindow::ShowAt(
     POINT point, UINT dpi, const std::vector<CandidateWindowItem> &items,
     size_t highlighted, size_t page, size_t page_count) {
     if (!hwnd_) {
+        last_error_ = ERROR_INVALID_WINDOW_HANDLE;
         return;
     }
+    const bool was_visible = IsWindowVisible(hwnd_) != FALSE;
+    last_error_ = ERROR_SUCCESS;
     dpi_ = dpi == 0 ? 96 : dpi;
     highlighted_ = highlighted;
     page_ = page;
@@ -153,14 +171,23 @@ void CandidateWindow::ShowAt(
     const int radius = Scale(18, dpi_);
     SetWindowRgn(hwnd_, CreateRoundRectRgn(0, 0, width + 1, height + 1,
                                            radius, radius), FALSE);
-    SetWindowPos(hwnd_, HWND_TOPMOST, point.x, point.y, width, height,
-                 SWP_NOACTIVATE | SWP_SHOWWINDOW);
+    if (!SetWindowPos(hwnd_, HWND_TOPMOST, point.x, point.y, width, height,
+                       SWP_NOACTIVATE | SWP_SHOWWINDOW)) {
+        last_error_ = GetLastError();
+        return;
+    }
+    NotifyWinEvent(was_visible ? EVENT_OBJECT_IME_CHANGE : EVENT_OBJECT_IME_SHOW,
+                    hwnd_, OBJID_CLIENT, CHILDID_SELF);
     InvalidateRect(hwnd_, nullptr, FALSE);
 }
 
 void CandidateWindow::Hide() {
     if (hwnd_) {
+        const bool was_visible = IsWindowVisible(hwnd_) != FALSE;
         ShowWindow(hwnd_, SW_HIDE);
+        if (was_visible) {
+            NotifyWinEvent(EVENT_OBJECT_IME_HIDE, hwnd_, OBJID_CLIENT, CHILDID_SELF);
+        }
         items_.clear();
     }
 }

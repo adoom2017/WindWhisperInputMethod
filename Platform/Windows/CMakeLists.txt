@@ -1,7 +1,13 @@
 if(WIN32)
+  # System input hosts may not search the COM DLL's directory for dependencies.
+  add_library(fy_engine_tsf STATIC ../../Core/src/fy_engine.cpp)
+  target_include_directories(fy_engine_tsf PUBLIC ../../Core/include)
+  target_compile_definitions(fy_engine_tsf PUBLIC FY_ENGINE_STATIC)
+  set_property(TARGET fy_engine_tsf PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
   add_library(fy_tsf SHARED TSF/FengYuTextService.cpp TSF/FengYuResources.rc TSF/FengYuTextService.def TSF/WindowsKeyMapper.cpp CandidateWindow/CandidateWindow.cpp Settings/CustomPhraseEditor.cpp Settings/CustomPhraseStore.cpp Settings/SettingsStore.cpp)
   target_include_directories(fy_tsf PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../Core/include)
-  target_link_libraries(fy_tsf PRIVATE fy_engine ole32 oleaut32 user32 gdi32 comctl32 comdlg32 uuid)
+  target_link_libraries(fy_tsf PRIVATE fy_engine_tsf ole32 oleaut32 user32 gdi32 comctl32 comdlg32 uuid)
+  set_property(TARGET fy_tsf PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
   set_target_properties(fy_tsf PROPERTIES OUTPUT_NAME "fy_tsf")
   add_custom_command(TARGET fy_tsf POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different

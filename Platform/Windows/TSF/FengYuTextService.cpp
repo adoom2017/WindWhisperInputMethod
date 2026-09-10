@@ -408,7 +408,6 @@ public:
         if (!ResolveEngine()) {
             return nullptr;
         }
-        candidate_window_.Create(GetModuleHandleW(nullptr));
         auto created = std::make_shared<FengYuContextSession>(
             context, engine_, &candidate_window_, schema_.c_str());
         if (!created->session) {
@@ -1163,8 +1162,14 @@ bool QueueEditSession(
     }
     auto *edit_session = new FengYuEditSession(state, composition, commit);
     HRESULT session_result = E_FAIL;
-    const HRESULT request_result = state->context->RequestEditSession(
+    HRESULT request_result = state->context->RequestEditSession(
         client_id, edit_session, TF_ES_SYNC | TF_ES_READWRITE, &session_result);
+    if (request_result == TF_E_SYNCHRONOUS || request_result == TF_E_LOCKED ||
+        (SUCCEEDED(request_result) &&
+         (session_result == TF_E_SYNCHRONOUS || session_result == TF_E_LOCKED))) {
+        request_result = state->context->RequestEditSession(
+            client_id, edit_session, TF_ES_ASYNC | TF_ES_READWRITE, &session_result);
+    }
     edit_session->Release();
     DebugLog("request-edit-session", request_result,
              static_cast<WPARAM>(session_result),
@@ -1199,15 +1204,23 @@ void ShowCandidates(
     ITfContextView *view = nullptr;
     result = context->GetActiveView(&view);
     RECT bounds{};
+    HWND owner = nullptr;
     BOOL clipped = FALSE;
     if (SUCCEEDED(result)) {
+        if (FAILED(view->GetWnd(&owner)) || !owner) owner = GetFocus();
         result = view->GetTextExt(cookie, range, &bounds, &clipped);
+        if (FAILED(result) || bounds.bottom <= bounds.top) {
+            DebugLog("candidate-text-layout-unavailable", result);
+            // Modern text hosts can defer layout until after this edit lock.
+            // Anchor to the document view until precise text bounds exist.
+            result = view->GetScreenExt(&bounds);
+        }
     }
     if (view) {
         view->Release();
     }
     range->Release();
-    if (FAILED(result)) {
+    if (FAILED(result) || bounds.bottom <= bounds.top) {
         DebugLog("candidate-get-text-ext", result);
         window.Hide();
         return;
@@ -1220,9 +1233,15 @@ void ShowCandidates(
                          Utf8ToWide(candidate.comment, candidate.comment_len)});
     }
     POINT point{bounds.left, bounds.bottom};
-    window.ShowAt(point, 96, items, snapshot.highlighted, snapshot.page,
+    if (!owner) owner = GetFocus();
+    if (!window.Create(GetModuleHandleW(nullptr), owner)) {
+        DebugLog("candidate-create-failed", HRESULT_FROM_WIN32(window.last_error()));
+        return;
+    }
+    const UINT dpi = owner ? GetDpiForWindow(owner) : 96;
+    window.ShowAt(point, dpi, items, snapshot.highlighted, snapshot.page,
                   snapshot.page_count);
-    DebugLog("candidate-show", S_OK,
+    DebugLog("candidate-show", HRESULT_FROM_WIN32(window.last_error()),
              static_cast<WPARAM>(snapshot.candidate_count));
 }
 }

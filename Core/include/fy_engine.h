@@ -3,7 +3,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifdef _WIN32
+#if defined(FY_ENGINE_STATIC)
+#  define FY_API
+#elif defined(_WIN32)
 #  ifdef FY_ENGINE_BUILD
 #    define FY_API __declspec(dllexport)
 #  else
