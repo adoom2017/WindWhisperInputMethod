@@ -1,4 +1,5 @@
 #include "WindowsKeyMapper.h"
+#include <initializer_list>
 
 #define CHECK(condition)      \
     do {                      \
@@ -31,6 +32,22 @@ int main() {
     CHECK(!shift.TestKeyUp(VK_SHIFT));
 
     FyMappedKey key{};
+    // Direct delivery without a preceding test callback must cancel the tap.
+    for (WPARAM combined : {WPARAM('A'), WPARAM(VK_LEFT), WPARAM(VK_TAB),
+                            WPARAM(VK_CONTROL), WPARAM(VK_MENU), WPARAM(VK_LWIN)}) {
+        shift.KeyDown(VK_SHIFT, false, false);
+        shift.KeyDown(combined, false, false);
+        shift.KeyDown(VK_SHIFT, true, false);
+        CHECK(!shift.KeyUp(VK_SHIFT));
+    }
+    shift.KeyDown(VK_SHIFT, false, false);
+    CHECK(!shift.TestKeyUp('A'));
+    CHECK(!shift.KeyUp(VK_SHIFT));
+    shift.KeyDown(VK_SHIFT, false, false);
+    shift.KeyUp(VK_TAB);
+    CHECK(!shift.KeyUp(VK_SHIFT));
+    shift.KeyDown(VK_SHIFT, false, false);
+    CHECK(shift.KeyUp(VK_SHIFT));
     CHECK(FyMapVirtualKey('N', false, false, false, false, false, false, &key));
     CHECK(key.key == 'n');
     CHECK(!FyMapVirtualKey('N', true, false, false, false, false, false, &key));

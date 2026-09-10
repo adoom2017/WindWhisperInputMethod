@@ -30,7 +30,7 @@ function Invoke-ElevatedSelf {
         '-LogPath', ('"{0}"' -f [IO.Path]::GetFullPath($LogPath))
     )
     $process = Start-Process -FilePath 'powershell.exe' -Verb RunAs `
-        -ArgumentList $argumentList -Wait -PassThru
+        -ArgumentList $argumentList -WindowStyle Hidden -Wait -PassThru
     exit $process.ExitCode
 }
 

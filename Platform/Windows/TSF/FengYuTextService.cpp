@@ -1432,6 +1432,10 @@ HRESULT FengYuTextService::OnKeyDown(
         return E_POINTER;
     }
     *eaten = FALSE;
+    // Observe direct deliveries too, before shortcut mapping returns early.
+    if (!FyShiftTapState::IsShiftKey(virtual_key)) {
+        shift_tap_.KeyDown(virtual_key, false, false);
+    }
     if (FyShiftTapState::IsShiftKey(virtual_key)) {
         const bool repeat =
             (static_cast<ULONG_PTR>(flags) & (1ull << 30)) != 0;
@@ -1482,6 +1486,10 @@ HRESULT FengYuTextService::OnKeyUp(
         return E_POINTER;
     }
     *eaten = FALSE;
+    if (KeyStateDown(VK_CONTROL) || KeyStateDown(VK_MENU) ||
+        KeyStateDown(VK_LWIN) || KeyStateDown(VK_RWIN)) {
+        shift_tap_.Reset();
+    }
     if (!shift_tap_.KeyUp(key)) {
         return S_OK;
     }

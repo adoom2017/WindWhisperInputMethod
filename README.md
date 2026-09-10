@@ -80,7 +80,7 @@ ni~r  →  倪 nire
 
 1. 关闭并重新打开编辑器或浏览器。
 2. 再按一次 `Win + Space` 检查输入法列表。
-3. 运行安装包旁的 `Refresh-Tsf-OneClick.cmd`（如果发布包包含该文件）。
+3. 如果任务栏仍显示旧状态，请注销 Windows 后重新登录，使输入法重新加载。
 4. 仍未恢复时，注销并重新登录 Windows。
 
 卸载路径：
@@ -159,6 +159,12 @@ pwsh -NoProfile -File Installer/Windows/build-msi.ps1 -Configuration Release
 WiX 已安装到 `build/tools/wix` 时，可跳过第一条命令。
 
 安装包：`build/windows/Installer/Release/WindWhisperInputMethod-x64.msi`。
+
+GitHub Actions 的 **Build Windows Installer** 工作流会在推送到 `main`、提交面向 `main` 的 PR 时自动构建 Windows x64 MSI，也支持在 Actions 页面手动选择 **Run workflow**。运行成功后，在该次运行的 Artifacts 中下载 `windwhisper-windows-x64-*`，解压后即可双击 MSI 安装。
+
+发布 GitHub Release 时，同一工作流会从发布标签构建、运行测试，并将 MSI 和 SHA-256 校验文件上传到 Release 附件。发布前请将 `Installer/Windows/Product.wxs` 的版本号与标签保持一致，例如版本 `1.0.40` 对应 `v1.0.40`。Windows 构建不依赖 macOS 签名密钥；当前生成的 MSI 未做 Authenticode 签名。
+
+直接双击 MSI 安装。安装注册程序使用无控制台模式，发布目录不再附带 CMD 刷新脚本。构建工具在后台运行，输出仍显示在当前构建终端；打包会校验注册程序的 Windows GUI 子系统，防止旧控制台程序混入安装包。
 
 ## macOS 编译
 

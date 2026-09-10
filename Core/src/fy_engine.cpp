@@ -709,9 +709,19 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
             session->commit = width_character(key, true);
             return 1;
         }
+        const bool shape = session->schema == "flypy" || session->schema == "flypyShape";
+        // A fifth letter starts a new code after committing the first
+        // candidate of a complete four-key shape code. Reverse lookup and
+        // longer custom codes without an exact four-key match stay intact.
+        if (shape && letter && session->code.size() == 4 &&
+            session->code.find('~') == std::string::npos &&
+            !session->matches.empty() &&
+            session->matches.front().code == session->code) {
+            session->page = 0;
+            fy_session_select_candidate(session, 0);
+        }
         session->code.push_back(static_cast<char>(key));
         refresh(session);
-        const bool shape = session->schema == "flypy" || session->schema == "flypyShape";
         if (shape && session->code.find('~') == std::string::npos &&
             session->code.size() >= 4 && !session->matches.empty()) {
             // The consolidated dictionary can contain the same phrase/code

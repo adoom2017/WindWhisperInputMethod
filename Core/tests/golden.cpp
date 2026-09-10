@@ -27,6 +27,29 @@ bool equals(const char *text, size_t length, const char *expected) {
 }
 
 int main() {
+    const char *shape_dictionary =
+        "甲\tabcd\t100\tflypy\t0\n"
+        "乙\tabcd\t90\tflypy\t1\n"
+        "丙\tef\t80\tflypy\t2\n";
+    auto *shape_engine = fy_engine_create(shape_dictionary, std::strlen(shape_dictionary));
+    auto *shape_session = fy_session_create(shape_engine);
+    CHECK(shape_session != nullptr);
+    CHECK(fy_session_select_schema(shape_session, "flypyShape", 10));
+    CHECK(type(shape_session, "abcd"));
+    fy_snapshot shape_snapshot{};
+    CHECK(fy_session_snapshot(shape_session, &shape_snapshot));
+    CHECK(shape_snapshot.commit_len == 0);
+    CHECK(shape_snapshot.candidate_count == 2);
+    CHECK(type(shape_session, "e"));
+    CHECK(fy_session_snapshot(shape_session, &shape_snapshot));
+    CHECK(equals(shape_snapshot.commit, shape_snapshot.commit_len, "甲"));
+    CHECK(equals(shape_snapshot.composition, shape_snapshot.composition_len, "e"));
+    CHECK(type(shape_session, "f"));
+    CHECK(fy_session_process_key(shape_session, ' ', 0));
+    CHECK(fy_session_snapshot(shape_session, &shape_snapshot));
+    CHECK(equals(shape_snapshot.commit, shape_snapshot.commit_len, "丙"));
+    fy_session_destroy(shape_session);
+    fy_engine_destroy(shape_engine);
     fy_engine *engine = fy_engine_create(nullptr, 0);
     CHECK(engine != nullptr);
     fy_session *session = fy_session_create(engine);

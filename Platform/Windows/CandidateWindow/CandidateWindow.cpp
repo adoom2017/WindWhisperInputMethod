@@ -12,7 +12,10 @@ namespace {
 constexpr wchar_t kWindowClass[] = L"WindWhisperCandidateWindow";
 struct ThemePalette {
     COLORREF background;
+    COLORREF surface_top;
+    COLORREF sheen;
     COLORREF highlight;
+    COLORREF highlight_bottom;
     COLORREF border;
     COLORREF divider;
     COLORREF accent;
@@ -22,13 +25,33 @@ struct ThemePalette {
 };
 
 constexpr ThemePalette kDarkPalette{
-    RGB(43, 43, 43), RGB(57, 57, 57), RGB(103, 103, 103),
-    RGB(72, 72, 72), RGB(255, 112, 88), RGB(244, 244, 244),
-    RGB(196, 196, 196), RGB(112, 112, 112)};
+    RGB(29, 34, 43), RGB(57, 65, 78), RGB(100, 112, 132),
+    RGB(66, 77, 94), RGB(29, 34, 43), RGB(76, 87, 105),
+    RGB(69, 79, 95), RGB(255, 145, 122), RGB(248, 250, 255),
+    RGB(200, 211, 226), RGB(123, 135, 152)};
 constexpr ThemePalette kLightPalette{
-    RGB(250, 250, 250), RGB(234, 236, 239), RGB(166, 169, 174),
-    RGB(218, 220, 224), RGB(224, 82, 62), RGB(28, 29, 31),
-    RGB(82, 85, 90), RGB(164, 167, 172)};
+    RGB(207, 221, 237), RGB(249, 253, 255), RGB(255, 255, 255),
+    RGB(242, 249, 255), RGB(180, 204, 230), RGB(153, 174, 198),
+    RGB(177, 196, 218), RGB(191, 66, 48), RGB(25, 37, 54),
+    RGB(71, 89, 112), RGB(139, 154, 174)};
+
+// A bounded, opaque glass finish keeps glyph contrast independent of the
+// host application's background and works without compositor-specific APIs.
+void FillGlassGradient(HDC dc, const RECT &rect, COLORREF top, COLORREF bottom) {
+    const int height = std::max<LONG>(1, rect.bottom - rect.top);
+    HGDIOBJ old = SelectObject(dc, GetStockObject(DC_BRUSH));
+    for (int y = 0; y < height; ++y) {
+        const auto channel = [&](int a, int b) {
+            return a + (b - a) * y / std::max(1, height - 1);
+        };
+        SetDCBrushColor(dc, RGB(channel(GetRValue(top), GetRValue(bottom)),
+                               channel(GetGValue(top), GetGValue(bottom)),
+                               channel(GetBValue(top), GetBValue(bottom))));
+        RECT line{rect.left, rect.top + y, rect.right, rect.top + y + 1};
+        FillRect(dc, &line, static_cast<HBRUSH>(GetStockObject(DC_BRUSH)));
+    }
+    SelectObject(dc, old);
+}
 
 int Scale(int value, UINT dpi) {
     return MulDiv(value, static_cast<int>(dpi), 96);
@@ -127,7 +150,7 @@ void CandidateWindow::ShowAt(
     if (point.y + height > monitor_info.rcWork.bottom) {
         point.y = std::max(monitor_info.rcWork.top, point.y - height - Scale(24, dpi_));
     }
-    const int radius = Scale(12, dpi_);
+    const int radius = Scale(18, dpi_);
     SetWindowRgn(hwnd_, CreateRoundRectRgn(0, 0, width + 1, height + 1,
                                            radius, radius), FALSE);
     SetWindowPos(hwnd_, HWND_TOPMOST, point.x, point.y, width, height,
@@ -153,17 +176,25 @@ void CandidateWindow::Paint(HDC dc) {
         dc, std::max<LONG>(1, client.right), std::max<LONG>(1, client.bottom));
     HGDIOBJ old_bitmap = SelectObject(buffer, bitmap);
 
-    HBRUSH background = CreateSolidBrush(palette.background);
-    FillRect(buffer, &client, background);
-    DeleteObject(background);
+    FillGlassGradient(buffer, client, palette.surface_top, palette.background);
     HPEN border = CreatePen(PS_SOLID, Scale(1, dpi_), palette.border);
     HGDIOBJ old_pen = SelectObject(buffer, border);
     HGDIOBJ old_brush = SelectObject(buffer, GetStockObject(NULL_BRUSH));
     RoundRect(buffer, 0, 0, client.right, client.bottom,
-              Scale(12, dpi_), Scale(12, dpi_));
+              Scale(18, dpi_), Scale(18, dpi_));
     SelectObject(buffer, old_brush);
     SelectObject(buffer, old_pen);
     DeleteObject(border);
+
+    HPEN sheen = CreatePen(PS_SOLID, 1, palette.sheen);
+    old_pen = SelectObject(buffer, sheen);
+    old_brush = SelectObject(buffer, GetStockObject(NULL_BRUSH));
+    const int inset = Scale(1, dpi_);
+    RoundRect(buffer, inset, inset, client.right - inset,
+              client.bottom - inset, Scale(16, dpi_), Scale(16, dpi_));
+    SelectObject(buffer, old_brush);
+    SelectObject(buffer, old_pen);
+    DeleteObject(sheen);
 
     SetBkMode(buffer, TRANSPARENT);
     HFONT font = CreateCandidateFont(dpi_);
@@ -193,9 +224,24 @@ void CandidateWindow::Paint(HDC dc) {
                        std::min<LONG>(client.right, x + item_width),
                        client.bottom - Scale(5, dpi_)};
         if (index == highlighted_) {
-            HBRUSH highlight = CreateSolidBrush(palette.highlight);
-            FillRect(buffer, &item_rect, highlight);
-            DeleteObject(highlight);
+            const int saved = SaveDC(buffer);
+            HRGN clip = CreateRoundRectRgn(
+                item_rect.left, item_rect.top, item_rect.right,
+                item_rect.bottom, Scale(12, dpi_), Scale(12, dpi_));
+            SelectClipRgn(buffer, clip);
+            FillGlassGradient(buffer, item_rect, palette.highlight,
+                              palette.highlight_bottom);
+            RestoreDC(buffer, saved);
+            DeleteObject(clip);
+            HPEN rim = CreatePen(PS_SOLID, 1, palette.sheen);
+            HGDIOBJ saved_pen = SelectObject(buffer, rim);
+            HGDIOBJ saved_brush = SelectObject(buffer, GetStockObject(NULL_BRUSH));
+            RoundRect(buffer, item_rect.left, item_rect.top,
+                      item_rect.right, item_rect.bottom,
+                      Scale(12, dpi_), Scale(12, dpi_));
+            SelectObject(buffer, saved_brush);
+            SelectObject(buffer, saved_pen);
+            DeleteObject(rim);
             RECT accent{item_rect.left, item_rect.top + Scale(8, dpi_),
                         item_rect.left + Scale(4, dpi_),
                         item_rect.bottom - Scale(8, dpi_)};
@@ -294,6 +340,7 @@ LRESULT CALLBACK CandidateWindow::WndProc(
     if (message == WM_NCHITTEST) {
         return HTTRANSPARENT;
     }
+    if (message == WM_ERASEBKGND) return 1;
     return DefWindowProcW(window, message, w_param, l_param);
 }
 #endif

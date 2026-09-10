@@ -1,0 +1,103 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and test x64 MSI
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Install WiX
+        run: |
+          dotnet tool install wix --version 6.0.2 --tool-path build/tools/wix
+          if ($LASTEXITCODE -ne 0) { throw 'WiX installation failed' }
+
+      - name: Configure x64 build
+        run: cmake -S . -B build/windows -G 'Visual Studio 17 2022' -A x64
+
+      - name: Build MSI
+        run: ./Installer/Windows/build-msi.ps1 -Configuration Release
+
+      - name: Run regression tests
+        run: ctest --test-dir build/windows -C Release --output-on-failure
+
+      - name: Verify installer and generate checksum
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $path = (Resolve-Path 'build/windows/Installer/Release/WindWhisperInputMethod-x64.msi').Path
+          $installer = New-Object -ComObject WindowsInstaller.Installer
+          $database = $installer.OpenDatabase($path, 0)
+          $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''')
+          $view.Execute()
+          $version = $view.Fetch().StringData(1)
+          $view.Close()
+          if (-not $version) { throw 'MSI ProductVersion is missing' }
+          if ($env:RELEASE_TAG -and $env:RELEASE_TAG -ne "v$version") {
+            throw "Release tag must match MSI version v$version. Update Product.wxs before tagging."
+          }
+          $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  WindWhisperInputMethod-x64.msi" | Set-Content -LiteralPath "$path.sha256" -Encoding utf8NoBOM
+          "Windows x64 MSI version: $version" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windwhisper-windows-x64-${{ github.run_number }}
+          path: |
+            build/windows/Installer/Release/*.msi
+            build/windows/Installer/Release/*.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Preserve test diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-logs-${{ github.run_number }}
+          path: build/windows/Testing/Temporary/
+          if-no-files-found: ignore
+
+  publish:
+    name: Attach MSI to release
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windwhisper-windows-x64-${{ github.run_number }}
+          path: installer
+      - name: Upload release assets
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          gh release upload "$env:RELEASE_TAG" installer/WindWhisperInputMethod-x64.msi installer/WindWhisperInputMethod-x64.msi.sha256 --repo "$env:GITHUB_REPOSITORY" --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }

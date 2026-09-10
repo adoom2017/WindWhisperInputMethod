@@ -15,7 +15,7 @@ public:
     static bool IsShiftKey(WPARAM virtual_key);
     bool TestKeyDown(WPARAM virtual_key);
     void KeyDown(WPARAM virtual_key, bool repeat, bool other_modifier_down);
-    bool TestKeyUp(WPARAM virtual_key) const;
+    bool TestKeyUp(WPARAM virtual_key);
     bool KeyUp(WPARAM virtual_key);
     void Reset();
 

@@ -25,6 +25,9 @@ function Invoke-NativeChecked {
     $startInfo.FileName = $FilePath
     $startInfo.WorkingDirectory = $repositoryRoot
     $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
     foreach ($argument in $ArgumentList) {
         $startInfo.ArgumentList.Add($argument)
     }
@@ -38,10 +41,40 @@ function Invoke-NativeChecked {
     }
 
     $process = [Diagnostics.Process]::Start($startInfo)
+    # Drain both pipes concurrently so verbose compiler output cannot deadlock.
+    $stdout = $process.StandardOutput.ReadToEndAsync()
+    $stderr = $process.StandardError.ReadToEndAsync()
     $process.WaitForExit()
+    $output = $stdout.GetAwaiter().GetResult()
+    $errors = $stderr.GetAwaiter().GetResult()
+    if ($output) { Write-Host $output }
+    if ($errors) { Write-Host $errors }
     if ($process.ExitCode -ne 0) {
         throw "$FilePath failed with exit code $($process.ExitCode)"
     }
+}
+
+function Assert-WindowlessExecutable {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $stream = [IO.File]::OpenRead($Path)
+    $reader = [IO.BinaryReader]::new($stream)
+    try {
+        if ($reader.ReadUInt16() -ne 0x5A4D) { throw "Invalid executable: $Path" }
+        $stream.Position = 0x3C
+        $peOffset = $reader.ReadInt32()
+        if ($peOffset -lt 0 -or $peOffset + 94 -gt $stream.Length) {
+            throw "Invalid PE header: $Path"
+        }
+        $stream.Position = $peOffset
+        if ($reader.ReadUInt32() -ne 0x4550) { throw "Invalid PE signature: $Path" }
+        # Subsystem has the same offset in PE32 and PE32+ optional headers.
+        $stream.Position = $peOffset + 24 + 68
+        if ($reader.ReadUInt16() -ne 2) {
+            throw "Registration helper must use Windows GUI subsystem. Rebuild without -SkipBuild: $Path"
+        }
+    }
+    finally { $reader.Dispose() }
 }
 
 if (-not $SkipBuild) {
@@ -72,17 +105,19 @@ foreach ($path in @(
 }
 
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+Assert-WindowlessExecutable -Path (Join-Path $sourceDirectory 'fy_tsf_registration.exe')
 $outputPath = Join-Path $outputDirectory 'WindWhisperInputMethod-x64.msi'
-& $wix build (Join-Path $PSScriptRoot 'Product.wxs') `
-    -arch x64 `
-    -d "SourceDir=$sourceDirectory" `
-    -d "RepositoryRoot=$repositoryRoot" `
-    -o $outputPath
-if ($LASTEXITCODE -ne 0) {
-    throw "WiX failed with exit code $LASTEXITCODE"
+Invoke-NativeChecked -FilePath $wix -ArgumentList @(
+    'build', (Join-Path $PSScriptRoot 'Product.wxs'),
+    '-arch', 'x64', '-d', "SourceDir=$sourceDirectory",
+    '-d', "RepositoryRoot=$repositoryRoot", '-o', $outputPath
+)
+# Keep development refresh scripts out of the release deliverables, including
+# copies left by older runs. Their source copies remain in Installer/Windows.
+foreach ($name in @('Refresh-Tsf-OneClick.cmd', 'Refresh-Tsf.ps1')) {
+    $legacyCopy = Join-Path $outputDirectory $name
+    if (Test-Path -LiteralPath $legacyCopy -PathType Leaf) {
+        Remove-Item -LiteralPath $legacyCopy
+    }
 }
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Refresh-Tsf-OneClick.cmd') `
-    -Destination (Join-Path $outputDirectory 'Refresh-Tsf-OneClick.cmd') -Force
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Refresh-Tsf.ps1') `
-    -Destination (Join-Path $outputDirectory 'Refresh-Tsf.ps1') -Force
 Write-Host $outputPath

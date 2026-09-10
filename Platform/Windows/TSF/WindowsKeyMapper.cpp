@@ -47,17 +47,23 @@ bool FyShiftTapState::TestKeyDown(WPARAM virtual_key) {
 
 void FyShiftTapState::KeyDown(
     WPARAM virtual_key, bool repeat, bool other_modifier_down) {
+    if (!IsShiftKey(virtual_key) || other_modifier_down) {
+        pending_ = false;
+        return;
+    }
     if (IsShiftKey(virtual_key) && !repeat) {
         pending_ = !other_modifier_down;
     }
 }
 
-bool FyShiftTapState::TestKeyUp(WPARAM virtual_key) const {
+bool FyShiftTapState::TestKeyUp(WPARAM virtual_key) {
+    if (!IsShiftKey(virtual_key)) pending_ = false;
     return IsShiftKey(virtual_key) && pending_;
 }
 
 bool FyShiftTapState::KeyUp(WPARAM virtual_key) {
     if (!IsShiftKey(virtual_key)) {
+        pending_ = false;
         return false;
     }
     const bool toggle = pending_;
