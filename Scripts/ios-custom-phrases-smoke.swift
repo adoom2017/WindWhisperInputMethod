@@ -29,7 +29,7 @@ struct IOSCustomPhrasesSmoke {
         try check(store.load().entries[0].text == "测试专属词组")
 
         func candidates(_ schema: FengYuSchema, code: String = "zz") throws -> [String] {
-            let service = try InputService(paths: paths, enabledSchemas: [schema], candidateLimit: 5)
+            let service = try InputService(paths: paths, enabledSchemas: [schema], candidateLimit: nil)
             let session = try service.makeSession()
             session.selectSchema(identifier: schema.rawValue)
             session.simulate(sequence: code)
@@ -50,7 +50,7 @@ struct IOSCustomPhrasesSmoke {
         let edited = try candidates(.flypy)
         precondition(edited.contains("修改后的专属词组") && !edited.contains("测试专属词组"))
         // Keep both the service and composition alive while the file changes.
-        let liveService = try InputService(paths: paths, enabledSchemas: [.flypy], candidateLimit: 5)
+        let liveService = try InputService(paths: paths, enabledSchemas: [.flypy], candidateLimit: nil)
         let liveSession = try liveService.makeSession()
         liveSession.simulate(sequence: "zz")
         _ = try liveSession.readSnapshot()
@@ -69,13 +69,17 @@ struct IOSCustomPhrasesSmoke {
         // Exercise the reported four-key code against the actual iOS dictionary.
         document.entries[0].code = "sdiy"
         try store.save(document)
-        let session = try InputService(paths: paths, enabledSchemas: [.flypy], candidateLimit: 5).makeSession()
+        let session = try InputService(paths: paths, enabledSchemas: [.flypy], candidateLimit: nil).makeSession()
         session.simulate(sequence: "sdiy")
         let snapshot = try session.readSnapshot()
         precondition(snapshot.commitText == "修改后的专属词组"
             || snapshot.menu.candidates.contains { $0.text == "修改后的专属词组" })
         try store.save(.empty)
         try check(!candidates(.flypy, code: "sdiy").contains("修改后的专属词组"))
-        print("PASS: persistence, normalization, duplicate rejection, schema isolation, edit and delete")
+        try store.save(CustomWordsDocument(comments: [], entries: [
+            CustomWordEntry(text: "𰻞𠮷★", code: "zz")
+        ]))
+        try check(candidates(.flypy).first == "𰻞𠮷★")
+        print("PASS: persistence, normalization, duplicate rejection, schema isolation, edit, delete and unrestricted custom characters")
     }
 }

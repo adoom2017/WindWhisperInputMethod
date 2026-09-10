@@ -13,6 +13,7 @@
 		33B781B5920A8F079817C2EF /* InputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FFC0E4E33BFFABC77BDCB23 /* InputService.swift */; };
 		3AD5A6BFA323B7ADD0500483 /* CustomPhrasesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E56DFCFE7E3AAA70D3A3A34 /* CustomPhrasesView.swift */; };
 		3E3C4C0F228D34C025469D5E /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 686FC8C2E08FCB7D3707E5B2 /* KeyboardViewController.swift */; };
+		51CB402FFFDA87FD40398FC5 /* pinyin-data-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = 07340F4AE2FFA3488D9FB662 /* pinyin-data-MIT.txt */; };
 		62D13AE28A1EA623127AA48C /* InputModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F76FD6BEEA28548083D2357 /* InputModels.swift */; };
 		6E537B3358D3B54954B760CE /* WindWhisperKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F26E7AA65F3C0C986572CDA7 /* WindWhisperKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		8DD8F420040DD719CA5DC01E /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B54DCB6B5537484BC645FFB8 /* Assets.xcassets */; };
@@ -47,6 +48,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		07340F4AE2FFA3488D9FB662 /* pinyin-data-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pinyin-data-MIT.txt"; sourceTree = "<group>"; };
 		0C5E12CFFF61D6F10DD55DDF /* WindWhisper.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = WindWhisper.entitlements; sourceTree = "<group>"; };
 		37D354D8EE2AC7E4F746F944 /* fy.dict.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = fy.dict.yaml; sourceTree = "<group>"; };
 		3E56DFCFE7E3AAA70D3A3A34 /* CustomPhrasesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomPhrasesView.swift; sourceTree = "<group>"; };
@@ -60,13 +62,22 @@
 		9B52AF4B6E1E48BCC2D53370 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		A537BA2A4E6D99ED16E2F5FD /* WindWhisperApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindWhisperApp.swift; sourceTree = "<group>"; };
 		B54DCB6B5537484BC645FFB8 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		D245C214A998F1B518A62AC6 /* WindWhisper.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WindWhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D245C214A998F1B518A62AC6 /* WindWhisper.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = WindWhisper.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D679FC226880EDAFF5777FD8 /* InputEnginePlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnginePlatform.swift; sourceTree = "<group>"; };
-		F26E7AA65F3C0C986572CDA7 /* WindWhisperKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = WindWhisperKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F26E7AA65F3C0C986572CDA7 /* WindWhisperKeyboard.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = WindWhisperKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		FDE9EBF93011234D88C8F4F4 /* FengYuSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSchema.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		282AEC62B0384A8AD766A83C /* LICENSES */ = {
+			isa = PBXGroup;
+			children = (
+				07340F4AE2FFA3488D9FB662 /* pinyin-data-MIT.txt */,
+			);
+			name = LICENSES;
+			path = ../LICENSES;
+			sourceTree = "<group>";
+		};
 		29B19FAB1932D32B98B450EA /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -102,6 +113,7 @@
 				CC80E46A045671F7F53AB700 /* App */,
 				388A1FB46CAD95110E5F6064 /* Configuration */,
 				379B7390FD2EB4FD98381B06 /* Keyboard */,
+				282AEC62B0384A8AD766A83C /* LICENSES */,
 				AAA5A01EFBFC85ACEBC12D14 /* Resources */,
 				4A4C407AAA89F1A91F94C084 /* Shared */,
 				E89C3EE34F6557865F51E47F /* SwiftAdapter */,
@@ -196,7 +208,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
-				LastUpgradeCheck = 2660;
+				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					30C48B653CDCF369B5D01B8B = {
 						DevelopmentTeam = YH6JCRN97J;
@@ -242,6 +254,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				288F4E085C3D0EFD273D581A /* fy.dict.yaml in Resources */,
+				51CB402FFFDA87FD40398FC5 /* pinyin-data-MIT.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -356,7 +369,6 @@
 				DEVELOPMENT_TEAM = YH6JCRN97J;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -370,7 +382,6 @@
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 6.0;
@@ -433,7 +444,6 @@
 				DEVELOPMENT_TEAM = YH6JCRN97J;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -454,7 +464,6 @@
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
-				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 6.0;

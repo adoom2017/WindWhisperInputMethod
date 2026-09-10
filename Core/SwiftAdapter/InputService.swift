@@ -157,6 +157,146 @@ private struct NativeStatisticalLanguageModel {
 }
 
 private final class NativeDictionary: @unchecked Sendable {
+    // Range maxima let a query split around its next best entry without
+    // copying or sorting all entries matching a short prefix.
+    final class RankedIndex {
+        let entries: [NativeDictionaryEntry]
+        private let size: Int
+        private var weighted: [Int]
+        private var singles: [Int]
+
+        init(_ entries: [NativeDictionaryEntry]) {
+            self.entries = entries
+            var size = 1
+            while size < entries.count { size *= 2 }
+            self.size = size
+            weighted = Array(repeating: -1, count: size * 2)
+            singles = weighted
+            for i in entries.indices { weighted[size + i] = i; singles[size + i] = i }
+            if size > 1 {
+                for i in stride(from: size - 1, through: 1, by: -1) {
+                    weighted[i] = better(weighted[i * 2], weighted[i * 2 + 1], singleFirst: false)
+                    singles[i] = better(singles[i * 2], singles[i * 2 + 1], singleFirst: true)
+                }
+            }
+        }
+
+        private func better(_ a: Int, _ b: Int, singleFirst: Bool) -> Int {
+            if a < 0 { return b }
+            if b < 0 { return a }
+            let lhs = entries[a], rhs = entries[b]
+            if singleFirst, (lhs.text.count == 1) != (rhs.text.count == 1) {
+                return lhs.text.count == 1 ? a : b
+            }
+            if lhs.weight != rhs.weight { return lhs.weight > rhs.weight ? a : b }
+            if lhs.order != rhs.order { return lhs.order < rhs.order ? a : b }
+            return min(a, b)
+        }
+
+        func best(in range: Range<Int>, singleFirst: Bool) -> Int? {
+            var lower = range.lowerBound + size, upper = range.upperBound + size
+            var result = -1
+            while lower < upper {
+                if lower % 2 == 1 {
+                    result = better(result, singleFirst ? singles[lower] : weighted[lower], singleFirst: singleFirst)
+                    lower += 1
+                }
+                if upper % 2 == 1 {
+                    upper -= 1
+                    result = better(result, singleFirst ? singles[upper] : weighted[upper], singleFirst: singleFirst)
+                }
+                lower /= 2; upper /= 2
+            }
+            return result < 0 ? nil : result
+        }
+    }
+
+    final class CandidateCursor {
+        private struct Node {
+            let range: Range<Int>
+            let winner: Int
+        }
+        private let index: RankedIndex
+        private let singleFirst: Bool
+        private let code: String
+        private let custom: Set<String>
+        private var heap = [Node]()
+        private let leading: [String]
+        private var leadingOffset = 0
+        private var seen = Set<String>()
+
+        init(index: RankedIndex, code: String, singleFirst: Bool, custom: Set<String>, leading: [String], prefixRange: Range<Int>, exactRange: Range<Int>) {
+            self.index = index
+            self.code = code
+            self.singleFirst = singleFirst
+            self.custom = custom
+            self.leading = leading
+            pushRange(prefixRange)
+            // Exact entries may have user-defined priority. Their range is
+            // small and is inserted separately from the unbounded prefix.
+            if custom.isEmpty { pushRange(exactRange) }
+            else { for i in exactRange { push(Node(range: i..<(i + 1), winner: i)) } }
+        }
+
+        private func precedes(_ a: Node, _ b: Node) -> Bool {
+            let lhs = index.entries[a.winner], rhs = index.entries[b.winner]
+            let lc = lhs.code == code && custom.contains(lhs.text)
+            let rc = rhs.code == code && custom.contains(rhs.text)
+            if lc != rc { return lc }
+            if singleFirst, (lhs.text.count == 1) != (rhs.text.count == 1) { return lhs.text.count == 1 }
+            if (lhs.code == code) != (rhs.code == code) { return lhs.code == code }
+            if lhs.weight != rhs.weight { return lhs.weight > rhs.weight }
+            if lhs.order != rhs.order { return lhs.order < rhs.order }
+            return a.winner < b.winner
+        }
+
+        private func pushRange(_ range: Range<Int>) {
+            if let winner = index.best(in: range, singleFirst: singleFirst) { push(Node(range: range, winner: winner)) }
+        }
+
+        private func push(_ node: Node) {
+            heap.append(node)
+            var i = heap.count - 1
+            while i > 0 {
+                let parent = (i - 1) / 2
+                guard precedes(heap[i], heap[parent]) else { break }
+                heap.swapAt(i, parent); i = parent
+            }
+        }
+
+        private func pop() -> Node? {
+            guard !heap.isEmpty else { return nil }
+            if heap.count == 1 { return heap.removeLast() }
+            let result = heap[0]
+            heap[0] = heap.removeLast()
+            var i = 0
+            while i * 2 + 1 < heap.count {
+                var child = i * 2 + 1
+                if child + 1 < heap.count, precedes(heap[child + 1], heap[child]) { child += 1 }
+                guard precedes(heap[child], heap[i]) else { break }
+                heap.swapAt(child, i); i = child
+            }
+            return result
+        }
+
+        func next(limit: Int) -> [String] {
+            var result = [String]()
+            while result.count < limit {
+                let text: String
+                if leadingOffset < leading.count {
+                    text = leading[leadingOffset]; leadingOffset += 1
+                } else if let node = pop() {
+                    text = index.entries[node.winner].text
+                    pushRange(node.range.lowerBound..<node.winner)
+                    pushRange((node.winner + 1)..<node.range.upperBound)
+                } else { break }
+                if seen.insert(text).inserted { result.append(text) }
+            }
+            return result
+        }
+
+        var hasMore: Bool { leadingOffset < leading.count || !heap.isEmpty }
+    }
     private struct CandidateCacheKey: Hashable {
         let schemaIdentifier: String
         let code: String
@@ -174,13 +314,18 @@ private final class NativeDictionary: @unchecked Sendable {
 #endif
     private let pinyinEntries: [NativeDictionaryEntry]
     private let flypyPhoneticEntries: [NativeDictionaryEntry]
+    private var shapeRankedIndex: RankedIndex!
+    private var pinyinRankedIndex: RankedIndex!
+    private var phoneticRankedIndex: RankedIndex!
+    private let buildsRankedIndexes: Bool
     private let languageModel: NativeStatisticalLanguageModel
     private let candidateCacheLock = NSLock()
     private var candidateCache = [CandidateCacheKey: [String]]()
     private var candidateCacheOrder = [CandidateCacheKey]()
     private let candidateCacheCapacity = 128
 
-    init(sharedData: URL, userData: URL, enabledSchemas: Set<FengYuSchema>) throws {
+    init(sharedData: URL, userData: URL, enabledSchemas: Set<FengYuSchema>, buildsRankedIndexes: Bool = false) throws {
+        self.buildsRankedIndexes = buildsRankedIndexes
         let dictionaryURL = sharedData.appendingPathComponent("fy.dict.yaml")
         guard FileManager.default.fileExists(atPath: dictionaryURL.path) else {
             throw InputEngineError.missingBundledData
@@ -306,6 +451,11 @@ private final class NativeDictionary: @unchecked Sendable {
         pinyinEntries = Self.sortedForPrefixSearch(pinyin)
         flypyPhoneticEntries = Self.sortedForPrefixSearch(flypyPhonetic)
         languageModel = languageModelBuilder.build()
+        if buildsRankedIndexes {
+            shapeRankedIndex = RankedIndex(self.shapeEntries)
+            pinyinRankedIndex = RankedIndex(pinyinEntries)
+            phoneticRankedIndex = RankedIndex(flypyPhoneticEntries)
+        }
     }
 
     private enum ConsolidatedSource: Hashable {
@@ -360,9 +510,11 @@ private final class NativeDictionary: @unchecked Sendable {
         let entries = Self.sortedForPrefixSearch(custom + baseShapeEntries)
         let codes = Self.shapeCodesByText(entries)
         let customTexts = Dictionary(grouping: custom, by: \.code).mapValues { Set($0.map(\.text)) }
+        let rankedIndex = buildsRankedIndexes ? RankedIndex(entries) : nil
         candidateCacheLock.lock()
         defer { candidateCacheLock.unlock() }
         shapeEntries = entries
+        shapeRankedIndex = rankedIndex
         shapeCodesByText = codes
         customShapeTextsByCode = customTexts
         candidateCache.removeAll()
@@ -475,6 +627,32 @@ private final class NativeDictionary: @unchecked Sendable {
         candidateCacheLock.unlock()
 #endif
         return result
+    }
+
+    func makeCandidateCursor(for code: String, schema: FengYuSchema) -> CandidateCursor {
+        candidateCacheLock.lock()
+        let index: RankedIndex = schema == .flypy ? shapeRankedIndex
+            : schema == .fullPinyin ? pinyinRankedIndex : phoneticRankedIndex
+        #if os(iOS)
+        let custom = schema == .flypy ? customShapeTextsByCode[code] ?? [] : []
+        #else
+        let custom = Set<String>()
+        #endif
+        candidateCacheLock.unlock()
+        let normalized = schema == .fullPinyin ? Self.normalizedPinyin(code) : code.lowercased()
+        let entries = index.entries
+        let start = Self.lowerBound(in: entries, prefix: normalized)
+        let exactEnd = Self.lowerBound(in: entries, prefix: normalized + "!")
+        let end = Self.lowerBound(in: entries, prefix: normalized + "{")
+        let leading = schema == .flypy ? [] : Self.rankedUniqueTexts(
+            entries[start..<exactEnd].map(\.text) + Self.sentenceCandidates(
+                for: normalized, in: entries, schema: schema, languageModel: languageModel, limit: 20
+            ), languageModel: languageModel
+        )
+        return CandidateCursor(index: index, code: normalized,
+            singleFirst: schema == .flypy && normalized.count < 4,
+            custom: custom, leading: leading, prefixRange: exactEnd..<end,
+            exactRange: schema == .flypy ? start..<exactEnd : start..<start)
     }
 
     func shapeCodeComment(for text: String, matchingPrefix prefix: String) -> String? {
@@ -701,18 +879,18 @@ final class InputService: @unchecked Sendable {
     let paths: InputServicePaths
     let version = "native-1.0"
     fileprivate let dictionary: NativeDictionary
-    fileprivate let candidateLimit: Int
+    fileprivate let candidateLimit: Int?
     private let lock = NSLock()
     private var activeSessions = 0
 
     init(
         paths: InputServicePaths,
         enabledSchemas: Set<FengYuSchema> = Set(FengYuSchema.allCases),
-        candidateLimit: Int = 100,
+        candidateLimit: Int? = 100,
         minLogLevel: Int32 = 2
     ) throws {
         self.paths = paths
-        self.candidateLimit = max(1, candidateLimit)
+        self.candidateLimit = candidateLimit.map { max(1, $0) }
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
@@ -723,7 +901,8 @@ final class InputService: @unchecked Sendable {
         dictionary = try NativeDictionary(
             sharedData: paths.sharedData,
             userData: paths.userData,
-            enabledSchemas: enabledSchemas
+            enabledSchemas: enabledSchemas,
+            buildsRankedIndexes: candidateLimit == nil
         )
         _ = minLogLevel
     }
@@ -785,6 +964,10 @@ final class InputSession: @unchecked Sendable {
     private var schema: FengYuSchema = .flypy
     private var buffer = ""
     private var candidates = [SessionCandidate]()
+    private var candidateCursor: NativeDictionary.CandidateCursor?
+    private var convertedCandidateTexts = Set<String>()
+    private var hasMoreCandidates = false
+    private var queryGeneration: UInt64 = 0
     private var highlightedIndex = 0
     private var pageNumber = 0
     private var reverseLookupMarkerOffset: Int?
@@ -799,6 +982,7 @@ final class InputSession: @unchecked Sendable {
     ]
     private var leftShiftPending = false
     private let pageSize = 5
+    private let candidateBatchSize = 32
 
     fileprivate init(service: InputService) {
         self.service = service
@@ -905,14 +1089,14 @@ final class InputSession: @unchecked Sendable {
                 // when the user starts the next syllable, matching the normal
                 // continuous-input behavior without requiring Space.
                 if schema == .flypy, reverseLookupMarkerOffset == nil,
-                    buffer.count >= 4, candidates.count > 1
+                    buffer.count >= 4, candidates.count > 1 || hasMoreCandidates
                 {
                     commitSelectedCandidate()
                 }
                 buffer.append(Character(String(character).lowercased()))
                 updateCandidates()
                 if schema == .flypy, reverseLookupMarkerOffset == nil,
-                    buffer.count >= 4, candidates.count == 1
+                    buffer.count >= 4, candidates.count == 1, !hasMoreCandidates
                 {
                     commitSelectedCandidate()
                 }
@@ -950,14 +1134,21 @@ final class InputSession: @unchecked Sendable {
         return true
     }
 
-#if os(iOS)
     func refreshCandidates() {
         lock.lock()
         defer { lock.unlock() }
         updateCandidates()
     }
 
-#endif
+    @discardableResult
+    func loadMoreCandidates(batchSize: Int = 32, generation: UInt64? = nil) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard service.candidateLimit == nil,
+              generation == nil || generation == queryGeneration else { return false }
+        return appendCandidateBatch(limit: max(1, batchSize))
+    }
+
     func clearComposition() {
         lock.lock()
         clearComposition(keepingCommit: false)
@@ -1003,13 +1194,24 @@ final class InputSession: @unchecked Sendable {
         return true
     }
 
+    @discardableResult
+    func selectCandidate(atAbsoluteIndex index: Int, generation: UInt64? = nil) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard generation == nil || generation == queryGeneration,
+              candidates.indices.contains(index) else { return false }
+        highlightedIndex = index
+        commitSelectedCandidate()
+        return true
+    }
+
     func readSnapshot() throws -> InputSnapshot {
         lock.lock()
         defer { lock.unlock() }
         let commit = pendingCommit
         pendingCommit = nil
-        let pageStart = pageNumber * pageSize
-        let pageEnd = min(pageStart + pageSize, candidates.count)
+        let pageStart = service.candidateLimit == nil ? 0 : pageNumber * pageSize
+        let pageEnd = service.candidateLimit == nil ? candidates.count : min(pageStart + pageSize, candidates.count)
         let pageCandidates = pageStart < pageEnd ? Array(candidates[pageStart..<pageEnd]) : []
         let compositionText = displayedCompositionText()
         let composition = compositionText.isEmpty ? nil : CompositionSnapshot(
@@ -1023,11 +1225,13 @@ final class InputSession: @unchecked Sendable {
             menu: MenuSnapshot(
                 pageSize: pageSize,
                 pageNumber: pageNumber,
-                isLastPage: pageEnd >= candidates.count,
+                isLastPage: pageEnd >= candidates.count && !hasMoreCandidates,
                 highlightedIndex: max(0, highlightedIndex - pageStart),
                 candidates: pageCandidates.map {
                     CandidateSnapshot(text: $0.text, comment: $0.comment)
-                }
+                },
+                hasMoreCandidates: hasMoreCandidates,
+                queryGeneration: queryGeneration
             ),
             status: StatusSnapshot(
                 schemaIdentifier: schema.rawValue,
@@ -1043,20 +1247,55 @@ final class InputSession: @unchecked Sendable {
         let transform = StringTransform(
             rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans"
         )
-        var seen = Set<String>()
-        candidates = service.dictionary.candidates(
-            for: buffer,
-            schema: schema,
-            limit: service.candidateLimit
-        ).compactMap { text in
-            let converted = text.applyingTransform(transform, reverse: false) ?? text
-            guard seen.insert(converted).inserted else { return nil }
-            let comment = reverseLookupMarkerOffset == nil ? nil
-                : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer)
-            return SessionCandidate(text: converted, comment: comment)
+        queryGeneration &+= 1
+        candidateCursor = nil
+        hasMoreCandidates = false
+        candidates.removeAll(keepingCapacity: true)
+        convertedCandidateTexts.removeAll(keepingCapacity: true)
+        guard !buffer.isEmpty else {
+            highlightedIndex = 0
+            pageNumber = 0
+            return
+        }
+        if let limit = service.candidateLimit {
+            var seen = Set<String>()
+            candidates = service.dictionary.candidates(for: buffer, schema: schema, limit: limit).compactMap { text in
+                let converted = text.applyingTransform(transform, reverse: false) ?? text
+                guard seen.insert(converted).inserted else { return nil }
+                return SessionCandidate(text: converted, comment: reverseLookupMarkerOffset == nil ? nil
+                    : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer))
+            }
+        } else {
+            candidateCursor = service.dictionary.makeCandidateCursor(for: buffer, schema: schema)
+            _ = appendCandidateBatch(limit: candidateBatchSize, transform: transform)
         }
         highlightedIndex = 0
         pageNumber = 0
+    }
+
+    @discardableResult
+    private func appendCandidateBatch(limit: Int, transform suppliedTransform: StringTransform? = nil) -> Bool {
+        guard let candidateCursor, limit > 0 else { return false }
+        let transform = suppliedTransform ?? StringTransform(
+            rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans"
+        )
+        var appended = false
+        let targetCount = candidates.count + limit
+        while candidates.count < targetCount, candidateCursor.hasMore {
+            let needed = targetCount - candidates.count
+            let values = candidateCursor.next(limit: needed)
+            if values.isEmpty { break }
+            for text in values {
+                let converted = text.applyingTransform(transform, reverse: false) ?? text
+                guard convertedCandidateTexts.insert(converted).inserted else { continue }
+                let comment = reverseLookupMarkerOffset == nil ? nil
+                    : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer)
+                candidates.append(SessionCandidate(text: converted, comment: comment))
+                appended = true
+            }
+        }
+        hasMoreCandidates = candidateCursor.hasMore
+        return appended
     }
 
     private func commitSelectedCandidate(suffix: String = "") {
@@ -1070,6 +1309,10 @@ final class InputSession: @unchecked Sendable {
     private func clearComposition(keepingCommit: Bool) {
         buffer = ""
         candidates = []
+        convertedCandidateTexts.removeAll(keepingCapacity: true)
+        candidateCursor = nil
+        hasMoreCandidates = false
+        queryGeneration &+= 1
         highlightedIndex = 0
         pageNumber = 0
         reverseLookupMarkerOffset = nil

@@ -1,0 +1,378 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		368B86C1029C1C928F31B0A9 /* ios-candidate-ui-smoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFDAACB4C5D4D747F14CB46 /* ios-candidate-ui-smoke.swift */; };
+		54FC6F95892133FBCF6AB9FB /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A29EA4699EA7B8A0EF084860 /* KeyboardViewController.swift */; };
+		73D36BFDE392E2CBDECB5786 /* pinyin-data-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = DE6983FBCD2DEA011C63CE7F /* pinyin-data-MIT.txt */; };
+		7C71494FCFB7D09C39B33269 /* KeyboardSharedStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 397FC57203A310C465B36A5B /* KeyboardSharedStorage.swift */; };
+		8657E541FE36D272B7D8B985 /* InputModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D94BBA1518AD9EA20B56D181 /* InputModels.swift */; };
+		B02504FF68C8A6C68A39E340 /* FengYuSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7C486D0767FA053A57002CE /* FengYuSchema.swift */; };
+		BA2B9DF2A82E19D2288E90DC /* InputEnginePlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CAA58433A496ADDD11AA889 /* InputEnginePlatform.swift */; };
+		BCD3E776990E9F0B2C9F4B57 /* InputService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B66929639E706A57F6C4235C /* InputService.swift */; };
+		DB8B0B8B45E9B348D9AFD7FA /* fy.dict.yaml in Resources */ = {isa = PBXBuildFile; fileRef = C29BBAC83F51F196FA55EE44 /* fy.dict.yaml */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0EFDAACB4C5D4D747F14CB46 /* ios-candidate-ui-smoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ios-candidate-ui-smoke.swift"; sourceTree = "<group>"; };
+		397FC57203A310C465B36A5B /* KeyboardSharedStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardSharedStorage.swift; sourceTree = "<group>"; };
+		4CAA58433A496ADDD11AA889 /* InputEnginePlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnginePlatform.swift; sourceTree = "<group>"; };
+		A29EA4699EA7B8A0EF084860 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
+		B66929639E706A57F6C4235C /* InputService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputService.swift; sourceTree = "<group>"; };
+		C29BBAC83F51F196FA55EE44 /* fy.dict.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = fy.dict.yaml; sourceTree = "<group>"; };
+		D94BBA1518AD9EA20B56D181 /* InputModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModels.swift; sourceTree = "<group>"; };
+		DE6983FBCD2DEA011C63CE7F /* pinyin-data-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pinyin-data-MIT.txt"; sourceTree = "<group>"; };
+		E1F58FDB3B2E073740FB74CB /* CandidateSmoke.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CandidateSmoke.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F7C486D0767FA053A57002CE /* FengYuSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSchema.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0B9FFD1A3230252541C672C3 = {
+			isa = PBXGroup;
+			children = (
+				26CFB2DBF0747A651251E3CD /* Keyboard */,
+				3C3704E4362FDACFD9B902E7 /* LICENSES */,
+				4F77BF676A279656B6270FE2 /* Resources */,
+				7B43F99E72BDEAFBE4354A60 /* Scripts */,
+				D42B431A51D6B11BD4D053A9 /* Shared */,
+				DD1D9B85C0A3DEE2E4FD6567 /* SwiftAdapter */,
+				98009EC62825E79C70A367F6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		26CFB2DBF0747A651251E3CD /* Keyboard */ = {
+			isa = PBXGroup;
+			children = (
+				F7C486D0767FA053A57002CE /* FengYuSchema.swift */,
+				A29EA4699EA7B8A0EF084860 /* KeyboardViewController.swift */,
+			);
+			name = Keyboard;
+			path = ../../iOS/Keyboard;
+			sourceTree = "<group>";
+		};
+		3C3704E4362FDACFD9B902E7 /* LICENSES */ = {
+			isa = PBXGroup;
+			children = (
+				DE6983FBCD2DEA011C63CE7F /* pinyin-data-MIT.txt */,
+			);
+			name = LICENSES;
+			path = ../../LICENSES;
+			sourceTree = "<group>";
+		};
+		4F77BF676A279656B6270FE2 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C29BBAC83F51F196FA55EE44 /* fy.dict.yaml */,
+			);
+			name = Resources;
+			path = ../../iOS/Resources;
+			sourceTree = "<group>";
+		};
+		7B43F99E72BDEAFBE4354A60 /* Scripts */ = {
+			isa = PBXGroup;
+			children = (
+				0EFDAACB4C5D4D747F14CB46 /* ios-candidate-ui-smoke.swift */,
+			);
+			name = Scripts;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		98009EC62825E79C70A367F6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E1F58FDB3B2E073740FB74CB /* CandidateSmoke.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D42B431A51D6B11BD4D053A9 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				397FC57203A310C465B36A5B /* KeyboardSharedStorage.swift */,
+			);
+			name = Shared;
+			path = ../../iOS/Shared;
+			sourceTree = "<group>";
+		};
+		DD1D9B85C0A3DEE2E4FD6567 /* SwiftAdapter */ = {
+			isa = PBXGroup;
+			children = (
+				4CAA58433A496ADDD11AA889 /* InputEnginePlatform.swift */,
+				D94BBA1518AD9EA20B56D181 /* InputModels.swift */,
+				B66929639E706A57F6C4235C /* InputService.swift */,
+			);
+			name = SwiftAdapter;
+			path = ../../Core/SwiftAdapter;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		05351ACA928900ABBF063AA9 /* CandidateSmoke */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7B42129361B0AF3A748330D8 /* Build configuration list for PBXNativeTarget "CandidateSmoke" */;
+			buildPhases = (
+				3498EE885F1BFA5A5157044B /* Sources */,
+				6B93D381EAE49104B5E3BBCC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CandidateSmoke;
+			packageProductDependencies = (
+			);
+			productName = CandidateSmoke;
+			productReference = E1F58FDB3B2E073740FB74CB /* CandidateSmoke.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		03835F28E54208BB832F3294 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					05351ACA928900ABBF063AA9 = {
+						DevelopmentTeam = YH6JCRN97J;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 18DD05092A9D12D06AB4B316 /* Build configuration list for PBXProject "CandidateSmoke" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 0B9FFD1A3230252541C672C3;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 98009EC62825E79C70A367F6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				05351ACA928900ABBF063AA9 /* CandidateSmoke */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		6B93D381EAE49104B5E3BBCC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				DB8B0B8B45E9B348D9AFD7FA /* fy.dict.yaml in Resources */,
+				73D36BFDE392E2CBDECB5786 /* pinyin-data-MIT.txt in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		3498EE885F1BFA5A5157044B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B02504FF68C8A6C68A39E340 /* FengYuSchema.swift in Sources */,
+				BA2B9DF2A82E19D2288E90DC /* InputEnginePlatform.swift in Sources */,
+				8657E541FE36D272B7D8B985 /* InputModels.swift in Sources */,
+				BCD3E776990E9F0B2C9F4B57 /* InputService.swift in Sources */,
+				7C71494FCFB7D09C39B33269 /* KeyboardSharedStorage.swift in Sources */,
+				54FC6F95892133FBCF6AB9FB /* KeyboardViewController.swift in Sources */,
+				368B86C1029C1C928F31B0A9 /* ios-candidate-ui-smoke.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		02A6760595BEC9D4098248EF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = YH6JCRN97J;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = CANDIDATE_UI_TEST;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		1775F3F131108B47E76EE89E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = YH6JCRN97J;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = CANDIDATE_UI_TEST;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		2CD55A3DA00A369021E2366D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = "../ios-candidate-ui-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.shendongchun.windwhisper.candidate-smoke";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6F5D792A8EB58918B70256BC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				INFOPLIST_FILE = "../ios-candidate-ui-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.shendongchun.windwhisper.candidate-smoke";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		18DD05092A9D12D06AB4B316 /* Build configuration list for PBXProject "CandidateSmoke" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1775F3F131108B47E76EE89E /* Debug */,
+				02A6760595BEC9D4098248EF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7B42129361B0AF3A748330D8 /* Build configuration list for PBXNativeTarget "CandidateSmoke" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2CD55A3DA00A369021E2366D /* Debug */,
+				6F5D792A8EB58918B70256BC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 03835F28E54208BB832F3294 /* Project object */;
+}

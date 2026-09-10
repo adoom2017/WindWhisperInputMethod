@@ -17,6 +17,7 @@ private actor KeyboardInputRuntime {
     private var service: InputService?
     private var loadedSchema: FengYuSchema?
     private var loadedUserData: URL?
+    private var customWordsData: Data?
 
     func makeSession(
         paths: InputServicePaths,
@@ -27,34 +28,72 @@ private actor KeyboardInputRuntime {
         if let cachedService = self.service, loadedSchema == schema,
            loadedUserData == paths.userData {
             service = cachedService
-            if schema == .flypy { try service.reloadCustomWords() }
             reusedService = true
         } else {
             let loadedService = try InputService(
                 paths: paths,
                 enabledSchemas: [schema],
-                candidateLimit: 5
+                candidateLimit: nil
             )
             self.service = loadedService
             loadedSchema = schema
             loadedUserData = paths.userData
+            customWordsData = nil
             service = loadedService
             reusedService = false
         }
         return (service, try service.makeSession(), reusedService)
     }
+
+    func reloadCustomWordsIfChanged(for expectedService: InputService) throws -> Bool {
+        guard loadedSchema == .flypy, let service, service === expectedService else { return false }
+        let url = service.paths.userData.appendingPathComponent("custom_words.tsv")
+        let data = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : Data()
+        guard data != customWordsData else { return false }
+        try service.reloadCustomWords()
+        customWordsData = data
+        return true
+    }
 }
 
-final class KeyboardViewController: UIInputViewController {
+final class KeyboardViewController: UIInputViewController, UICollectionViewDataSource,
+    UICollectionViewDelegate, UICollectionViewDelegateFlowLayout {
     private enum LayoutMode {
         case letters
         case numbers
         case symbols
     }
 
-    private enum SuggestionAction {
+    private enum SuggestionItem {
         case punctuation(String)
-        case candidate(Int)
+        case candidate(CandidateSnapshot)
+        case status(String)
+    }
+
+    private final class SuggestionCell: UICollectionViewCell {
+        static let reuseIdentifier = "SuggestionCell"
+        #if CANDIDATE_UI_TEST
+        static var creationCount = 0
+        #endif
+        let label = UILabel()
+
+        override init(frame: CGRect) {
+            super.init(frame: frame)
+            #if CANDIDATE_UI_TEST
+            Self.creationCount += 1
+            #endif
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            contentView.addSubview(label)
+            NSLayoutConstraint.activate([
+                label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
+                label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
+                label.topAnchor.constraint(equalTo: contentView.topAnchor),
+                label.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+            ])
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     }
 
     private enum Metrics {
@@ -140,7 +179,6 @@ final class KeyboardViewController: UIInputViewController {
     /// handles haptics through the button's `.touchDown` control event.
     private final class KeyboardButton: UIButton {
         private var restingTransform = CGAffineTransform.identity
-        var suggestionAction: SuggestionAction?
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
             super.touchesBegan(touches, with: event)
@@ -198,7 +236,6 @@ final class KeyboardViewController: UIInputViewController {
     private var service: InputService?
     private var startupErrorDescription: String?
     private var requestedSchemaIdentifier: String?
-    private var requestedCustomWords: Data?
     private var requestedUserData: URL?
     private var layoutMode = LayoutMode.letters
     private var isShifted = false
@@ -209,6 +246,7 @@ final class KeyboardViewController: UIInputViewController {
     private var backspaceHandledOnTouchDown = false
     private var appliedKeyboardAppearance: UIKeyboardAppearance?
     private var hasMarkedComposition = false
+    private var markedCompositionText = ""
     private var customWordsRefreshTimer: Timer?
     private var hasActiveEngineComposition = false
 #if DEBUG
@@ -219,10 +257,20 @@ final class KeyboardViewController: UIInputViewController {
 
     private let rootStack = UIStackView()
     private let keyboardRowsStack = UIStackView()
-    private let suggestionScrollView = UIScrollView()
-    private let suggestionsStack = UIStackView()
-    private let compositionLabel = UILabel()
-    private var reusableSuggestionButtons = [KeyboardButton]()
+    private let suggestionCollectionView: UICollectionView = {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .horizontal
+        layout.minimumLineSpacing = 5
+        layout.minimumInteritemSpacing = 5
+        let view = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    private var suggestionItems = [SuggestionItem]()
+    private var candidateQueryGeneration: UInt64 = 0
+    private var hasMoreCandidateItems = false
+    private var highlightedCandidateIndex = 0
+    private var candidateLoadScheduled = false
     private let shiftButton = KeyboardButton(type: .system)
     private let modeButton = KeyboardButton(type: .system)
     private let asciiButton = KeyboardButton(type: .system)
@@ -302,7 +350,20 @@ final class KeyboardViewController: UIInputViewController {
         customWordsRefreshTimer?.invalidate()
         customWordsRefreshTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] timer in
             guard self != nil else { timer.invalidate(); return }
-            MainActor.assumeIsolated { self?.reloadCustomWordsIfNeeded() }
+            Task { @MainActor [weak self] in
+                guard let self, let service = self.service, let session = self.session else { return }
+                do {
+                    if try await KeyboardInputRuntime.shared.reloadCustomWordsIfChanged(for: service) {
+                        await MainActor.run {
+                            guard self.session === session else { return }
+                            self.session?.refreshCandidates()
+                            self.refresh()
+                        }
+                    }
+                } catch {
+                    self.logger.error("Custom words reload failed: \(error.localizedDescription, privacy: .public)")
+                }
+            }
         }
         keyFeedbackGenerator?.prepare()
 #if DEBUG
@@ -369,7 +430,7 @@ final class KeyboardViewController: UIInputViewController {
         clearMarkedComposition()
         session?.clearComposition()
         hasActiveEngineComposition = false
-        if session != nil { compositionLabel.text = "" }
+        if session != nil { showQuickPunctuation() }
     }
 
     override func textDidChange(_ textInput: UITextInput?) {
@@ -378,6 +439,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func startEngine() {
+        #if CANDIDATE_UI_TEST
+        return
+        #else
         let schemaIdentifier = KeyboardPreferences.selectedSchemaIdentifier
         let paths: InputServicePaths
         do {
@@ -396,28 +460,16 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         let schema = FengYuSchema(rawValue: schemaIdentifier) ?? .flypy
-        let customWords: Data?
-        do {
-            let url = paths.userData.appendingPathComponent("custom_words.tsv")
-            customWords = schema == .flypy && FileManager.default.fileExists(atPath: url.path)
-                ? try Data(contentsOf: url) : nil
-        } catch {
-            requestedSchemaIdentifier = nil
-            showStartupError(error.localizedDescription)
-            return
-        }
         guard requestedSchemaIdentifier != schemaIdentifier
-            || requestedCustomWords != customWords || requestedUserData != paths.userData else { return }
+            || requestedUserData != paths.userData else { return }
         if requestedSchemaIdentifier == schemaIdentifier, requestedUserData == paths.userData,
            session != nil {
-            reloadCustomWordsIfNeeded()
             return
         }
         requestedSchemaIdentifier = schemaIdentifier
-        requestedCustomWords = customWords
         requestedUserData = paths.userData
         logger.notice(
-            "Loading shared dictionary schema=\(schema.rawValue, privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public) customBytes=\(customWords?.count ?? 0, privacy: .public)"
+            "Loading shared dictionary schema=\(schema.rawValue, privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public)"
         )
         clearMarkedComposition()
         session?.clearComposition()
@@ -454,29 +506,84 @@ final class KeyboardViewController: UIInputViewController {
                 self?.showStartupError(error.localizedDescription)
             }
         }
+        #endif
     }
+
+    #if CANDIDATE_UI_TEST
+    private var testLastCommit: String?
+    private var testFeedbackCount = 0
+
+    func verifyCandidateCollection(dictionary: URL) async throws -> String {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let engine = try InputService(paths: .temporary(root: root, sharedData: dictionary.deletingLastPathComponent()), enabledSchemas: [.flypy], candidateLimit: nil)
+        service = engine
+        session = try engine.makeSession()
+        session?.simulate(sequence: "z")
+        refresh()
+        view.layoutIfNeeded()
+        let baseline = SuggestionCell.creationCount
+        var rounds = 0
+        while hasMoreCandidateItems {
+            guard rounds < 200 else { throw InputEngineError.smokeAssertion("collection did not finish loading") }
+            let last = IndexPath(item: suggestionItems.count - 1, section: 0)
+            suggestionCollectionView.scrollToItem(at: last, at: .right, animated: false)
+            view.layoutIfNeeded()
+            try await Task.sleep(for: .milliseconds(10))
+            rounds += 1
+        }
+        let count = suggestionItems.count
+        precondition(count > 1000)
+        let created = SuggestionCell.creationCount - baseline
+        precondition(created < 50, "collection accumulated \(created) cells")
+        let image = UIGraphicsImageRenderer(bounds: view.bounds).image { context in
+            UIColor.systemGray5.setFill()
+            context.fill(view.bounds)
+            view.layer.render(in: context.cgContext)
+        }
+        try image.pngData()?.write(to: root.deletingLastPathComponent().appendingPathComponent("candidate-stress.png"))
+        for selected in [5, 32, count - 1] {
+            session?.clearComposition()
+            session?.simulate(sequence: "z")
+            while try session!.readSnapshot().menu.candidates.count <= selected {
+                precondition(session!.loadMoreCandidates())
+            }
+            refresh()
+            guard case .candidate(let expected) = suggestionItems[selected] else {
+                throw InputEngineError.smokeAssertion("missing candidate")
+            }
+            let feedbackBeforeSelection = testFeedbackCount
+            collectionView(suggestionCollectionView, didSelectItemAt: IndexPath(item: selected, section: 0))
+            precondition(testLastCommit == expected.text, "wrong collection selection at \(selected)")
+            precondition(testFeedbackCount == feedbackBeforeSelection + 1, "selection must trigger feedback once")
+        }
+        session?.simulate(sequence: "z")
+        refresh()
+        collectionView(suggestionCollectionView, willDisplay: SuggestionCell(frame: .zero),
+                       forItemAt: IndexPath(item: suggestionItems.count - 1, section: 0))
+        session?.process(keyCode: 0xFF08)
+        session?.simulate(sequence: "ni")
+        refresh()
+        view.layoutIfNeeded()
+        let newGeneration = candidateQueryGeneration
+        let newCount = suggestionItems.count
+        try await Task.sleep(for: .milliseconds(20))
+        precondition(candidateQueryGeneration == newGeneration && suggestionItems.count == newCount)
+        precondition(suggestionCollectionView.contentOffset.x == 0)
+        session?.clearComposition()
+        session?.simulate(sequence: "vvvvvv")
+        refresh()
+        precondition(suggestionItems.isEmpty && hasActiveEngineComposition)
+        insertNewline()
+        precondition(testLastCommit == "vvvvvv" && !hasActiveEngineComposition && !hasMarkedComposition)
+        return "PASS collection: \(count) items, \(created) additional cells, \(rounds) scroll batches, selection 6/33/last, stale batch rejected, query reset, Return commits unmatched code"
+    }
+    #endif
 
     private func showStartupError(_ description: String) {
         startupErrorDescription = description
         showStatus("词库加载失败，请检查完全访问后重开键盘")
         logger.error("Input engine startup failed: \(description, privacy: .public)")
-    }
-
-    private func reloadCustomWordsIfNeeded() {
-        guard requestedSchemaIdentifier == FengYuSchema.flypy.rawValue,
-              let service, let session else { return }
-        do {
-            let url = service.paths.userData.appendingPathComponent("custom_words.tsv")
-            let data = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : nil
-            guard data != requestedCustomWords else { return }
-            try service.reloadCustomWords()
-            requestedCustomWords = data
-            session.refreshCandidates()
-            refresh()
-            logger.notice("Custom words reloaded in active session; bytes=\(data?.count ?? 0, privacy: .public)")
-        } catch {
-            logger.error("Custom words reload failed: \(error.localizedDescription, privacy: .public)")
-        }
     }
 
     private func buildView() {
@@ -493,7 +600,7 @@ final class KeyboardViewController: UIInputViewController {
 
         configureSuggestionBar()
         configureKeyboardRows()
-        rootStack.addArrangedSubview(suggestionScrollView)
+        rootStack.addArrangedSubview(suggestionCollectionView)
         rootStack.addArrangedSubview(keyboardRowsStack)
 
         view.addSubview(rootStack)
@@ -541,27 +648,19 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func configureSuggestionBar() {
-        suggestionScrollView.showsHorizontalScrollIndicator = false
-        suggestionScrollView.alwaysBounceHorizontal = true
-        suggestionScrollView.heightAnchor.constraint(equalToConstant: Metrics.suggestionHeight).isActive = true
+        suggestionCollectionView.showsHorizontalScrollIndicator = false
+        suggestionCollectionView.alwaysBounceHorizontal = true
+        suggestionCollectionView.backgroundColor = .clear
+        suggestionCollectionView.dataSource = self
+        suggestionCollectionView.delegate = self
+        suggestionCollectionView.register(
+            SuggestionCell.self,
+            forCellWithReuseIdentifier: SuggestionCell.reuseIdentifier
+        )
+        suggestionCollectionView.heightAnchor.constraint(
+            equalToConstant: Metrics.suggestionHeight
+        ).isActive = true
 
-        suggestionsStack.axis = .horizontal
-        suggestionsStack.alignment = .center
-        suggestionsStack.spacing = 5
-        suggestionsStack.translatesAutoresizingMaskIntoConstraints = false
-        suggestionScrollView.addSubview(suggestionsStack)
-        NSLayoutConstraint.activate([
-            suggestionsStack.leadingAnchor.constraint(equalTo: suggestionScrollView.contentLayoutGuide.leadingAnchor),
-            suggestionsStack.trailingAnchor.constraint(equalTo: suggestionScrollView.contentLayoutGuide.trailingAnchor),
-            suggestionsStack.topAnchor.constraint(equalTo: suggestionScrollView.contentLayoutGuide.topAnchor),
-            suggestionsStack.bottomAnchor.constraint(equalTo: suggestionScrollView.contentLayoutGuide.bottomAnchor),
-            suggestionsStack.heightAnchor.constraint(equalTo: suggestionScrollView.frameLayoutGuide.heightAnchor)
-        ])
-
-        compositionLabel.font = .monospacedSystemFont(ofSize: 15, weight: .medium)
-        compositionLabel.textAlignment = .left
-        compositionLabel.setContentHuggingPriority(.required, for: .horizontal)
-        compositionLabel.accessibilityLabel = "正在输入"
         showQuickPunctuation()
     }
 
@@ -770,21 +869,14 @@ final class KeyboardViewController: UIInputViewController {
         guard appearance != appliedKeyboardAppearance else { return }
         appliedKeyboardAppearance = appearance
         view.backgroundColor = .clear
-        compositionLabel.textColor = keyForegroundColor
-        suggestionScrollView.backgroundColor = .clear
+        suggestionCollectionView.backgroundColor = .clear
+        suggestionCollectionView.reloadData()
         findButtons(in: rootStack).forEach { button in
             if button === asciiButton {
                 button.tintColor = keyForegroundColor
                 button.setTitleColor(keyForegroundColor, for: .normal)
                 button.backgroundColor = .clear
                 button.layer.shadowOpacity = 0
-            } else if button.superview === suggestionsStack {
-                let isSelected = button.accessibilityTraits.contains(.selected)
-                button.tintColor = keyForegroundColor
-                button.setTitleColor(keyForegroundColor, for: .normal)
-                button.backgroundColor = isSelected ? selectedCandidateBackgroundColor : .clear
-                button.layer.cornerRadius = isSelected ? 12 : 0
-                button.layer.shadowOpacity = isSelected && appearance != .dark ? 0.1 : 0
             } else {
                 styleKey(button)
             }
@@ -813,104 +905,133 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func showQuickPunctuation() {
-        replaceSuggestions()
-        let punctuationKeys = usesChineseSymbols
+        let punctuationKeys: [String] = usesChineseSymbols
             ? ["，", "。", "？", "！", "、", "……"]
             : [",", ".", "?", "!", "\\", "…"]
-        punctuationKeys.enumerated().forEach { index, punctuation in
-            let button = suggestionButton(at: index)
-            button.setTitle(punctuation, for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 21)
-            button.titleLabel?.transform = CGAffineTransform(translationX: 0, y: -1)
-            button.setTitleColor(keyForegroundColor, for: .normal)
-            button.backgroundColor = .clear
-            button.layer.cornerRadius = 0
-            button.layer.shadowOpacity = 0
-            button.accessibilityTraits = .button
-            button.accessibilityLabel = punctuation
-            button.suggestionAction = .punctuation(punctuation)
-        }
+        suggestionItems = punctuationKeys.map(SuggestionItem.punctuation)
+        hasMoreCandidateItems = false
+        reloadSuggestions(resetPosition: true)
     }
 
     private func showCandidates(
-        _ candidates: [(index: Int, text: String, isSelected: Bool)],
-        composition: String
+        _ candidates: [CandidateSnapshot],
+        resetPosition: Bool
     ) {
-        replaceSuggestions()
-        if !composition.isEmpty {
-            compositionLabel.text = composition
-            compositionLabel.accessibilityValue = composition
-            suggestionsStack.insertArrangedSubview(compositionLabel, at: 0)
-            compositionLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
-        }
-        for (buttonIndex, candidate) in candidates.enumerated() {
-            let button = suggestionButton(at: buttonIndex)
-            button.setTitle(candidate.text, for: .normal)
-            button.titleLabel?.font = .systemFont(ofSize: 19)
-            button.titleLabel?.transform = CGAffineTransform(translationX: 0, y: -1)
-            button.setTitleColor(keyForegroundColor, for: .normal)
-            button.backgroundColor = candidate.isSelected ? selectedCandidateBackgroundColor : .clear
-            button.layer.cornerRadius = candidate.isSelected ? 12 : 0
-            button.layer.cornerCurve = .continuous
-            button.layer.shadowColor = UIColor.black.cgColor
-            button.layer.shadowOpacity = candidate.isSelected
-                && textDocumentProxy.keyboardAppearance != .dark ? 0.1 : 0
-            button.layer.shadowRadius = candidate.isSelected ? 1 : 0
-            button.layer.shadowOffset = CGSize(width: 0, height: 1)
-            button.accessibilityTraits = candidate.isSelected ? [.button, .selected] : .button
-            button.accessibilityLabel = "候选词 \(candidate.text)"
-            button.suggestionAction = .candidate(candidate.index)
+        let oldCount = suggestionItems.count
+        suggestionItems = candidates.map(SuggestionItem.candidate)
+        if !resetPosition, candidates.count > oldCount {
+            suggestionCollectionView.insertItems(at: (oldCount..<candidates.count).map { IndexPath(item: $0, section: 0) })
+        } else {
+            reloadSuggestions(resetPosition: resetPosition)
         }
     }
 
-    private func suggestionButton(at index: Int) -> KeyboardButton {
-        while reusableSuggestionButtons.count <= index {
-            let button = KeyboardButton(type: .system)
-            configureTouchFeedback(for: button)
-            button.addTarget(self, action: #selector(suggestionPressed(_:)), for: .touchUpInside)
-            button.widthAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
-            button.heightAnchor.constraint(equalToConstant: 28).isActive = true
-            button.contentVerticalAlignment = .center
-            reusableSuggestionButtons.append(button)
-            suggestionsStack.addArrangedSubview(button)
-        }
-        let button = reusableSuggestionButtons[index]
-        button.isHidden = false
-        return button
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        _ = collectionView
+        _ = section
+        return suggestionItems.count
     }
 
-    @objc private func suggestionPressed(_ sender: UIButton) {
-        guard let button = sender as? KeyboardButton else { return }
-        switch button.suggestionAction {
+    func collectionView(
+        _ collectionView: UICollectionView,
+        cellForItemAt indexPath: IndexPath
+    ) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(
+            withReuseIdentifier: SuggestionCell.reuseIdentifier,
+            for: indexPath
+        ) as! SuggestionCell
+        let item = suggestionItems[indexPath.item]
+        let selected: Bool
+        if case .candidate = item { selected = indexPath.item == highlightedCandidateIndex }
+        else { selected = false }
+        switch item {
+        case .punctuation(let text):
+            cell.label.text = text
+            cell.label.font = .systemFont(ofSize: 21)
+            cell.accessibilityLabel = text
+        case .candidate(let candidate):
+            cell.label.text = candidate.comment.map { "\(candidate.text) \($0)" } ?? candidate.text
+            cell.label.font = .systemFont(ofSize: 19)
+            cell.accessibilityLabel = "候选词 \(candidate.text)"
+        case .status(let text):
+            cell.label.text = text
+            cell.label.font = .systemFont(ofSize: 15, weight: .medium)
+            cell.accessibilityLabel = text
+        }
+        cell.label.textColor = keyForegroundColor
+        cell.contentView.backgroundColor = selected ? selectedCandidateBackgroundColor : .clear
+        cell.contentView.layer.cornerRadius = selected ? 8 : 0
+        cell.accessibilityTraits = selected ? [.button, .selected] : .button
+        cell.isAccessibilityElement = true
+        if case .status = item { cell.accessibilityTraits = .staticText }
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        switch suggestionItems[indexPath.item] {
         case .punctuation(let punctuation):
+            playKeyFeedback()
             insertPunctuation(punctuation)
-        case .candidate(let index):
-            _ = session?.selectCandidate(at: index)
+        case .candidate:
+            let selected = session?.selectCandidate(
+                atAbsoluteIndex: indexPath.item,
+                generation: candidateQueryGeneration
+            ) ?? false
+            if selected { playKeyFeedback() }
             refresh()
-        case nil:
+        case .status:
             break
         }
     }
 
-    private func showStatus(_ message: String) {
-        replaceSuggestions()
-        let label = UILabel()
-        label.text = message
-        label.textColor = keyForegroundColor
-        label.font = .systemFont(ofSize: 15, weight: .medium)
-        suggestionsStack.addArrangedSubview(label)
+    func collectionView(
+        _ collectionView: UICollectionView,
+        layout collectionViewLayout: UICollectionViewLayout,
+        sizeForItemAt indexPath: IndexPath
+    ) -> CGSize {
+        _ = collectionViewLayout
+        let text: String
+        switch suggestionItems[indexPath.item] {
+        case .punctuation(let value), .status(let value): text = value
+        case .candidate(let value): text = value.comment.map { "\(value.text) \($0)" } ?? value.text
+        }
+        let width = ceil((text as NSString).size(withAttributes: [
+            .font: UIFont.systemFont(ofSize: 19)
+        ]).width) + 20
+        return CGSize(width: max(50, width), height: 28)
     }
 
-    private func replaceSuggestions() {
-        suggestionsStack.arrangedSubviews.forEach {
-            if let button = $0 as? KeyboardButton,
-               reusableSuggestionButtons.contains(where: { $0 === button }) {
-                button.isHidden = true
-                button.suggestionAction = nil
-                return
-            }
-            suggestionsStack.removeArrangedSubview($0)
-            $0.removeFromSuperview()
+    func collectionView(
+        _ collectionView: UICollectionView,
+        willDisplay cell: UICollectionViewCell,
+        forItemAt indexPath: IndexPath
+    ) {
+        _ = cell
+        guard hasMoreCandidateItems, !candidateLoadScheduled,
+              indexPath.item >= max(0, suggestionItems.count - 8)
+        else { return }
+        candidateLoadScheduled = true
+        let generation = candidateQueryGeneration
+        let currentSession = session
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.candidateLoadScheduled = false
+            guard self.session === currentSession, self.candidateQueryGeneration == generation else { return }
+            _ = self.session?.loadMoreCandidates(generation: generation)
+            self.refresh()
+        }
+    }
+
+    private func showStatus(_ message: String) {
+        suggestionItems = [.status(message)]
+        hasMoreCandidateItems = false
+        reloadSuggestions(resetPosition: true)
+    }
+
+    private func reloadSuggestions(resetPosition: Bool) {
+        suggestionCollectionView.reloadData()
+        if resetPosition, !suggestionItems.isEmpty {
+            suggestionCollectionView.setContentOffset(.zero, animated: false)
         }
     }
 
@@ -925,7 +1046,6 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func keyPressed(_ sender: UIButton) {
-        reloadCustomWordsIfNeeded()
         guard let title = sender.currentTitle else { return }
         guard layoutMode == .letters else {
             textDocumentProxy.insertText(title)
@@ -989,7 +1109,9 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     @objc private func insertNewline() {
-        textDocumentProxy.insertText("\n")
+        let handled = session?.process(keyCode: 0xFF0D) ?? false
+        refresh()
+        if !handled { textDocumentProxy.insertText("\n") }
     }
 
     @objc private func toggleASCII() {
@@ -1031,6 +1153,13 @@ final class KeyboardViewController: UIInputViewController {
 
     @objc private func keyTouchDown(_ sender: UIButton) {
         _ = sender
+        playKeyFeedback()
+    }
+
+    private func playKeyFeedback() {
+        #if CANDIDATE_UI_TEST
+        testFeedbackCount += 1
+        #endif
         keyFeedbackGenerator?.impactOccurred(intensity: 0.9)
         keyFeedbackGenerator?.prepare()
     }
@@ -1049,16 +1178,14 @@ final class KeyboardViewController: UIInputViewController {
 
         let composition = snapshot.composition?.text ?? ""
         hasActiveEngineComposition = !composition.isEmpty
-        let candidates = snapshot.menu.candidates.enumerated().map {
-            (
-                index: $0.offset,
-                text: $0.element.text,
-                isSelected: $0.offset == snapshot.menu.highlightedIndex
-            )
-        }
+        let isNewQuery = candidateQueryGeneration != snapshot.menu.queryGeneration
+        candidateQueryGeneration = snapshot.menu.queryGeneration
+        hasMoreCandidateItems = snapshot.menu.hasMoreCandidates
+        highlightedCandidateIndex = snapshot.menu.highlightedIndex
+        let candidates = snapshot.menu.candidates
         if snapshot.status.isASCIIMode || composition.isEmpty {
             clearMarkedComposition()
-        } else {
+        } else if !hasMarkedComposition || markedCompositionText != composition {
             // Mirror the uncommitted code in the host text field, like the
             // native Chinese keyboards. The candidate strip below contains
             // candidates only; it does not duplicate the raw code.
@@ -1067,13 +1194,17 @@ final class KeyboardViewController: UIInputViewController {
                 selectedRange: NSRange(location: composition.utf16.count, length: 0)
             )
             hasMarkedComposition = true
+            markedCompositionText = composition
         }
         if composition.isEmpty && candidates.isEmpty {
             showQuickPunctuation()
         } else {
-            showCandidates(candidates, composition: "")
+            showCandidates(candidates, resetPosition: isNewQuery)
         }
         if let commit = snapshot.commitText {
+            #if CANDIDATE_UI_TEST
+            testLastCommit = commit
+            #endif
             clearMarkedComposition()
             textDocumentProxy.insertText(commit)
         }
@@ -1090,5 +1221,6 @@ final class KeyboardViewController: UIInputViewController {
             selectedRange: NSRange(location: 0, length: 0)
         )
         hasMarkedComposition = false
+        markedCompositionText = ""
     }
 }

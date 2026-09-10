@@ -17,6 +17,8 @@ struct MenuSnapshot: Equatable, Sendable {
     let isLastPage: Bool
     let highlightedIndex: Int
     let candidates: [CandidateSnapshot]
+    var hasMoreCandidates: Bool = false
+    var queryGeneration: UInt64 = 0
 }
 
 struct StatusSnapshot: Equatable, Sendable {

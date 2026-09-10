@@ -46,6 +46,8 @@ targets:
       - path: ../Core/SwiftAdapter/InputEnginePlatform.swift
       - path: Resources/fy.dict.yaml
         buildPhase: resources
+      - path: ../LICENSES/pinyin-data-MIT.txt
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.shendongchun.inputmethod.windwhisper.ios.keyboard

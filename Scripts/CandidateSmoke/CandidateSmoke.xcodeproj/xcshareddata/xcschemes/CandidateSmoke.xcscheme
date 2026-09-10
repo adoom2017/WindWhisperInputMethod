@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "D3CDC1B26A6ED977EB2EECB4"
-               BuildableName = "WindWhisper.app"
-               BlueprintName = "WindWhisper"
-               ReferencedContainer = "container:WindWhisperiOS.xcodeproj">
+               BlueprintIdentifier = "05351ACA928900ABBF063AA9"
+               BuildableName = "CandidateSmoke.app"
+               BlueprintName = "CandidateSmoke"
+               ReferencedContainer = "container:CandidateSmoke.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -32,10 +32,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "D3CDC1B26A6ED977EB2EECB4"
-            BuildableName = "WindWhisper.app"
-            BlueprintName = "WindWhisper"
-            ReferencedContainer = "container:WindWhisperiOS.xcodeproj">
+            BlueprintIdentifier = "05351ACA928900ABBF063AA9"
+            BuildableName = "CandidateSmoke.app"
+            BlueprintName = "CandidateSmoke"
+            ReferencedContainer = "container:CandidateSmoke.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -55,14 +55,12 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "D3CDC1B26A6ED977EB2EECB4"
-            BuildableName = "WindWhisper.app"
-            BlueprintName = "WindWhisper"
-            ReferencedContainer = "container:WindWhisperiOS.xcodeproj">
+            BlueprintIdentifier = "05351ACA928900ABBF063AA9"
+            BuildableName = "CandidateSmoke.app"
+            BlueprintName = "CandidateSmoke"
+            ReferencedContainer = "container:CandidateSmoke.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
-      <CommandLineArguments>
-      </CommandLineArguments>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -74,10 +72,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "D3CDC1B26A6ED977EB2EECB4"
-            BuildableName = "WindWhisper.app"
-            BlueprintName = "WindWhisper"
-            ReferencedContainer = "container:WindWhisperiOS.xcodeproj">
+            BlueprintIdentifier = "05351ACA928900ABBF063AA9"
+            BuildableName = "CandidateSmoke.app"
+            BlueprintName = "CandidateSmoke"
+            ReferencedContainer = "container:CandidateSmoke.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
