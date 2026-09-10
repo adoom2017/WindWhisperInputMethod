@@ -32,6 +32,20 @@ int main() {
     fy_session *session = fy_session_create(engine);
     CHECK(session != nullptr);
 
+    for (uint32_t enter : {0x0Du, 0xFF0Du}) {
+        for (const char *code : {"nihao", "vvvvvv"}) {
+            CHECK(type(session, code));
+            CHECK(fy_session_process_key(session, enter, 0));
+            fy_snapshot result{};
+            CHECK(fy_session_snapshot(session, &result));
+            CHECK(equals(result.commit, result.commit_len, code));
+            CHECK(!result.is_composing && result.candidate_count == 0);
+            CHECK(fy_session_snapshot(session, &result));
+            CHECK(result.commit_len == 0);
+            CHECK(!fy_session_process_key(session, enter, 0));
+        }
+    }
+
     for (const char *sequence : {"nihao", "haishiyiyang", "womenkeyiyiqi"}) {
         CHECK(type(session, sequence));
         fy_snapshot snapshot{};

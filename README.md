@@ -1,15 +1,6 @@
 # 风语输入法
 
-风语（WindWhisper）是一款面向 Windows、macOS 和 iOS 的中文输入法，支持小鹤音形、小鹤双拼和全拼。项目使用同一份词典与输入规则，并通过 Windows TSF、macOS InputMethodKit 和 iOS Keyboard Extension 提供各平台原生集成。
-
-## 功能概览
-
-- 默认使用小鹤音形，同时支持小鹤双拼和全拼
-- 候选词横向展示，支持键盘选词、翻页和高亮移动
-- 小鹤音形支持形码缩选与 `~` 编码反查
-- 支持简体中文、繁体中文以及全角、半角切换
-- 候选框支持深色和浅色配色
-- 支持长句输入、可视化管理自定义词组和稳定的候选排序
+风语（WindWhisper）支持 Windows、macOS 和 iOS，提供小鹤音形、小鹤双拼和全拼输入。
 
 ## Windows 使用说明
 
@@ -50,7 +41,8 @@ Shift 与其他按键组成快捷键时不会切换模式。Win、Ctrl、Alt 组
 
 | 按键 | 功能 |
 | --- | --- |
-| `Space` / `Enter` | 提交当前高亮候选 |
+| `Space` | 提交当前高亮候选 |
+| `Enter` | 直接提交英文编码并清空候选；无编码时由应用正常处理 |
 | `1`–`5` | 选择本页对应候选 |
 | `←` / `↑` | 移动到上一个候选 |
 | `→` / `↓` | 移动到下一个候选 |
@@ -99,6 +91,24 @@ Windows 设置 → 应用 → 已安装的应用 → 风语输入法 → 卸载
 
 卸载默认保留 `%LOCALAPPDATA%\WindWhisper\InputMethod` 中的设置和自定义词典，重新安装后可以继续使用。
 
+### 自定义词典
+
+Windows 用户词典位置：
+
+```text
+%LOCALAPPDATA%\WindWhisper\InputMethod\custom_words.tsv
+```
+
+每行使用制表符分隔：
+
+```text
+词语<Tab>编码<Tab>权重
+```
+
+权重可以省略；数值越高，候选排序越靠前。推荐通过 Windows 任务栏模式按钮的右键菜单选择“管理自定义词组...”，避免手工编辑格式。请定期备份该文件。
+
+管理窗口中的“导入”支持合并或替换当前词库；合并时，同词组、同编码的记录会使用导入文件中的权重。“导出”生成 UTF-8 编码的 TSV 文件，可用于备份或迁移到其他设备。
+
 ## macOS 使用说明
 
 ### 系统要求
@@ -117,208 +127,95 @@ Windows 设置 → 应用 → 已安装的应用 → 风语输入法 → 卸载
 
 首次安装新的输入法身份时，macOS 会要求用户手动授权。详细的升级、回滚和卸载说明见 [发布版安装说明](docs/RELEASE_INSTALL.md)。
 
-## 自定义词典
+### 输入与设置
 
-Windows 用户词典位置：
+从菜单栏的风语菜单切换输入方案、繁简、全半角和管理自定义词组。
 
-```text
-%LOCALAPPDATA%\WindWhisper\InputMethod\custom_words.tsv
-```
+- 单独按下并释放左 `Shift` 切换中英文。
+- 输入编码后按空格选词，数字键选择对应候选，`-` / `=` 翻页。
+- 按回车直接提交当前英文编码并清空候选，不额外换行；没有编码时正常回车。
+- `Backspace` 删除一个编码，`Esc` 取消当前组合。
+- 小鹤音形输入 `~` 可反查候选的完整音形编码。
 
-每行使用制表符分隔：
+## iOS 安装与使用
 
-```text
-词语<Tab>编码<Tab>权重
-```
+安装宿主 App 后，在“设置 → 通用 → 键盘 → 键盘 → 添加新键盘”中添加“风语”，
+并开启“允许完全访问”。在宿主 App 中选择输入方案，再在普通文本框中切换到风语。
 
-权重可以省略；数值越高，候选排序越靠前。推荐通过 Windows 任务栏模式按钮的右键菜单选择“管理自定义词组...”，避免手工编辑格式。请定期备份该文件。
+编译、真机安装、打包和键盘使用说明见 [iOS README](iOS/README.md)。
 
-管理窗口中的“导入”支持合并或替换当前词库；合并时，同词组、同编码的记录会使用导入文件中的权重。“导出”生成 UTF-8 编码的 TSV 文件，可用于备份或迁移到其他设备。
+## Windows 编译与打包
 
-## Windows 开发构建
-
-需要 Visual Studio 2022、MSVC v143、Windows 10/11 SDK、CMake 和 WiX Toolset 4。
-
-在 Developer PowerShell 中执行：
+需要 Windows 10/11 x64、Visual Studio 2022（MSVC v143、Windows SDK）、CMake、
+PowerShell 7、.NET SDK 和 WiX Toolset 4。在仓库根目录的 Developer PowerShell 中执行：
 
 ```powershell
+dotnet tool install wix --version "4.*" --tool-path build/tools/wix
 cmake -S . -B build/windows -A x64
 cmake --build build/windows --config Release
-ctest --test-dir build/windows -C Release --output-on-failure
 pwsh -NoProfile -File Installer/Windows/build-msi.ps1 -Configuration Release
 ```
 
-安装包输出到：
+WiX 已安装到 `build/tools/wix` 时，可跳过第一条命令。
 
-```text
-build/windows/Installer/Release/WindWhisperInputMethod-x64.msi
-```
+安装包：`build/windows/Installer/Release/WindWhisperInputMethod-x64.msi`。
 
-Windows 架构、TSF 注册和测试说明见 [Windows 开发文档](docs/WINDOWS_HANDOFF.md)。
+## macOS 编译
 
-## macOS 开发构建
-
-需要 Xcode 26 或兼容版本。在仓库根目录执行：
+需要 Xcode 26 或兼容版本。以下命令均在仓库根目录执行：
 
 ```bash
-./Scripts/verify-project.sh
 ./Scripts/build.sh Debug
-```
-
-安装当前用户的开发版本：
-
-```bash
 ./Scripts/install-user.sh Debug
 ```
 
-构建产物位于：
-
-```text
-build/DerivedData/Build/Products/<Configuration>/windwhisper.app
-```
-
-## iOS 开发构建与测试
-
-iOS 版本由宿主 App 和 Keyboard Extension 组成，最低支持 iOS 17。需要 Xcode 26、
-iOS Simulator runtime 和 [XcodeGen](https://github.com/yonaskolb/XcodeGen)。在仓库根目录执行：
+如果没有开发签名证书，可使用本地签名编译：
 
 ```bash
-cd iOS
-xcodegen generate --spec project.yml
-xcodebuild \
-  -project WindWhisperiOS.xcodeproj \
-  -scheme WindWhisper \
-  -configuration Debug \
-  -sdk iphonesimulator \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -derivedDataPath ../build/iOSDerivedData \
-  build CODE_SIGNING_ALLOWED=NO
+WINDWHISPER_AD_HOC_SIGNING=1 ./Scripts/build.sh Debug
 ```
 
-模拟器产物位于：
+构建产物：`build/DerivedData/Build/Products/<Configuration>/windwhisper.app`。
+`Debug` 构建用于 Apple Silicon 开发；`Release` 构建用于通用发布包。
 
-```text
-build/iOSDerivedData/Build/Products/Debug-iphonesimulator/WindWhisper.app
+## macOS 打包
+
+本地安装包：
+
+```bash
+Scripts/package-release.sh local 0.1.0 2026091001
 ```
 
-交互测试建议使用 Xcode 打开 `iOS/WindWhisperiOS.xcodeproj`，选择 `WindWhisper`
-scheme 和一个 iPhone 模拟器运行。安装宿主 App 后，在模拟器的“设置 → 通用 → 键盘 →
-键盘 → 添加新键盘”中启用“风语”，再到备忘录等普通文本框切换到风语键盘。
+版本号和纯数字构建号按需替换。产物输出到 `dist/`，包含 PKG、DMG 和 SHA-256 文件。
+`local` 使用本地签名；对外发布使用下方的签名和公证流程。
 
-完整的模拟器、真机、测试用例和故障排查说明见 [iOS 测试说明](iOS/README.md)。
+### 签名与公证
 
-## 正式签名与 Apple 公证
-
-对 Mac 外部分发需同时使用 Apple Developer 账号中的 `Developer ID Application`
-和 `Developer ID Installer` 证书，分别签名应用与 PKG。`Apple Development` 证书仅适用于开发调试。先检查本机可用的签名身份：
+准备 Apple Developer 账号中的 `Developer ID Application` 和 `Developer ID Installer`
+证书，并将包含私钥的证书导入钥匙串。查看可用身份：
 
 ```bash
 security find-identity -v -p codesigning
 security find-identity -v -p basic
 ```
 
-第一条命令应列出 Application identity，第二条命令还应列出 Installer identity：
-
-```text
-Developer ID Application: Your Name (TEAMID)
-Developer ID Installer: Your Name (TEAMID)
-```
-
-如果显示 `0 valid identities found`，请在“钥匙串访问”中导入创建该证书时导出的
-`.p12`，并确认证书下方有对应的私钥。仅安装从 Apple 下载的 `.cer`
-不会构成可用 identity；如果私钥在另一台 Mac，需从那台 Mac 导出包含私钥的
-`.p12` 再导入本机。
-
-### 生成正式签名包
-
-将下面的 identity 替换为上一步查到的完整证书名称：
+首次使用时保存公证凭据，按提示输入 Apple ID、团队 ID 和 App 专用密码：
 
 ```bash
-WINDWHISPER_APP_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-WINDWHISPER_INSTALLER_SIGN_IDENTITY="Developer ID Installer: Your Name (TEAMID)" \
-  Scripts/package-release.sh signed 0.1.0 2026090201
+xcrun notarytool store-credentials "windwhisper-notary"
 ```
 
-`signed` 模式会构建 arm64/x86_64 通用应用，启用 Hardened Runtime、时间戳并使用
-Developer ID 签名，然后在 `dist/` 下生成 PKG、内含该 PKG 的 DMG 和各自的 SHA-256 文件。构建号必须为纯数字。
-可用以下命令查看和验证签名：
-
-```bash
-pkgutil --check-signature dist/windwhisper-0.1.0-2026090201-macos-universal.pkg
-spctl --assess --type install --verbose=2 \
-  dist/windwhisper-0.1.0-2026090201-macos-universal.pkg
-```
-
-仅完成 Developer ID 签名的包可用于内部验证；面向用户分发时应继续完成 Apple 公证。
-`Scripts/package-release.sh local ...` 只会使用 ad-hoc 签名，不是正式发布包。
-
-### 生成已公证发布包
-
-先在 Apple ID 账号页面创建 app-specific password，然后将公证凭据安全存入登录钥匙串：
-
-```bash
-xcrun notarytool store-credentials "windwhisper-notary" \
-  --apple-id "your-apple-id@example.com" \
-  --team-id "TEAMID" \
-  --password "app-specific-password"
-```
-
-提交公证并将 ticket staple 到 PKG 和 DMG：
+将证书名称替换为本机实际身份后打包：
 
 ```bash
 WINDWHISPER_APP_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 WINDWHISPER_INSTALLER_SIGN_IDENTITY="Developer ID Installer: Your Name (TEAMID)" \
 WINDWHISPER_NOTARY_PROFILE="windwhisper-notary" \
-WINDWHISPER_NOTARY_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db" \
-  Scripts/package-release.sh notarized 0.1.0 2026090201
+  Scripts/package-release.sh notarized 0.1.0 2026091001
 ```
 
-`notarized` 模式会完成签名、上传公证、等待 Apple 结果、staple、
-`stapler validate` 和最终发布包校验。PKG 安装后输入法位于：
+脚本自动完成通用应用构建、签名、公证和票据装订。仅需签名时，将 `notarized` 改为 `signed`。
+公证凭据位于非默认钥匙串时，设置 `WINDWHISPER_NOTARY_KEYCHAIN` 为对应路径。
 
-```text
-/Library/Input Methods/windwhisper.app
-```
-
-### 生成正式签名并公证的安装包
-
-`Scripts/package-release.sh` 会同时生成签名 PKG 和包含 `安装风语.pkg` 的 DMG。
-PKG 在覆盖前停止旧输入法进程，避免 Finder 因应用正在使用而拒绝升级。
-下面示例中的版本号、构建号、证书名称和公证 profile 应替换为实际值：
-
-```bash
-WINDWHISPER_APP_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-WINDWHISPER_INSTALLER_SIGN_IDENTITY="Developer ID Installer: Your Name (TEAMID)" \
-WINDWHISPER_NOTARY_PROFILE="windwhisper-notary" \
-  Scripts/package-release.sh notarized 0.1.0 2026090301
-```
-
-若公证凭据存放在非默认钥匙串，为 `notarytool submit` 增加
-`--keychain /path/to/keychain-db`。只有 `notarytool` 返回 `Accepted`，并且
-`stapler validate` 与 `spctl` 均通过后，PKG 和 DMG 才可作为正式对外发布产物。
-最终应同时发布 `.pkg`、`.dmg` 和对应的 SHA-256 文件。仅签名但未公证的安装包
-可用于内部测试，不应作为面向普通用户的正式下载包。
-
-不要将 `.p12`、证书密码、Apple ID app-specific password 或公证凭据提交到
-Git。GitHub Actions 中的证书与公证凭据应保存为 Repository Secrets，详见
-[`docs/GITHUB_RELEASE.md`](docs/GITHUB_RELEASE.md)。
-
-## 项目结构
-
-```text
-Core/               跨平台 C++ 输入核心和测试
-Platform/Windows/   Windows TSF、任务栏按钮与候选窗
-Platform/macOS/     macOS InputMethodKit 与原生界面
-Installer/Windows/  WiX MSI 和安装维护脚本
-Installer/macOS/    PKG 安装前后维护脚本
-Resources/          词典、图标与共享资源
-Scripts/            构建、安装、验证和发布脚本
-docs/               架构、发布与验收文档
-```
-
-## 自动发布
-
-发布 `vMAJOR.MINOR.PATCH` 格式的 GitHub Release 后，GitHub Actions 会自动构建、
-Developer ID 签名、公证并上传 macOS universal PKG、DMG 与各自的 SHA-256 文件。首次启用前需
-配置签名与 Apple 公证 Secrets，详见
-[`docs/GITHUB_RELEASE.md`](docs/GITHUB_RELEASE.md)。
+也可通过 GitHub Release 自动打包：配置签名与公证 Secrets 后，发布 `vMAJOR.MINOR.PATCH`
+格式的 Release。配置步骤见 [自动发布说明](docs/GITHUB_RELEASE.md)。

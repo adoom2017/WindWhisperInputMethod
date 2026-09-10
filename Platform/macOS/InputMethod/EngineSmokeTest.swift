@@ -16,6 +16,7 @@ enum EngineSmokeTest {
             print("flypyFourKeyMultipleCandidates=passed")
             print("flypyFourKeyContinuationCommit=passed")
             print("candidatePageAliases=passed")
+            print("returnCommitsCode=passed")
             print("flypyCodeReverseLookup=passed")
             print("customWords=passed")
             print("customWordsRefresh=passed")
@@ -74,6 +75,7 @@ enum EngineSmokeTest {
         }
         try verifyCandidate(service: service, schema: .flypy, code: "fy", text: "风语输入法")
         try verifyCandidatePageAliases(service: service)
+        try verifyReturnCommitsCode(service: service)
         try verifyFlypyCodeReverseLookup(service: service)
         try verifySelectiveSchemaLoading(paths: paths)
 
@@ -132,6 +134,32 @@ enum EngineSmokeTest {
                 code: fixture.code,
                 text: fixture.expected
             )
+        }
+    }
+
+    private static func verifyReturnCommitsCode(service: InputService) throws {
+        for schema in FengYuSchema.allCases {
+            for code in (schema == .fullPinyin ? ["ni", "vvvvvv"] : ["ni", "q"]) {
+                let session = try service.makeSession()
+                guard session.selectSchema(identifier: schema.rawValue),
+                    session.simulate(sequence: code),
+                    session.process(keyCode: 0xFF0D)
+                else {
+                    throw InputEngineError.smokeAssertion("could not submit code with Return")
+                }
+                let snapshot = try session.readSnapshot()
+                guard snapshot.commitText == code, snapshot.composition == nil,
+                    snapshot.menu.candidates.isEmpty,
+                    try session.readSnapshot().commitText == nil,
+                    !session.process(keyCode: 0xFF0D)
+                else {
+                    throw InputEngineError.smokeAssertion("Return did not commit raw code exactly once")
+                }
+                session.setOption("ascii_mode", enabled: true)
+                guard !session.process(keyCode: 0xFF0D) else {
+                    throw InputEngineError.smokeAssertion("ASCII Return was consumed")
+                }
+            }
         }
     }
 

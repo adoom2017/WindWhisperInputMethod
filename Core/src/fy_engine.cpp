@@ -668,7 +668,14 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
     if (key >= '1' && key <= '9' && !session->code.empty()) {
         return fy_session_select_candidate(session, key - '1');
     }
-    if (key == 0x20 || is_key(key, 0x0D, kKeyReturn)) {
+    if (is_key(key, 0x0D, kKeyReturn)) {
+        if (session->code.empty()) return 0;
+        const std::string code = session->code;
+        fy_session_reset(session);
+        session->commit = code;
+        return 1;
+    }
+    if (key == 0x20) {
         if (key == 0x20 && session->code.empty() && session->full_shape) {
             session->commit = width_character(key, true);
             return 1;
