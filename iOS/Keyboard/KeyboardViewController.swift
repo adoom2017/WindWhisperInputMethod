@@ -96,21 +96,39 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     }
 
+    @MainActor
     private enum Metrics {
-        static let horizontalInset: CGFloat = 6
-        static let suggestionToKeysSpacing: CGFloat = 7
-        static let keyRowSpacing: CGFloat = 10.5
-        static let keySpacing: CGFloat = 6
-        static let keyHeight: CGFloat = 43
-        static let utilityKeyHeight: CGFloat = 43
-        static let suggestionHeight: CGFloat = 32
-        static let keyCornerRadius: CGFloat = 8
-        static let contentHeight: CGFloat = 247
-        static let inputViewHeight: CGFloat = contentHeight + 9
+        static var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
+        static var horizontalInset: CGFloat { isPad ? 14 : 6 }
+        static var suggestionToKeysSpacing: CGFloat { isPad ? 8 : 7 }
+        static var keyRowSpacing: CGFloat { isPad ? 11 : 10.5 }
+        static var keySpacing: CGFloat { isPad ? 10 : 6 }
+        static var keyHeight: CGFloat { isPad ? 70 : 43 }
+        static var utilityKeyHeight: CGFloat { isPad ? 70 : 43 }
+        static var suggestionHeight: CGFloat { isPad ? 28 : 32 }
+        static var keyCornerRadius: CGFloat { isPad ? 10 : 8 }
+        static var contentHeight: CGFloat {
+            guard isPad else { return 247 }
+            return suggestionHeight + suggestionToKeysSpacing
+                + keyHeight * 3 + utilityKeyHeight + keyRowSpacing * 3
+        }
+        static var inputViewHeight: CGFloat { contentHeight + (isPad ? 12 : 9) }
     }
 
     /// Gives the keyboard host a stable size before it lays out the extension's content.
     private final class SelfSizingInputView: UIInputView {
+        weak var keyboardRows: KeyboardRowsStack?
+
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            guard isUserInteractionEnabled, !isHidden, alpha > 0.01,
+                  bounds.contains(point) else { return nil }
+            if let rows = keyboardRows,
+               let key = rows.hitTest(rows.convert(point, from: self), with: event) {
+                return key
+            }
+            return super.hitTest(point, with: event)
+        }
+
 #if DEBUG
         private static let sizingLogger = Logger(
             subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard",
@@ -175,50 +193,123 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
     }
 
+    /// Routes gaps between keys to the nearest visible key, across nested rows.
+    private final class KeyboardRowsStack: UIStackView {
+        weak var touchSurface: UIView?
+
+        private var touchBounds: CGRect {
+            guard let touchSurface else { return bounds }
+            let surfaceBounds = convert(touchSurface.bounds, from: touchSurface)
+            let top = max(surfaceBounds.minY, -Metrics.suggestionToKeysSpacing)
+            return CGRect(x: surfaceBounds.minX, y: top,
+                          width: surfaceBounds.width, height: max(0, surfaceBounds.maxY - top))
+        }
+
+        override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+            guard isUserInteractionEnabled, !isHidden, alpha > 0.01,
+                  touchBounds.contains(point) else { return nil }
+            // Staggered-row padding belongs to that row, even when a key in
+            // another row is closer diagonally. Ties go to the earlier row.
+            let row = arrangedSubviews.filter { !$0.isHidden && $0.isUserInteractionEnabled }.min {
+                let lhs = max($0.frame.minY - point.y, 0, point.y - $0.frame.maxY)
+                let rhs = max($1.frame.minY - point.y, 0, point.y - $1.frame.maxY)
+                return lhs < rhs
+            }
+            guard let row else { return nil }
+            var buttons = [KeyboardButton]()
+            func collect(_ view: UIView) {
+                for child in view.subviews where !child.isHidden && child.alpha > 0.01 && child.isUserInteractionEnabled {
+                    if let button = child as? KeyboardButton, button.isEnabled { buttons.append(button) }
+                    collect(child)
+                }
+            }
+            collect(row)
+
+            func layoutFrame(_ button: KeyboardButton) -> CGRect {
+                // Ignore the button's pressed transform when assigning regions.
+                let rect = button.bounds.offsetBy(dx: button.center.x - button.bounds.midX,
+                                                 dy: button.center.y - button.bounds.midY)
+                return convert(rect, from: button.superview)
+            }
+
+            // Prefer actual bounds (including the language button inside Space).
+            if let direct = buttons.reversed().first(where: { layoutFrame($0).contains(point) }) {
+                return direct
+            }
+            var nearest: KeyboardButton?
+            var nearestDistance = CGFloat.greatestFiniteMagnitude
+            for button in buttons {
+                guard !(button.superview is KeyboardButton) else { continue }
+                let frame = layoutFrame(button)
+                let dx = max(frame.minX - point.x, 0, point.x - frame.maxX)
+                let dy = max(frame.minY - point.y, 0, point.y - frame.maxY)
+                let distance = dx * dx + dy * dy
+                if distance < nearestDistance {
+                    nearest = button
+                    nearestDistance = distance
+                }
+            }
+            return nearest
+        }
+    }
+
     /// Provides native-style immediate pressed appearance while the controller
     /// handles haptics through the button's `.touchDown` control event.
     private final class KeyboardButton: UIButton {
         private var restingTransform = CGAffineTransform.identity
+#if DEBUG
+        static let touchLogger = Logger(
+            subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard", category: "Touch"
+        )
+#endif
+
+        override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+            var ancestor = superview
+            while let view = ancestor {
+                if let rows = view as? KeyboardRowsStack {
+                    return rows.hitTest(rows.convert(point, from: self), with: event) === self
+                }
+                ancestor = view.superview
+            }
+            return bounds.insetBy(dx: -8, dy: -8).contains(point)
+        }
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+#if DEBUG
+            if let point = touches.first?.location(in: self) {
+                Self.touchLogger.notice("KeyboardTouch opaque-v1 began visualInside=\(self.bounds.contains(point), privacy: .public) regionInside=\(self.point(inside: point, with: event), privacy: .public)")
+            }
+#endif
             super.touchesBegan(touches, with: event)
             restingTransform = transform
-            let changes = {
-                self.transform = self.restingTransform.scaledBy(x: 1.08, y: 1.08)
-                self.layer.zPosition = 10
-            }
-            if UIAccessibility.isReduceMotionEnabled {
-                changes()
-            } else {
-                UIView.animate(
-                    withDuration: 0.06,
-                    delay: 0,
-                    options: [.allowUserInteraction, .beginFromCurrentState],
-                    animations: changes
-                )
-            }
+            setPressedAppearance(true)
         }
 
         override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+#if DEBUG
+            if let point = touches.first?.location(in: self) {
+                Self.touchLogger.notice("KeyboardTouch opaque-v1 ended visualInside=\(self.bounds.contains(point), privacy: .public) regionInside=\(self.point(inside: point, with: event), privacy: .public) tracking=\(self.isTracking, privacy: .public)")
+            }
+#endif
             super.touchesEnded(touches, with: event)
-            restorePressedAppearance()
+            setPressedAppearance(false)
         }
 
         override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
             super.touchesCancelled(touches, with: event)
-            restorePressedAppearance()
+            setPressedAppearance(false)
         }
 
-        private func restorePressedAppearance() {
+        private func setPressedAppearance(_ pressed: Bool) {
             let changes = {
-                self.transform = self.restingTransform
-                self.layer.zPosition = 0
+                self.transform = pressed ? self.restingTransform.scaledBy(x: 1.08, y: 1.08) : self.restingTransform
+                self.layer.zPosition = pressed ? 10 : 0
             }
             if UIAccessibility.isReduceMotionEnabled {
                 changes()
             } else {
                 UIView.animate(
-                    withDuration: 0.1,
+                    withDuration: pressed ? 0.06 : 0.1,
                     delay: 0,
                     options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut],
                     animations: changes
@@ -256,7 +347,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 #endif
 
     private let rootStack = UIStackView()
-    private let keyboardRowsStack = UIStackView()
+    private let keyboardBackdrop = UIView()
+    private let keyboardRowsStack = KeyboardRowsStack()
     private let suggestionCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
@@ -274,6 +366,14 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private let shiftButton = KeyboardButton(type: .system)
     private let modeButton = KeyboardButton(type: .system)
     private let asciiButton = KeyboardButton(type: .system)
+    private static let functionKeyTag = 1
+
+#if CANDIDATE_UI_TEST
+    var testDocumentProxy: (any UITextDocumentProxy)?
+    override var textDocumentProxy: any UITextDocumentProxy {
+        testDocumentProxy ?? super.textDocumentProxy
+    }
+#endif
 
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
         super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
@@ -322,6 +422,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        keyboardBackdrop.frame = CGRect(x: 0, y: rootStack.frame.minY,
+                                        width: view.bounds.width,
+                                        height: max(0, view.bounds.maxY - rootStack.frame.minY))
         updateHostPresentationVisibility()
 #if DEBUG
         guard layoutLogSequence < 20,
@@ -593,6 +696,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         // negotiation. Only the keyboard content is hidden for transient
         // expanded frames, which avoids changing the host layer's alpha.
         rootStack.layer.opacity = 0
+        // Keep nonzero pixel coverage for remote hit testing without covering
+        // UIKit's keyboard material with a second opaque panel.
+        keyboardBackdrop.backgroundColor = UIColor(white: 0.5, alpha: 0.01)
+        keyboardBackdrop.isUserInteractionEnabled = false
+        keyboardBackdrop.layer.opacity = 0
+        view.addSubview(keyboardBackdrop)
 
         rootStack.axis = .vertical
         rootStack.spacing = Metrics.suggestionToKeysSpacing
@@ -604,6 +713,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         rootStack.addArrangedSubview(keyboardRowsStack)
 
         view.addSubview(rootStack)
+        keyboardRowsStack.touchSurface = view
+        (view as? SelfSizingInputView)?.keyboardRows = keyboardRowsStack
         NSLayoutConstraint.activate([
             rootStack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: Metrics.horizontalInset),
             rootStack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -Metrics.horizontalInset),
@@ -634,11 +745,13 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         guard shouldBeVisible != hostPresentationVisible else { return }
 
         hostPresentationVisible = shouldBeVisible
+        keyboardRowsStack.isUserInteractionEnabled = shouldBeVisible
         // Change only the content layer, leaving the host view's alpha and
         // hit-testing intact. Do not animate or capture the temporary frame.
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         rootStack.layer.opacity = shouldBeVisible ? 1 : 0
+        keyboardBackdrop.layer.opacity = shouldBeVisible ? 1 : 0
         CATransaction.commit()
 #if DEBUG
         logger.notice(
@@ -706,10 +819,17 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             ]
         }
 
-        keyboardRowsStack.addArrangedSubview(makeCharacterRow(rows[0]))
-        keyboardRowsStack.addArrangedSubview(makeCharacterRow(rows[1], horizontalInset: 20))
-        keyboardRowsStack.addArrangedSubview(makeThirdRow(rows[2]))
-        keyboardRowsStack.addArrangedSubview(makeUtilityRow())
+        if Metrics.isPad {
+            keyboardRowsStack.addArrangedSubview(makePadFirstRow(rows[0]))
+            keyboardRowsStack.addArrangedSubview(makePadSecondRow(rows[1]))
+            keyboardRowsStack.addArrangedSubview(makePadThirdRow(rows[2]))
+            keyboardRowsStack.addArrangedSubview(makePadUtilityRow())
+        } else {
+            keyboardRowsStack.addArrangedSubview(makeCharacterRow(rows[0]))
+            keyboardRowsStack.addArrangedSubview(makeCharacterRow(rows[1], horizontalInset: 20))
+            keyboardRowsStack.addArrangedSubview(makeThirdRow(rows[2]))
+            keyboardRowsStack.addArrangedSubview(makeUtilityRow())
+        }
         applyColors()
     }
 
@@ -764,6 +884,117 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         return row
     }
 
+    private func makePadFirstRow(_ titles: [String]) -> UIView {
+        makePadCharacterRow(
+            titles,
+            trailingButton: makeBackspaceKey(),
+            trailingWidthMultiplier: 0.12
+        )
+    }
+
+    private func makePadSecondRow(_ titles: [String]) -> UIView {
+        makePadCharacterRow(
+            titles,
+            leadingWidthMultiplier: 0.05,
+            trailingButton: makePadIconKey(
+                "return",
+                accessibilityLabel: "换行",
+                action: #selector(insertNewline)
+            ),
+            trailingWidthMultiplier: 0.15
+        )
+    }
+
+    private func makePadThirdRow(_ titles: [String]) -> UIView {
+        let leftButton: UIButton
+        let rightButton: UIButton
+        if layoutMode == .letters {
+            let symbol = isShifted ? "shift.fill" : "shift"
+            leftButton = makePadIconKey(symbol, accessibilityLabel: "大写", action: #selector(toggleShift))
+            rightButton = makePadIconKey(symbol, accessibilityLabel: "大写", action: #selector(toggleShift))
+        } else {
+            let title = layoutMode == .numbers ? "#+=" : "123"
+            leftButton = makePadTextKey(title, accessibilityLabel: "切换符号", action: #selector(toggleSymbolPage))
+            rightButton = makePadTextKey(title, accessibilityLabel: "切换符号", action: #selector(toggleSymbolPage))
+        }
+
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = Metrics.keySpacing
+        row.heightAnchor.constraint(equalToConstant: Metrics.keyHeight).isActive = true
+        row.translatesAutoresizingMaskIntoConstraints = false
+
+        let characterStack = equalWidthStack()
+        titles.forEach { characterStack.addArrangedSubview(makeCharacterKey($0)) }
+        if layoutMode == .letters {
+            let punctuation = usesChineseSymbols ? ["，", "。"] : [",", "."]
+            punctuation.forEach { characterStack.addArrangedSubview(makePunctuationKey($0)) }
+        }
+
+        row.addArrangedSubview(leftButton)
+        row.addArrangedSubview(characterStack)
+        row.addArrangedSubview(rightButton)
+        NSLayoutConstraint.activate([
+            leftButton.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.08),
+            rightButton.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.08)
+        ])
+        return row
+    }
+
+    private func makePadCharacterRow(
+        _ titles: [String],
+        leadingWidthMultiplier: CGFloat = 0,
+        trailingButton: UIButton? = nil,
+        trailingWidthMultiplier: CGFloat = 0
+    ) -> UIView {
+        let container = UIView()
+        container.heightAnchor.constraint(equalToConstant: Metrics.keyHeight).isActive = true
+
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = Metrics.keySpacing
+        row.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(row)
+        NSLayoutConstraint.activate([
+            row.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            row.topAnchor.constraint(equalTo: container.topAnchor),
+            row.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+
+        if leadingWidthMultiplier > 0 {
+            let spacer = UIView()
+            row.addArrangedSubview(spacer)
+            spacer.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: leadingWidthMultiplier).isActive = true
+        }
+
+        let characters = equalWidthStack()
+        titles.forEach { characters.addArrangedSubview(makeCharacterKey($0)) }
+        row.addArrangedSubview(characters)
+
+        if let trailingButton {
+            row.addArrangedSubview(trailingButton)
+            trailingButton.widthAnchor.constraint(
+                equalTo: row.widthAnchor,
+                multiplier: trailingWidthMultiplier
+            ).isActive = true
+        }
+        return container
+    }
+
+    private func makeBackspaceKey() -> UIButton {
+        let backspace = makePadIconKey(
+            "delete.left",
+            accessibilityLabel: "删除",
+            action: #selector(finishBackspace(_:))
+        )
+        backspace.addTarget(self, action: #selector(beginBackspace(_:)), for: .touchDown)
+        for event: UIControl.Event in [.touchUpOutside, .touchCancel, .touchDragExit] {
+            backspace.addTarget(self, action: #selector(stopRepeatingBackspace), for: event)
+        }
+        return backspace
+    }
+
     private func makeUtilityRow() -> UIStackView {
         let row = UIStackView()
         row.axis = .horizontal
@@ -782,6 +1013,52 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         NSLayoutConstraint.activate([
             modeButton.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.24, constant: -4),
             returnButton.widthAnchor.constraint(equalTo: modeButton.widthAnchor)
+        ])
+        return row
+    }
+
+    private func makePadUtilityRow() -> UIStackView {
+        let row = UIStackView()
+        row.axis = .horizontal
+        row.spacing = Metrics.keySpacing
+        row.heightAnchor.constraint(equalToConstant: Metrics.utilityKeyHeight).isActive = true
+
+        let modeTitle = layoutMode == .letters ? "123" : "ABC"
+        configureTextButton(modeButton, title: modeTitle, accessibilityLabel: layoutMode == .letters ? "数字键盘" : "字母键盘")
+        modeButton.addTarget(self, action: #selector(toggleLayoutMode), for: .touchUpInside)
+        styleFunctionKey(modeButton)
+
+        let inputModeButton = KeyboardButton(type: .system)
+        configureIconButton(inputModeButton, symbol: "globe", accessibilityLabel: "切换输入法")
+        styleFunctionKey(inputModeButton)
+        inputModeButton.addTarget(
+            self,
+            action: #selector(handleInputModeList(from:with:)),
+            for: .allTouchEvents
+        )
+
+        let space = makeSpaceKey()
+        let modeShortcut = makePadTextKey(
+            modeTitle,
+            accessibilityLabel: layoutMode == .letters ? "数字键盘" : "字母键盘",
+            action: #selector(toggleLayoutMode)
+        )
+        let dismissButton = makePadIconKey(
+            "keyboard.chevron.compact.down",
+            accessibilityLabel: "收起键盘",
+            action: #selector(dismissKeyboard)
+        )
+
+        row.addArrangedSubview(inputModeButton)
+        row.addArrangedSubview(modeButton)
+        row.addArrangedSubview(space)
+        row.addArrangedSubview(modeShortcut)
+        row.addArrangedSubview(dismissButton)
+        NSLayoutConstraint.activate([
+            inputModeButton.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.09),
+            modeButton.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.09),
+            modeShortcut.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.13),
+            dismissButton.widthAnchor.constraint(equalTo: row.widthAnchor, multiplier: 0.13)
         ])
         return row
     }
@@ -831,6 +1108,22 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         return button
     }
 
+    private func makePadTextKey(_ title: String, accessibilityLabel: String, action: Selector) -> UIButton {
+        let button = makeActionKey(title, accessibilityLabel: accessibilityLabel, action: action)
+        styleFunctionKey(button)
+        return button
+    }
+
+    private func makePadIconKey(_ symbol: String, accessibilityLabel: String, action: Selector) -> UIButton {
+        let button = makeIconKey(symbol, accessibilityLabel: accessibilityLabel, action: action)
+        styleFunctionKey(button)
+        return button
+    }
+
+    private func makePunctuationKey(_ punctuation: String) -> UIButton {
+        makeActionKey(punctuation, accessibilityLabel: punctuation, action: #selector(insertPunctuationKey(_:)))
+    }
+
     private func configureTextButton(_ button: UIButton, title: String, accessibilityLabel: String) {
         button.removeTarget(nil, action: nil, for: .allEvents)
         button.setTitle(title, for: .normal)
@@ -864,6 +1157,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         button.layer.shadowOffset = CGSize(width: 0, height: 1)
     }
 
+    private func styleFunctionKey(_ button: UIButton) {
+        button.tag = Self.functionKeyTag
+        styleKey(button)
+        button.backgroundColor = functionKeyBackgroundColor
+    }
+
     private func applyColors() {
         let appearance = textDocumentProxy.keyboardAppearance
         guard appearance != appliedKeyboardAppearance else { return }
@@ -877,6 +1176,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
                 button.setTitleColor(keyForegroundColor, for: .normal)
                 button.backgroundColor = .clear
                 button.layer.shadowOpacity = 0
+            } else if button.tag == Self.functionKeyTag {
+                styleFunctionKey(button)
             } else {
                 styleKey(button)
             }
@@ -898,6 +1199,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     private var keyForegroundColor: UIColor {
         textDocumentProxy.keyboardAppearance == .dark ? .white : .black
+    }
+
+    private var functionKeyBackgroundColor: UIColor {
+        textDocumentProxy.keyboardAppearance == .dark
+            ? UIColor(red: 0.28, green: 0.29, blue: 0.32, alpha: 1)
+            : UIColor(red: 0.91, green: 0.92, blue: 0.94, alpha: 1)
     }
 
     private var usesChineseSymbols: Bool {
@@ -1039,6 +1346,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         textDocumentProxy.insertText(punctuation)
     }
 
+    @objc private func insertPunctuationKey(_ sender: UIButton) {
+        guard let punctuation = sender.currentTitle else { return }
+        insertPunctuation(punctuation)
+    }
+
     private var selectedCandidateBackgroundColor: UIColor {
         textDocumentProxy.keyboardAppearance == .dark
             ? UIColor.white.withAlphaComponent(0.16)
@@ -1046,6 +1358,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     @objc private func keyPressed(_ sender: UIButton) {
+#if DEBUG
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            logger.notice("KeyboardPerf key totalMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000, privacy: .public) engineReady=\(self.session != nil, privacy: .public)")
+        }
+#endif
         guard let title = sender.currentTitle else { return }
         guard layoutMode == .letters else {
             textDocumentProxy.insertText(title)
@@ -1157,6 +1475,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     private func playKeyFeedback() {
+#if DEBUG
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            logger.notice("KeyboardPerf feedbackMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000, privacy: .public)")
+        }
+#endif
         #if CANDIDATE_UI_TEST
         testFeedbackCount += 1
         #endif
@@ -1165,6 +1489,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     private func refresh() {
+#if DEBUG
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            logger.notice("KeyboardPerf refreshMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000, privacy: .public)")
+        }
+#endif
         guard let session else {
             if startupErrorDescription != nil {
                 showStatus("引擎不可用")
