@@ -3,6 +3,68 @@ import UIKit
 
 final class KeyboardTouchTests: XCTestCase {
     @MainActor
+    func testInstalledExtensionBackspaceRepeats() {
+        verifyInstalledExtensionBackspaceRepeats(dark: false)
+    }
+
+    @MainActor
+    func testInstalledExtensionDarkBackspaceRepeats() {
+        verifyInstalledExtensionBackspaceRepeats(dark: true)
+    }
+
+    @MainActor
+    private func verifyInstalledExtensionBackspaceRepeats(dark: Bool) {
+        let app = XCUIApplication()
+        app.launchArguments = ["--keyboard-extension-test", "--backspace-test"]
+        if dark { app.launchArguments.append("--dark-keyboard") }
+        app.launch()
+        let field = app.textFields["extensionText"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        let delete = app.buttons["删除"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 10))
+        func textCount() -> Int { (field.value as? String)?.count ?? 0 }
+        func assertStopped() {
+            let value = field.value as? String ?? ""
+            let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", value), object: field)
+            changed.isInverted = true
+            XCTAssertEqual(XCTWaiter.wait(for: [changed], timeout: 0.35), .completed,
+                           "Deletion must stop when the finger leaves the key")
+        }
+        XCTAssertEqual(textCount(), 64)
+        delete.tap()
+        XCTAssertEqual(textCount(), 63, "A quick tap deletes exactly one character")
+        delete.press(forDuration: 0.8)
+        let afterHold = textCount()
+        XCTAssertLessThanOrEqual(afterHold, 59, "A held key must delete repeatedly")
+        XCTAssertGreaterThan(afterHold, 0)
+        assertStopped()
+
+        let frame = delete.frame
+        let gap = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: frame.minX - 2, dy: frame.midY))
+        gap.press(forDuration: 0.8)
+        XCTAssertLessThanOrEqual(textCount(), afterHold - 4, "Repeat also works from the enlarged touch region")
+        assertStopped()
+        let beforeDrag = textCount()
+        gap.press(forDuration: 0.05,
+                  thenDragTo: app.buttons["t"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)),
+                  withVelocity: .fast, thenHoldForDuration: 2)
+        XCTAssertGreaterThanOrEqual(textCount(), beforeDrag - 6,
+                                    "Deletion must stop while the finger is held outside the key")
+        assertStopped()
+
+        for mode in ["数字键盘", "切换符号"] {
+            app.buttons[mode].firstMatch.tap()
+            let beforeHold = textCount()
+            delete.press(forDuration: 0.8)
+            XCTAssertLessThanOrEqual(textCount(), beforeHold - 4,
+                                     "Repeat must survive rebuilding the \(mode) layout")
+            XCTAssertGreaterThan(textCount(), 0)
+            assertStopped()
+        }
+    }
+
+    @MainActor
     func testInstalledExtensionGapTaps() {
         verifyInstalledExtensionGapTaps(dark: false)
     }

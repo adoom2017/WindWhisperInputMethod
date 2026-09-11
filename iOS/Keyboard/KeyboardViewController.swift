@@ -1130,6 +1130,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         button.setImage(nil, for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: title.count > 2 ? 18 : 23, weight: .regular)
         styleKey(button)
+        configureTouchFeedback(for: button)
         button.accessibilityLabel = accessibilityLabel
     }
 
@@ -1139,13 +1140,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         button.setTitle(nil, for: .normal)
         button.setImage(UIImage(systemName: symbol, withConfiguration: configuration), for: .normal)
         styleKey(button)
+        configureTouchFeedback(for: button)
         button.accessibilityLabel = accessibilityLabel
     }
 
     private func styleKey(_ button: UIButton) {
-        if let keyboardButton = button as? KeyboardButton {
-            configureTouchFeedback(for: keyboardButton)
-        }
         button.tintColor = keyForegroundColor
         button.setTitleColor(keyForegroundColor, for: .normal)
         button.backgroundColor = keyBackgroundColor
@@ -1465,7 +1464,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     private func configureTouchFeedback(for button: UIButton) {
-        button.removeTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
+        // Bind once during configuration; restyling must preserve other touch-down actions.
         button.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
     }
 

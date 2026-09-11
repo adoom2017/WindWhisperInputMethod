@@ -16,6 +16,9 @@ final class CandidateTestApp: UIResponder, UIApplicationDelegate {
             }
             field.borderStyle = .roundedRect
             field.accessibilityIdentifier = "extensionText"
+            if ProcessInfo.processInfo.arguments.contains("--backspace-test") {
+                field.text = String(repeating: "abcdefgh", count: 8)
+            }
             field.autocorrectionType = .no
             field.autocapitalizationType = .none
             host.view.addSubview(field)
