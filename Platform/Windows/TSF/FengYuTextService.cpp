@@ -3,6 +3,7 @@
 #include "../Settings/CustomPhraseEditor.h"
 #include "../Settings/CustomPhraseStore.h"
 #include "WindowsKeyMapper.h"
+#include "InputModeIcon.h"
 #include "fy_engine.h"
 
 #ifdef _WIN32
@@ -112,67 +113,8 @@ bool WriteConfiguredSchema(const char *schema) {
 HICON CreateInputModeIcon(bool ascii_mode) {
     const int width = (std::max)(16, GetSystemMetrics(SM_CXSMICON));
     const int height = (std::max)(16, GetSystemMetrics(SM_CYSMICON));
-    BITMAPINFO bitmap_info{};
-    bitmap_info.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    bitmap_info.bmiHeader.biWidth = width;
-    bitmap_info.bmiHeader.biHeight = -height;
-    bitmap_info.bmiHeader.biPlanes = 1;
-    bitmap_info.bmiHeader.biBitCount = 32;
-    bitmap_info.bmiHeader.biCompression = BI_RGB;
-
-    void *pixels = nullptr;
-    HDC screen = GetDC(nullptr);
-    HDC memory = screen ? CreateCompatibleDC(screen) : nullptr;
-    HBITMAP color = screen ? CreateDIBSection(
-        screen, &bitmap_info, DIB_RGB_COLORS, &pixels, nullptr, 0) : nullptr;
-    HBITMAP mask = screen ? CreateCompatibleBitmap(screen, width, height) : nullptr;
-    if (!screen || !memory || !color || !mask || !pixels) {
-        if (mask) DeleteObject(mask);
-        if (color) DeleteObject(color);
-        if (memory) DeleteDC(memory);
-        if (screen) ReleaseDC(nullptr, screen);
-        return nullptr;
-    }
-
-    HGDIOBJ old_bitmap = SelectObject(memory, color);
-    RECT bounds{0, 0, width, height};
-    FillRect(memory, &bounds, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
-    HFONT font = CreateFontW(
-        -(height - 2), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-        ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE,
-        L"Microsoft YaHei UI");
-    HGDIOBJ old_font = font ? SelectObject(memory, font) : nullptr;
-    SetBkMode(memory, TRANSPARENT);
-    SetTextColor(memory, RGB(255, 255, 255));
-    DrawTextW(memory, ascii_mode ? L"英" : L"中", 1, &bounds,
-              DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-
-    auto *rgba = static_cast<BYTE *>(pixels);
-    for (int index = 0; index < width * height; ++index) {
-        const BYTE alpha = rgba[index * 4];
-        rgba[index * 4] = 255;
-        rgba[index * 4 + 1] = 255;
-        rgba[index * 4 + 2] = 255;
-        rgba[index * 4 + 3] = alpha;
-    }
-
-    if (old_font) SelectObject(memory, old_font);
-    if (font) DeleteObject(font);
-    SelectObject(memory, old_bitmap);
-    HGDIOBJ old_mask = SelectObject(memory, mask);
-    PatBlt(memory, 0, 0, width, height, BLACKNESS);
-    SelectObject(memory, old_mask);
-    ICONINFO icon_info{};
-    icon_info.fIcon = TRUE;
-    icon_info.hbmColor = color;
-    icon_info.hbmMask = mask;
-    HICON icon = CreateIconIndirect(&icon_info);
-    DeleteObject(mask);
-    DeleteObject(color);
-    DeleteDC(memory);
-    ReleaseDC(nullptr, screen);
-    return icon;
+    return fengyu::CreateInputModeIcon(ascii_mode, fengyu::ReadInputModeIconColor(),
+                                       width, height);
 }
 
 void DebugLog(const char *event, HRESULT result = S_OK, WPARAM virtual_key = 0,
@@ -633,6 +575,7 @@ public:
         InterlockedIncrement(&g_object_count);
     }
     ~FengYuLanguageBarButton() {
+        StopThemeNotifications();
         if (sink_) sink_->Release();
         InterlockedDecrement(&g_object_count);
     }
@@ -673,8 +616,9 @@ public:
         // Use a command button so OnClick receives both left and right clicks.
         // A pure BTN_MENU item routes every click to InitMenu and therefore
         // cannot use left click for the Chinese/English mode switch.
-        info->dwStyle = TF_LBI_STYLE_SHOWNINTRAY | TF_LBI_STYLE_BTN_BUTTON |
-                        TF_LBI_STYLE_TEXTCOLORICON;
+        // GetIcon supplies the taskbar-theme color explicitly. Do not ask
+        // the legacy language bar to recolor an already themed alpha icon.
+        info->dwStyle = TF_LBI_STYLE_SHOWNINTRAY | TF_LBI_STYLE_BTN_BUTTON;
         info->ulSort = 0;
         StringCchCopyW(info->szDescription, TF_LBI_DESC_MAXLEN,
                        L"风语输入法中英文切换与设置");
@@ -869,12 +813,14 @@ public:
             return E_NOINTERFACE;
         }
         *cookie = kSinkCookie;
+        StartThemeNotifications();
         DebugLog("language-bar-advise-sink");
         return S_OK;
     }
 
     HRESULT STDMETHODCALLTYPE UnadviseSink(DWORD cookie) override {
         if (cookie != kSinkCookie || !sink_) return CONNECT_E_NOCONNECTION;
+        StopThemeNotifications();
         sink_->Release();
         sink_ = nullptr;
         DebugLog("language-bar-unadvise-sink");
@@ -882,6 +828,70 @@ public:
     }
 
 private:
+    static LRESULT CALLBACK ThemeWindowProc(HWND window, UINT message,
+                                            WPARAM wparam, LPARAM lparam) {
+        auto *self = reinterpret_cast<FengYuLanguageBarButton *>(
+            GetWindowLongPtrW(window, GWLP_USERDATA));
+        if (message == WM_NCCREATE) {
+            self = static_cast<FengYuLanguageBarButton *>(
+                reinterpret_cast<CREATESTRUCTW *>(lparam)->lpCreateParams);
+            SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
+        }
+        if (self && (message == WM_SETTINGCHANGE || message == WM_THEMECHANGED ||
+                     message == WM_SYSCOLORCHANGE)) {
+            // Queue the refresh after the shell's broadcast has completed.
+            PostMessageW(window, WM_APP + 1, 0, 0);
+            return 0;
+        }
+        if (self && message == WM_APP + 1) {
+            const COLORREF color = fengyu::ReadInputModeIconColor();
+            if (color != self->icon_color_) {
+                self->icon_color_ = color;
+                ITfLangBarItemSink *sink = self->sink_;
+                if (sink) {
+                    sink->AddRef();
+                    sink->OnUpdate(TF_LBI_ICON);
+                    sink->Release();
+                }
+            }
+            return 0;
+        }
+        if (message == WM_NCDESTROY) SetWindowLongPtrW(window, GWLP_USERDATA, 0);
+        return DefWindowProcW(window, message, wparam, lparam);
+    }
+
+    void StartThemeNotifications() {
+        if (theme_window_) return;
+        icon_color_ = fengyu::ReadInputModeIconColor();
+        HMODULE module = nullptr;
+        if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                  GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                               reinterpret_cast<LPCWSTR>(&ThemeWindowProc), &module)) return;
+        WNDCLASSW window_class{};
+        window_class.hInstance = module;
+        window_class.lpfnWndProc = ThemeWindowProc;
+        window_class.lpszClassName = kThemeWindowClass;
+        if (!RegisterClassW(&window_class) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return;
+        theme_module_ = module;
+        // A hidden top-level window receives theme broadcasts; HWND_MESSAGE
+        // does not. There is no timer or work added to the key event path.
+        theme_window_ = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+            kThemeWindowClass, L"", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, module, this);
+    }
+
+    void StopThemeNotifications() {
+        if (theme_window_) DestroyWindow(theme_window_);
+        theme_window_ = nullptr;
+        // Other active instances keep the class registered until the last
+        // theme window is destroyed.
+        if (theme_module_) UnregisterClassW(kThemeWindowClass, theme_module_);
+        theme_module_ = nullptr;
+    }
+
+    static constexpr wchar_t kThemeWindowClass[] = L"WindWhisperInputModeTheme";
+    HWND theme_window_ = nullptr;
+    HMODULE theme_module_ = nullptr;
+    COLORREF icon_color_ = CLR_INVALID;
     bool IsAsciiMode() const {
         return service_ && service_->ascii_mode_;
     }

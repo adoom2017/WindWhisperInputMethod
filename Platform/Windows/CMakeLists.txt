@@ -4,7 +4,7 @@ if(WIN32)
   target_include_directories(fy_engine_tsf PUBLIC ../../Core/include)
   target_compile_definitions(fy_engine_tsf PUBLIC FY_ENGINE_STATIC)
   set_property(TARGET fy_engine_tsf PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-  add_library(fy_tsf SHARED TSF/FengYuTextService.cpp TSF/FengYuResources.rc TSF/FengYuTextService.def TSF/WindowsKeyMapper.cpp CandidateWindow/CandidateWindow.cpp Settings/CustomPhraseEditor.cpp Settings/CustomPhraseStore.cpp Settings/SettingsStore.cpp)
+  add_library(fy_tsf SHARED TSF/FengYuTextService.cpp TSF/FengYuResources.rc TSF/FengYuTextService.def TSF/WindowsKeyMapper.cpp TSF/InputModeIcon.cpp CandidateWindow/CandidateWindow.cpp Settings/CustomPhraseEditor.cpp Settings/CustomPhraseStore.cpp Settings/SettingsStore.cpp)
   target_include_directories(fy_tsf PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../../Core/include)
   target_link_libraries(fy_tsf PRIVATE fy_engine_tsf ole32 oleaut32 user32 gdi32 comctl32 comdlg32 uuid)
   set_property(TARGET fy_tsf PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -27,6 +27,10 @@ if(WIN32)
 
   add_executable(fy_custom_phrase_store_test Settings/CustomPhraseStore.cpp Settings/CustomPhraseStoreTest.cpp)
   add_test(NAME custom_phrase_store COMMAND fy_custom_phrase_store_test)
+
+  add_executable(fy_input_mode_icon_test TSF/InputModeIcon.cpp TSF/InputModeIconTest.cpp)
+  target_link_libraries(fy_input_mode_icon_test PRIVATE user32 gdi32 advapi32)
+  add_test(NAME input_mode_icon COMMAND fy_input_mode_icon_test)
 
   # The registration helper is invoked several times by Windows Installer.
   # Build it as a GUI-subsystem executable so those background custom actions

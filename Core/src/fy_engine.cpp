@@ -631,11 +631,16 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
     if ((modifiers & (kModifierControl | kModifierOption)) != 0) {
         return 0;
     }
-    if (key == kKeyPageUp || (key == '-' && !session->code.empty())) {
-        return fy_session_page(session, -1);
+    if (!session->code.empty() &&
+        (key == kKeyPageUp || key == kKeyPageDown ||
+         key == '-' || key == '=' || key == '+')) {
+        fy_session_page(session, (key == kKeyPageUp || key == '-') ? -1 : 1);
+        // A paging key is handled even when already at a boundary or when
+        // the current code has no candidates. Never leak it to the host.
+        return 1;
     }
-    if (key == kKeyPageDown || (key == '=' && !session->code.empty())) {
-        return fy_session_page(session, 1);
+    if (key == kKeyPageUp || key == kKeyPageDown) {
+        return 0;
     }
     if (key == kKeyLeft || key == kKeyUp || key == kKeyRight || key == kKeyDown) {
         if (session->matches.empty()) return 0;
