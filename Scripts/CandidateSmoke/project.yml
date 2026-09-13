@@ -26,8 +26,23 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.shendongchun.windwhisper.candidate-smoke
         INFOPLIST_FILE: ../ios-candidate-ui-Info.plist
         CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+  KeyboardTouchTests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ../KeyboardTouchTests
+    dependencies:
+      - target: CandidateSmoke
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.shendongchun.windwhisper.keyboard-touch-tests
 schemes:
   CandidateSmoke:
     build:
       targets:
         CandidateSmoke: all
+    test:
+      targets:
+        - KeyboardTouchTests

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		368B86C1029C1C928F31B0A9 /* ios-candidate-ui-smoke.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFDAACB4C5D4D747F14CB46 /* ios-candidate-ui-smoke.swift */; };
+		4C58CC861C0EEC94693A20BB /* KeyboardTouchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588C89266FAF4043B1EBEE89 /* KeyboardTouchTests.swift */; };
 		54FC6F95892133FBCF6AB9FB /* KeyboardViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A29EA4699EA7B8A0EF084860 /* KeyboardViewController.swift */; };
 		73D36BFDE392E2CBDECB5786 /* pinyin-data-MIT.txt in Resources */ = {isa = PBXBuildFile; fileRef = DE6983FBCD2DEA011C63CE7F /* pinyin-data-MIT.txt */; };
 		7C71494FCFB7D09C39B33269 /* KeyboardSharedStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 397FC57203A310C465B36A5B /* KeyboardSharedStorage.swift */; };
@@ -18,16 +19,28 @@
 		DB8B0B8B45E9B348D9AFD7FA /* fy.dict.yaml in Resources */ = {isa = PBXBuildFile; fileRef = C29BBAC83F51F196FA55EE44 /* fy.dict.yaml */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		B2F60DEA9AE8FB5E0A22B507 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 03835F28E54208BB832F3294 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 05351ACA928900ABBF063AA9;
+			remoteInfo = CandidateSmoke;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		0EFDAACB4C5D4D747F14CB46 /* ios-candidate-ui-smoke.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "ios-candidate-ui-smoke.swift"; sourceTree = "<group>"; };
 		397FC57203A310C465B36A5B /* KeyboardSharedStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardSharedStorage.swift; sourceTree = "<group>"; };
 		4CAA58433A496ADDD11AA889 /* InputEnginePlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputEnginePlatform.swift; sourceTree = "<group>"; };
+		588C89266FAF4043B1EBEE89 /* KeyboardTouchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTouchTests.swift; sourceTree = "<group>"; };
 		A29EA4699EA7B8A0EF084860 /* KeyboardViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardViewController.swift; sourceTree = "<group>"; };
 		B66929639E706A57F6C4235C /* InputService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputService.swift; sourceTree = "<group>"; };
 		C29BBAC83F51F196FA55EE44 /* fy.dict.yaml */ = {isa = PBXFileReference; lastKnownFileType = text.yaml; path = fy.dict.yaml; sourceTree = "<group>"; };
 		D94BBA1518AD9EA20B56D181 /* InputModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputModels.swift; sourceTree = "<group>"; };
 		DE6983FBCD2DEA011C63CE7F /* pinyin-data-MIT.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "pinyin-data-MIT.txt"; sourceTree = "<group>"; };
 		E1F58FDB3B2E073740FB74CB /* CandidateSmoke.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CandidateSmoke.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F02F473BB369FFCC64680D38 /* KeyboardTouchTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = KeyboardTouchTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F7C486D0767FA053A57002CE /* FengYuSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSchema.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -36,6 +49,7 @@
 			isa = PBXGroup;
 			children = (
 				26CFB2DBF0747A651251E3CD /* Keyboard */,
+				3C1679391B19222205AA1871 /* KeyboardTouchTests */,
 				3C3704E4362FDACFD9B902E7 /* LICENSES */,
 				4F77BF676A279656B6270FE2 /* Resources */,
 				7B43F99E72BDEAFBE4354A60 /* Scripts */,
@@ -53,6 +67,15 @@
 			);
 			name = Keyboard;
 			path = ../../iOS/Keyboard;
+			sourceTree = "<group>";
+		};
+		3C1679391B19222205AA1871 /* KeyboardTouchTests */ = {
+			isa = PBXGroup;
+			children = (
+				588C89266FAF4043B1EBEE89 /* KeyboardTouchTests.swift */,
+			);
+			name = KeyboardTouchTests;
+			path = ../KeyboardTouchTests;
 			sourceTree = "<group>";
 		};
 		3C3704E4362FDACFD9B902E7 /* LICENSES */ = {
@@ -86,6 +109,7 @@
 			isa = PBXGroup;
 			children = (
 				E1F58FDB3B2E073740FB74CB /* CandidateSmoke.app */,
+				F02F473BB369FFCC64680D38 /* KeyboardTouchTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -131,6 +155,24 @@
 			productReference = E1F58FDB3B2E073740FB74CB /* CandidateSmoke.app */;
 			productType = "com.apple.product-type.application";
 		};
+		8EB61417670C14C3D89A41C2 /* KeyboardTouchTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AF50F5ADF3903CD53382A2AE /* Build configuration list for PBXNativeTarget "KeyboardTouchTests" */;
+			buildPhases = (
+				1F6D363AC7755D24E08879C3 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				58FF5A190ADB5C80B6ADB05F /* PBXTargetDependency */,
+			);
+			name = KeyboardTouchTests;
+			packageProductDependencies = (
+			);
+			productName = KeyboardTouchTests;
+			productReference = F02F473BB369FFCC64680D38 /* KeyboardTouchTests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -143,6 +185,10 @@
 					05351ACA928900ABBF063AA9 = {
 						DevelopmentTeam = YH6JCRN97J;
 						ProvisioningStyle = Automatic;
+					};
+					8EB61417670C14C3D89A41C2 = {
+						DevelopmentTeam = YH6JCRN97J;
+						TestTargetID = 05351ACA928900ABBF063AA9;
 					};
 				};
 			};
@@ -161,6 +207,7 @@
 			projectRoot = "";
 			targets = (
 				05351ACA928900ABBF063AA9 /* CandidateSmoke */,
+				8EB61417670C14C3D89A41C2 /* KeyboardTouchTests */,
 			);
 		};
 /* End PBXProject section */
@@ -178,6 +225,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		1F6D363AC7755D24E08879C3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4C58CC861C0EEC94693A20BB /* KeyboardTouchTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		3498EE885F1BFA5A5157044B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -193,6 +248,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		58FF5A190ADB5C80B6ADB05F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 05351ACA928900ABBF063AA9 /* CandidateSmoke */;
+			targetProxy = B2F60DEA9AE8FB5E0A22B507 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		02A6760595BEC9D4098248EF /* Release */ = {
@@ -334,6 +397,40 @@
 			};
 			name = Debug;
 		};
+		4645725CCD5EFB25C364FA76 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.shendongchun.windwhisper.keyboard-touch-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CandidateSmoke;
+			};
+			name = Debug;
+		};
+		666E99C70A92826247EC2071 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = "com.shendongchun.windwhisper.keyboard-touch-tests";
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = CandidateSmoke;
+			};
+			name = Release;
+		};
 		6F5D792A8EB58918B70256BC /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -368,6 +465,15 @@
 			buildConfigurations = (
 				2CD55A3DA00A369021E2366D /* Debug */,
 				6F5D792A8EB58918B70256BC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		AF50F5ADF3903CD53382A2AE /* Build configuration list for PBXNativeTarget "KeyboardTouchTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4645725CCD5EFB25C364FA76 /* Debug */,
+				666E99C70A92826247EC2071 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

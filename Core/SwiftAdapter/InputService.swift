@@ -1,4 +1,8 @@
 import Foundation
+#if DEBUG && os(iOS)
+import OSLog
+private let keyboardPerformanceLogger = Logger(subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard", category: "Performance")
+#endif
 
 enum InputEngineError: Error, LocalizedError {
     case missingBundledData
@@ -994,6 +998,12 @@ final class InputSession: @unchecked Sendable {
 
     @discardableResult
     func process(keyCode: Int32, modifierMask: Int32 = 0) -> Bool {
+#if DEBUG && os(iOS)
+        let started = ProcessInfo.processInfo.systemUptime
+        defer {
+            keyboardPerformanceLogger.notice("KeyboardPerf processMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000, privacy: .public)")
+        }
+#endif
         lock.lock()
         defer { lock.unlock() }
         pendingCommit = nil
@@ -1275,6 +1285,13 @@ final class InputSession: @unchecked Sendable {
 
     @discardableResult
     private func appendCandidateBatch(limit: Int, transform suppliedTransform: StringTransform? = nil) -> Bool {
+#if DEBUG && os(iOS)
+        let started = ProcessInfo.processInfo.systemUptime
+        var conversionMs = 0.0
+        defer {
+            keyboardPerformanceLogger.notice("KeyboardPerf batchMs=\((ProcessInfo.processInfo.systemUptime - started) * 1000, privacy: .public) conversionMs=\(conversionMs, privacy: .public)")
+        }
+#endif
         guard let candidateCursor, limit > 0 else { return false }
         let transform = suppliedTransform ?? StringTransform(
             rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans"
@@ -1286,7 +1303,13 @@ final class InputSession: @unchecked Sendable {
             let values = candidateCursor.next(limit: needed)
             if values.isEmpty { break }
             for text in values {
+#if DEBUG && os(iOS)
+                let conversionStarted = ProcessInfo.processInfo.systemUptime
+#endif
                 let converted = text.applyingTransform(transform, reverse: false) ?? text
+#if DEBUG && os(iOS)
+                conversionMs += (ProcessInfo.processInfo.systemUptime - conversionStarted) * 1000
+#endif
                 guard convertedCandidateTexts.insert(converted).inserted else { continue }
                 let comment = reverseLookupMarkerOffset == nil ? nil
                     : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer)
