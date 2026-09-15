@@ -1094,7 +1094,20 @@ final class InputSession: @unchecked Sendable {
                 return true
             }
             if character.isASCII, character.isLetter {
-                guard modifierMask & InputEngineModifierMask.shift == 0 else { return false }
+                let shifted = modifierMask & InputEngineModifierMask.shift != 0
+                if shifted {
+                    let uppercase = String(character).uppercased()
+                    if !buffer.isEmpty {
+                        let committed = candidates.indices.contains(highlightedIndex)
+                            ? candidates[highlightedIndex].text
+                            : buffer
+                        clearComposition(keepingCommit: true)
+                        pendingCommit = committed + uppercase
+                    } else {
+                        pendingCommit = uppercase
+                    }
+                    return true
+                }
                 // A complete Flypy code with ambiguous candidates is committed
                 // when the user starts the next syllable, matching the normal
                 // continuous-input behavior without requiring Space.

@@ -23,6 +23,8 @@ enum M3SmokeTest {
             print("compositionEditing=passed")
             try verifyShiftModeSwitch(root: temporaryRoot)
             print("shiftModeSwitch=passed")
+            try verifyShiftedEnglish(root: temporaryRoot)
+            print("shiftedEnglish=passed")
             try verifyShortcutRouting(root: temporaryRoot)
             print("shortcutRouting=passed")
             try verifyFrontendCommit(root: temporaryRoot)
@@ -215,6 +217,23 @@ enum M3SmokeTest {
         guard try session.readSnapshot().status.isASCIIMode == false else {
             throw InputEngineError.smokeAssertion("Right Shift should be a no-op in the native key mapping.")
         }
+    }
+
+    private static func verifyShiftedEnglish(root: URL) throws {
+        let session = try makeSession(root: root.appendingPathComponent("shifted-english", isDirectory: true))
+        let shiftedA = try requireEvent(
+            character: "A",
+            keyCode: UInt16(kVK_ANSI_A),
+            flags: .shift
+        )
+        guard let mapped = KeyMapper.map(shiftedA),
+              mapped.modifierMask & KeyMapper.ModifierMask.shift != 0,
+              session.process(keyCode: mapped.keyCode, modifierMask: mapped.modifierMask),
+              try session.readSnapshot().commitText == "A"
+        else {
+            throw InputEngineError.smokeAssertion("Shift+letter did not commit uppercase English in Chinese mode.")
+        }
+
     }
 
     private static func verifyShortcutRouting(root: URL) throws {

@@ -330,6 +330,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var requestedUserData: URL?
     private var layoutMode = LayoutMode.letters
     private var isShifted = false
+    private var isCapsLocked = false
+    private var lastShiftTapUptime: TimeInterval?
+    private static let shiftDoubleTapInterval: TimeInterval = 0.8
     private var startupTask: Task<Void, Never>?
     private var hostPresentationVisible = false
     private var keyFeedbackGenerator: UIImpactFeedbackGenerator?
@@ -855,7 +858,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         row.heightAnchor.constraint(equalToConstant: Metrics.keyHeight).isActive = true
 
         if layoutMode == .letters {
-            configureIconButton(shiftButton, symbol: isShifted ? "shift.fill" : "shift", accessibilityLabel: "大写")
+            configureIconButton(shiftButton, symbol: isCapsLocked ? "capslock.fill" : (isShifted ? "shift.fill" : "shift"), accessibilityLabel: "大写")
             shiftButton.addTarget(self, action: #selector(toggleShift), for: .touchUpInside)
             row.addArrangedSubview(shiftButton)
         } else {
@@ -909,7 +912,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         let leftButton: UIButton
         let rightButton: UIButton
         if layoutMode == .letters {
-            let symbol = isShifted ? "shift.fill" : "shift"
+            let symbol = isCapsLocked ? "capslock.fill" : (isShifted ? "shift.fill" : "shift")
             leftButton = makePadIconKey(symbol, accessibilityLabel: "大写", action: #selector(toggleShift))
             rightButton = makePadIconKey(symbol, accessibilityLabel: "大写", action: #selector(toggleShift))
         } else {
@@ -1370,11 +1373,26 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
         guard let value = title.lowercased().first else { return }
         let output = isShifted ? String(value).uppercased() : String(value)
+        if isShifted {
+            // Shifted letters are literal English input even while the Chinese
+            // engine has an active composition; do not feed them as pinyin.
+            if hasActiveEngineComposition, session?.process(keyCode: 0xFF0D) == true {
+                refresh()
+            }
+            textDocumentProxy.insertText(output)
+            if !isCapsLocked {
+                isShifted = false
+                lastShiftTapUptime = nil
+                rebuildCharacterRows()
+            }
+            return
+        }
         let keyCode = Int32(output.utf8.first ?? 0)
         let handled = session?.process(keyCode: keyCode) ?? false
         if !handled { textDocumentProxy.insertText(output) }
         if isShifted {
             isShifted = false
+            lastShiftTapUptime = nil
             rebuildCharacterRows()
         }
         if handled { refresh() }
@@ -1439,13 +1457,28 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     @objc private func toggleShift() {
-        isShifted.toggle()
+        let now = ProcessInfo.processInfo.systemUptime
+        let isDoubleTap = lastShiftTapUptime.map {
+            now - $0 <= Self.shiftDoubleTapInterval
+        } ?? false
+        lastShiftTapUptime = now
+        if isCapsLocked {
+            isCapsLocked = false
+            isShifted = false
+        } else if isDoubleTap {
+            isCapsLocked = true
+            isShifted = true
+        } else {
+            isShifted = true
+        }
         rebuildCharacterRows()
     }
 
     @objc private func toggleLayoutMode() {
         layoutMode = layoutMode == .letters ? .numbers : .letters
         isShifted = false
+        isCapsLocked = false
+        lastShiftTapUptime = nil
         rebuildCharacterRows()
     }
 
@@ -1465,7 +1498,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     private func configureTouchFeedback(for button: UIButton) {
         // Bind once during configuration; restyling must preserve other touch-down actions.
-        button.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
+        let feedbackAction = NSStringFromSelector(#selector(keyTouchDown(_:)))
+        let alreadyBound = button.actions(forTarget: self, forControlEvent: .touchDown)?
+            .contains(feedbackAction) == true
+        if !alreadyBound {
+            button.addTarget(self, action: #selector(keyTouchDown(_:)), for: .touchDown)
+        }
     }
 
     @objc private func keyTouchDown(_ sender: UIButton) {

@@ -268,4 +268,31 @@ final class KeyboardTouchTests: XCTestCase {
         app.collectionViews.cells.firstMatch.tap()
         XCTAssertEqual(output.label, " \n，", "The candidate strip must keep its own touch handling")
     }
+
+    @MainActor
+    func testShiftUppercaseAndCapsLock() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--keyboard-touch-test"]
+        app.launch()
+        let shift = app.buttons["大写"].firstMatch
+        XCTAssertTrue(shift.waitForExistence(timeout: 10))
+        let output = app.staticTexts["typedText"]
+
+        shift.tap()
+        XCTAssertTrue(app.buttons["Q"].waitForExistence(timeout: 5))
+        app.buttons["Q"].tap()
+        XCTAssertEqual(output.label, "Q")
+
+        shift.tap()
+        shift.tap()
+        XCTAssertTrue(app.buttons["Q"].waitForExistence(timeout: 5))
+        app.buttons["Q"].tap()
+        app.buttons["W"].tap()
+        XCTAssertEqual(output.label, "QQW", "Double-tapping Shift enables caps lock")
+
+        shift.tap()
+        XCTAssertTrue(app.buttons["q"].waitForExistence(timeout: 5))
+        app.buttons["q"].tap()
+        XCTAssertEqual(output.label, "QQWq", "Tapping Shift again disables caps lock")
+    }
 }
