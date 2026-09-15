@@ -14,7 +14,7 @@ $OutputPath = [IO.Path]::GetFullPath($OutputPath)
 
 $fontFamily = [Drawing.FontFamily]::new('Microsoft YaHei UI')
 $pngImages = [Collections.Generic.List[byte[]]]::new()
-$sizes = @(16, 20, 24, 32, 48, 256)
+$sizes = @(16, 20, 24, 32, 40, 48, 256)
 
 try {
     foreach ($size in $sizes) {
@@ -47,22 +47,18 @@ try {
                         $matrix.Dispose()
                     }
 
-                    $shadowPath = $path.Clone()
-                    $shadowMatrix = [Drawing.Drawing2D.Matrix]::new()
-                    $shadow = [Drawing.SolidBrush]::new(
-                        [Drawing.Color]::FromArgb(190, 18, 18, 18))
-                    $fill = [Drawing.SolidBrush]::new([Drawing.Color]::White)
+                    # The profile icon is a static Windows resource. A dark
+                    # glyph with a white contour stays visible on both trays.
+                    $outline = [Drawing.Pen]::new([Drawing.Color]::White,
+                        [single][Math]::Max(1.5, $size * 0.075))
+                    $outline.LineJoin = [Drawing.Drawing2D.LineJoin]::Round
+                    $fill = [Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(28, 28, 28))
                     try {
-                        $shadowOffset = [single][Math]::Max(0.65, $size * 0.025)
-                        $shadowMatrix.Translate($shadowOffset, $shadowOffset)
-                        $shadowPath.Transform($shadowMatrix)
-                        $graphics.FillPath($shadow, $shadowPath)
+                        $graphics.DrawPath($outline, $path)
                         $graphics.FillPath($fill, $path)
                     } finally {
                         $fill.Dispose()
-                        $shadow.Dispose()
-                        $shadowMatrix.Dispose()
-                        $shadowPath.Dispose()
+                        $outline.Dispose()
                     }
                 } finally {
                     $path.Dispose()

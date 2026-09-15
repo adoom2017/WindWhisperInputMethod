@@ -2,6 +2,7 @@
 
 #include <cstring>
 #include <iostream>
+#include <string>
 
 #define CHECK(condition)      \
     do {                      \
@@ -27,6 +28,49 @@ bool equals(const char *text, size_t length, const char *expected) {
 }
 
 int main() {
+    std::string paging_dictionary;
+    for (int i = 0; i < 12; ++i) {
+        paging_dictionary += "词组" + std::to_string(i) + "\taa\t100\tflypy\t" +
+                             std::to_string(i) + "\n";
+    }
+    auto *paging_engine = fy_engine_create(paging_dictionary.data(), paging_dictionary.size());
+    auto *paging_session = fy_session_create(paging_engine);
+    CHECK(paging_session != nullptr);
+    CHECK(fy_session_select_schema(paging_session, "flypyShape", 10));
+    for (uint32_t next : {uint32_t('='), uint32_t('+'), 0xFF56u}) {
+        fy_session_reset(paging_session);
+        CHECK(type(paging_session, "aa"));
+        fy_snapshot paging{};
+        CHECK(fy_session_process_key(paging_session, '-', 0));
+        CHECK(fy_session_snapshot(paging_session, &paging));
+        CHECK(paging.page == 0 && paging.commit_len == 0);
+        CHECK(paging.page_count > 1);
+        const size_t pages = paging.page_count;
+        for (size_t i = 0; i < pages + 2; ++i) {
+            CHECK(fy_session_process_key(paging_session, next, 0));
+        }
+        CHECK(fy_session_snapshot(paging_session, &paging));
+        CHECK(paging.page == pages - 1 && paging.commit_len == 0);
+        CHECK(equals(paging.composition, paging.composition_len, "aa"));
+        CHECK(fy_session_process_key(paging_session, '-', 0));
+        CHECK(fy_session_snapshot(paging_session, &paging));
+        CHECK(paging.page == pages - 2);
+    }
+    fy_session_reset(paging_session);
+    CHECK(type(paging_session, "zz"));
+    for (uint32_t symbol : {uint32_t('-'), uint32_t('='), uint32_t('+')}) {
+        CHECK(fy_session_process_key(paging_session, symbol, 0));
+        fy_snapshot empty{};
+        CHECK(fy_session_snapshot(paging_session, &empty));
+        CHECK(empty.commit_len == 0 && empty.candidate_count == 0);
+        CHECK(equals(empty.composition, empty.composition_len, "zz"));
+    }
+    fy_session_reset(paging_session);
+    CHECK(fy_session_set_option(paging_session, "full_shape", 10, 0));
+    CHECK(!fy_session_process_key(paging_session, '-', 0));
+    CHECK(!fy_session_process_key(paging_session, '+', 0));
+    fy_session_destroy(paging_session);
+    fy_engine_destroy(paging_engine);
     const char *shape_dictionary =
         "甲\tabcd\t100\tflypy\t0\n"
         "乙\tabcd\t90\tflypy\t1\n"
