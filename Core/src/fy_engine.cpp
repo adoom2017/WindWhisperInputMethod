@@ -1,4 +1,5 @@
 #include "fy_engine.h"
+#include "user_frequency.h"
 
 #include <algorithm>
 #include <cmath>
@@ -30,6 +31,7 @@ struct Entry {
     int weight = 0;
     int order = 0;
     Kind kind = Kind::Pinyin;
+    std::string source_text;
 };
 
 std::string lower_ascii(std::string text) {
@@ -43,6 +45,7 @@ std::string lower_ascii(std::string text) {
 }
 
 struct fy_engine {
+    UserFrequency user_frequency;
     std::vector<Entry> entries;
     std::unordered_map<std::string, std::vector<size_t>> exact[3];
     std::vector<size_t> prefix_order[3];
@@ -465,9 +468,16 @@ void refresh(fy_session *session) {
         const Entry::Kind kind = phonetic ? Entry::Kind::Phonetic : Entry::Kind::Pinyin;
         session->matches = sentence_matches(session, needle, kind);
     }
+    const auto frequencies = session->engine->user_frequency.frequencies(
+        shape ? "flypyShape" : session->schema, raw_needle);
     std::stable_sort(
         session->matches.begin(), session->matches.end(),
         [&](const Entry &lhs, const Entry &rhs) {
+            const auto lhs_frequency = frequencies.find(lhs.text);
+            const auto rhs_frequency = frequencies.find(rhs.text);
+            const int lhs_count = lhs_frequency == frequencies.end() ? 0 : lhs_frequency->second;
+            const int rhs_count = rhs_frequency == frequencies.end() ? 0 : rhs_frequency->second;
+            if (lhs_count != rhs_count) return lhs_count > rhs_count;
             const bool lhs_exact = marker == std::string::npos && lhs.code == needle;
             const bool rhs_exact = marker == std::string::npos && rhs.code == needle;
             return lhs_exact != rhs_exact ? lhs_exact > rhs_exact
@@ -476,6 +486,7 @@ void refresh(fy_session *session) {
                                                 : lhs.order < rhs.order;
         });
     for (Entry &entry : session->matches) {
+        entry.source_text = entry.text;
         entry.text = session->traditional ? traditionalize_text(entry.text)
                                           : simplify_text(entry.text);
     }
@@ -594,6 +605,13 @@ fy_engine *fy_engine_create(const char *data, size_t length) {
     else if (data && length > 0) add_compatibility_phrases(engine);
     rebuild_indexes(engine);
     return engine;
+}
+
+int fy_engine_set_user_data_path(fy_engine *engine, const char *path, size_t length) {
+    if (!engine || !path || length == 0) return 0;
+    try {
+        return engine->user_frequency.configure(std::string(path, length)) ? 1 : 0;
+    } catch (...) { return 0; }
 }
 
 void fy_engine_destroy(fy_engine *engine) {
@@ -716,7 +734,8 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
         if (shape && letter && session->code.size() == 4 &&
             session->code.find('~') == std::string::npos &&
             !session->matches.empty() &&
-            session->matches.front().code == session->code) {
+            std::any_of(session->matches.begin(), session->matches.end(),
+                        [&](const Entry &entry) { return entry.code == session->code; })) {
             session->page = 0;
             fy_session_select_candidate(session, 0);
         }
@@ -748,7 +767,11 @@ int fy_session_select_candidate(fy_session *session, size_t index) {
     if (absolute_index >= session->matches.size()) {
         return 0;
     }
-    session->commit = session->matches[absolute_index].text;
+    const Entry &selected = session->matches[absolute_index];
+    session->engine->user_frequency.record(
+        session->schema == "flypy" ? "flypyShape" : session->schema,
+        lower_ascii(session->code), selected.source_text);
+    session->commit = selected.text;
     if (session->traditional) session->commit = traditionalize_text(session->commit);
     session->code.clear();
     session->matches.clear();

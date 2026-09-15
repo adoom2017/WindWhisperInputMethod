@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 #if DEBUG && os(iOS)
 import OSLog
 private let keyboardPerformanceLogger = Logger(subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard", category: "Performance")
@@ -526,7 +527,7 @@ private final class NativeDictionary: @unchecked Sendable {
     }
 
 #endif
-    func candidates(for code: String, schema: FengYuSchema, limit: Int = 100) -> [String] {
+    func candidates(for code: String, schema: FengYuSchema, limit: Int = 100, frequencies: [String: Int] = [:]) -> [String] {
 #if os(iOS)
         candidateCacheLock.lock()
         defer { candidateCacheLock.unlock() }
@@ -545,7 +546,7 @@ private final class NativeDictionary: @unchecked Sendable {
 #if !os(iOS)
         candidateCacheLock.unlock()
 #endif
-        if let cached { return cached }
+        if frequencies.isEmpty, let cached { return cached }
 
         let entries: [NativeDictionaryEntry]
         switch schema {
@@ -560,9 +561,11 @@ private final class NativeDictionary: @unchecked Sendable {
         var matches = [NativeDictionaryEntry]()
         var index = start
         while index < entries.count, entries[index].code.hasPrefix(normalized) {
-            matches.append(entries[index])
+            if index - start < 20_000 || frequencies[entries[index].text, default: 0] > 0 {
+                matches.append(entries[index])
+            }
             index += 1
-            if matches.count >= 20_000 { break }
+            if index - start >= 20_000 && frequencies.isEmpty { break }
         }
         matches.sort {
 #if os(iOS)
@@ -612,14 +615,18 @@ private final class NativeDictionary: @unchecked Sendable {
                 languageModel: languageModel
             ) + prefixMatches
         }
-        for text in rankedMatches where seen.insert(text).inserted {
+        let personalized = frequencies.isEmpty ? rankedMatches : rankedMatches.enumerated().sorted {
+            let lhs = frequencies[$0.element, default: 0], rhs = frequencies[$1.element, default: 0]
+            return lhs != rhs ? lhs > rhs : $0.offset < $1.offset
+        }.map(\.element)
+        for text in personalized where seen.insert(text).inserted {
             result.append(text)
             if result.count == limit { break }
         }
 #if !os(iOS)
         candidateCacheLock.lock()
 #endif
-        if candidateCache[cacheKey] == nil {
+        if frequencies.isEmpty, candidateCache[cacheKey] == nil {
             if candidateCacheOrder.count >= candidateCacheCapacity {
                 let evictedKey = candidateCacheOrder.removeFirst()
                 candidateCache.removeValue(forKey: evictedKey)
@@ -633,7 +640,7 @@ private final class NativeDictionary: @unchecked Sendable {
         return result
     }
 
-    func makeCandidateCursor(for code: String, schema: FengYuSchema) -> CandidateCursor {
+    func makeCandidateCursor(for code: String, schema: FengYuSchema, frequencies: [String: Int] = [:]) -> CandidateCursor {
         candidateCacheLock.lock()
         let index: RankedIndex = schema == .flypy ? shapeRankedIndex
             : schema == .fullPinyin ? pinyinRankedIndex : phoneticRankedIndex
@@ -653,9 +660,34 @@ private final class NativeDictionary: @unchecked Sendable {
                 for: normalized, in: entries, schema: schema, languageModel: languageModel, limit: 20
             ), languageModel: languageModel
         )
+        var personalizedLeading = [String]()
+        if !frequencies.isEmpty {
+            let learnedEntries = entries[start..<end].enumerated().filter {
+                frequencies[$0.element.text, default: 0] > 0
+            }.sorted {
+                let lhs = $0.element, rhs = $1.element
+                let lc = lhs.code == normalized && custom.contains(lhs.text)
+                let rc = rhs.code == normalized && custom.contains(rhs.text)
+                if lc != rc { return lc }
+                if schema == .flypy, normalized.count < 4,
+                   (lhs.text.count == 1) != (rhs.text.count == 1) { return lhs.text.count == 1 }
+                if (lhs.code == normalized) != (rhs.code == normalized) { return lhs.code == normalized }
+                if lhs.weight != rhs.weight { return lhs.weight > rhs.weight }
+                if lhs.order != rhs.order { return lhs.order < rhs.order }
+                return $0.offset < $1.offset
+            }.map { $0.element.text }
+            var seen = Set<String>()
+            let base = (leading + learnedEntries).filter {
+                frequencies[$0, default: 0] > 0 && seen.insert($0).inserted
+            }
+            personalizedLeading = base.enumerated().sorted {
+                let lhs = frequencies[$0.element, default: 0], rhs = frequencies[$1.element, default: 0]
+                return lhs != rhs ? lhs > rhs : $0.offset < $1.offset
+            }.map(\.element)
+        }
         return CandidateCursor(index: index, code: normalized,
             singleFirst: schema == .flypy && normalized.count < 4,
-            custom: custom, leading: leading, prefixRange: exactEnd..<end,
+            custom: custom, leading: personalizedLeading + leading, prefixRange: exactEnd..<end,
             exactRange: schema == .flypy ? start..<exactEnd : start..<start)
     }
 
@@ -879,11 +911,85 @@ struct InputEngineDiagnostics: Equatable, Sendable {
     let residentMemoryBytes: UInt64
 }
 
+// A separate lock file survives atomic replacement of the TSV. Re-read under
+// that lock before incrementing so separate keyboard/IME processes merge counts.
+private final class NativeUserFrequency {
+    private let url: URL
+    private let lockURL: URL
+    private let lock = NSLock()
+    private var counts = [String: Int]()
+    private var stamp: Date?
+    private var byteCount: UInt64?
+
+    init(userData: URL) {
+        url = userData.appendingPathComponent("user_frequency.tsv")
+        lockURL = userData.appendingPathComponent("user_frequency.lock")
+        reload()
+    }
+
+    private func reload(force: Bool = false) {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let date = attributes?[.modificationDate] as? Date
+        let size = attributes?[.size] as? UInt64
+        guard force || date != stamp || size != byteCount else { return }
+        guard let contents = try? String(contentsOf: url, encoding: .utf8) else { return }
+        var loaded = [String: Int]()
+        for line in contents.split(separator: "\n") {
+            let fields = line.split(separator: "\t", omittingEmptySubsequences: false)
+            guard fields.count == 4, FengYuSchema(rawValue: String(fields[0])) != nil,
+                  !fields[1].isEmpty, !fields[2].isEmpty,
+                  let count = Int(fields[3]), (1...1_000_000_000).contains(count) else { continue }
+            loaded[fields.prefix(3).joined(separator: "\t")] = count
+        }
+        counts = loaded
+        stamp = date
+        byteCount = size
+    }
+
+    func frequencies(schema: FengYuSchema, code: String) -> [String: Int] {
+        lock.lock()
+        defer { lock.unlock() }
+        reload()
+        let prefix = schema.rawValue + "\t" + code + "\t"
+        var result = [String: Int]()
+        for (key, count) in counts where key.hasPrefix(prefix) {
+            result[String(key.dropFirst(prefix.count))] = count
+        }
+        return result
+    }
+
+    func record(schema: FengYuSchema, code: String, text: String) {
+        guard !code.isEmpty, !text.isEmpty,
+              !code.contains(where: { $0 == "\t" || $0 == "\n" || $0 == "\r" }),
+              !text.contains(where: { $0 == "\t" || $0 == "\n" || $0 == "\r" }) else { return }
+        lock.lock()
+        defer { lock.unlock() }
+        let descriptor = open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+        guard descriptor >= 0 else { return }
+        defer { close(descriptor) }
+        guard flock(descriptor, LOCK_EX) == 0 else { return }
+        defer { flock(descriptor, LOCK_UN) }
+        reload(force: true)
+        let key = schema.rawValue + "\t" + code + "\t" + text
+        counts[key] = min(counts[key, default: 0] + 1, 1_000_000_000)
+        let contents = counts.keys.sorted().map { "\($0)\t\(counts[$0]!)\n" }.joined()
+        do {
+            try contents.write(to: url, atomically: true, encoding: .utf8)
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            stamp = attributes[.modificationDate] as? Date
+            byteCount = attributes[.size] as? UInt64
+        } catch {
+            NSLog("WindWhisper: could not save user frequencies")
+        }
+    }
+}
+
 final class InputService: @unchecked Sendable {
     let paths: InputServicePaths
     let version = "native-1.0"
     fileprivate let dictionary: NativeDictionary
     fileprivate let candidateLimit: Int?
+    fileprivate let userFrequency: NativeUserFrequency
     private let lock = NSLock()
     private var activeSessions = 0
 
@@ -902,6 +1008,7 @@ final class InputService: @unchecked Sendable {
         if !fileManager.fileExists(atPath: customWords.path) {
             try "# 词条<Tab>编码<Tab>可选权重\n".write(to: customWords, atomically: true, encoding: .utf8)
         }
+        userFrequency = NativeUserFrequency(userData: paths.userData)
         dictionary = try NativeDictionary(
             sharedData: paths.sharedData,
             userData: paths.userData,
@@ -945,6 +1052,7 @@ final class InputService: @unchecked Sendable {
 final class InputSession: @unchecked Sendable {
     private struct SessionCandidate {
         let text: String
+        let sourceText: String
         let comment: String?
     }
 
@@ -1098,11 +1206,7 @@ final class InputSession: @unchecked Sendable {
                 if shifted {
                     let uppercase = String(character).uppercased()
                     if !buffer.isEmpty {
-                        let committed = candidates.indices.contains(highlightedIndex)
-                            ? candidates[highlightedIndex].text
-                            : buffer
-                        clearComposition(keepingCommit: true)
-                        pendingCommit = committed + uppercase
+                        commitSelectedCandidate(suffix: uppercase)
                     } else {
                         pendingCommit = uppercase
                     }
@@ -1280,16 +1384,17 @@ final class InputSession: @unchecked Sendable {
             pageNumber = 0
             return
         }
+        let frequencies = service.userFrequency.frequencies(schema: schema, code: learningCode)
         if let limit = service.candidateLimit {
             var seen = Set<String>()
-            candidates = service.dictionary.candidates(for: buffer, schema: schema, limit: limit).compactMap { text in
+            candidates = service.dictionary.candidates(for: buffer, schema: schema, limit: limit, frequencies: frequencies).compactMap { text in
                 let converted = text.applyingTransform(transform, reverse: false) ?? text
                 guard seen.insert(converted).inserted else { return nil }
-                return SessionCandidate(text: converted, comment: reverseLookupMarkerOffset == nil ? nil
+                return SessionCandidate(text: converted, sourceText: text, comment: reverseLookupMarkerOffset == nil ? nil
                     : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer))
             }
         } else {
-            candidateCursor = service.dictionary.makeCandidateCursor(for: buffer, schema: schema)
+            candidateCursor = service.dictionary.makeCandidateCursor(for: buffer, schema: schema, frequencies: frequencies)
             _ = appendCandidateBatch(limit: candidateBatchSize, transform: transform)
         }
         highlightedIndex = 0
@@ -1326,7 +1431,7 @@ final class InputSession: @unchecked Sendable {
                 guard convertedCandidateTexts.insert(converted).inserted else { continue }
                 let comment = reverseLookupMarkerOffset == nil ? nil
                     : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer)
-                candidates.append(SessionCandidate(text: converted, comment: comment))
+                candidates.append(SessionCandidate(text: converted, sourceText: text, comment: comment))
                 appended = true
             }
         }
@@ -1334,7 +1439,18 @@ final class InputSession: @unchecked Sendable {
         return appended
     }
 
+    private var learningCode: String {
+        // Keep auxiliary lookup selections separate from ordinary spelling.
+        let code = buffer.lowercased()
+        guard let offset = reverseLookupMarkerOffset else { return code }
+        return String(code.prefix(offset)) + "~" + String(code.dropFirst(offset))
+    }
+
     private func commitSelectedCandidate(suffix: String = "") {
+        if candidates.indices.contains(highlightedIndex) {
+            service.userFrequency.record(schema: schema, code: learningCode,
+                                         text: candidates[highlightedIndex].sourceText)
+        }
         let text = candidates.indices.contains(highlightedIndex)
             ? candidates[highlightedIndex].text
             : buffer

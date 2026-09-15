@@ -41,6 +41,9 @@ typedef struct fy_snapshot {
 // delivered by exactly one successful snapshot.
 
 FY_API fy_engine *fy_engine_create(const char *dictionary_utf8, size_t length);
+// Configure before creating sessions. UTF-8 directory; history is shared by
+// processes using that directory. Without a path, learning is memory-only.
+FY_API int fy_engine_set_user_data_path(fy_engine *engine, const char *path, size_t length);
 FY_API void fy_engine_destroy(fy_engine *engine);
 FY_API fy_session *fy_session_create(fy_engine *engine);
 FY_API void fy_session_destroy(fy_session *session);

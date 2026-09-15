@@ -349,7 +349,12 @@ public:
         engine_future_ = std::async(std::launch::async, [] {
             try {
                 const std::string dictionary = LoadBundledDictionary();
-                return fy_engine_create(dictionary.data(), dictionary.size());
+                const auto user_data = fengyu::CustomPhraseFilePath().parent_path().u8string();
+                auto *engine = fy_engine_create(dictionary.data(), dictionary.size());
+                if (!fy_engine_set_user_data_path(engine, user_data.data(), user_data.size())) {
+                    DebugLog("user-frequency-storage-unavailable", E_FAIL);
+                }
+                return engine;
             } catch (...) {
                 return static_cast<fy_engine *>(nullptr);
             }

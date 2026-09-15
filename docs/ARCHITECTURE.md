@@ -5,7 +5,7 @@
 1. InputMethodKit 处理系统会话；原生 Swift 引擎处理输入语义；候选窗只处理表现与交互。
 2. 全局引擎生命周期、每会话生命周期与 UI 生命周期分别管理。
 3. 输入引擎内部只暴露值类型快照和语义动作，Swift 业务层不依赖外部运行库。
-4. 任何磁盘读取和配置解析都不进入按键热路径，任何 AppKit 更新都回到主线程。
+4. 词库读取和配置解析在初始化时完成，任何 AppKit 更新都回到主线程。用户词频在查询时检查文件时间戳，外部更新后才重载；候选提交时同步合并并原子保存，避免键盘进程退出丢失选择。
 5. 前端不实现双拼或辅码算法，它们由输入引擎根据词库索引处理。
 
 ## 双平台迁移边界
@@ -68,6 +68,15 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - 全拼与小鹤双拼纯音码使用有限 beam search 组合完整词条，并结合词频、字符二元/三元连贯度和分词惩罚重排；小鹤音形保持原有形码排序。
 - 小鹤音形额外维护词条到四键内完整编码的只读反查索引；`InputSession` 记录 `~` 在预编辑串中的位置，并通过 `CandidateSnapshot.comment` 输出匹配编码，不改变候选提交正文。
 - Swift 快照只含值类型；组合串的 UTF-8/UTF-16 范围转换集中在 `RangeConverter`。
+
+## 用户词频学习
+
+- iOS/macOS 的 `NativeUserFrequency` 与 Windows C++ 的 `UserFrequency` 使用 `user_frequency.tsv`，每行为 `schema<Tab>code<Tab>source-text<Tab>count`。键包含输入方案和实际输入编码；音形兼容名统一为 `flypyShape`。
+- 保存词库源文本作为词条标识，显示用简繁转换不改变该标识。有效候选提交累加一次，取消、无效索引和原始编码提交不累加；次数上限为 1,000,000,000。
+- 词频降序优先于默认候选排序，同次数保留默认顺序。Swift 有限列表在截断前重排，增量游标将当前匹配的已学习候选放在前导区并去重，因此后续批次选择也能提升至首页。被词库移除的候选不会由历史重新引入。
+- 用户目录中的稳定 sidecar 文件 `user_frequency.lock` 用于跨进程排他锁；提交在锁内读取最新记录、累加并原子替换 TSV，避免多个 TSF 宿主覆盖彼此记录。损坏行被忽略，不影响正常输入。查询以文件时间戳和大小判断是否重载；频次文件不可用时不阻断输入。
+- Windows TSF 在后台创建引擎后调用 `fy_engine_set_user_data_path`，路径与自定义词组目录一致。未配置路径的 C ABI 引擎仅在内存中学习。
+- 回归：`Scripts/test-user-frequency.sh macos`、`Scripts/test-user-frequency.sh ios [device]`，以及 CMake/CTest 的 `user_frequency`；iOS 候选全套脚本也包含词频测试。
 
 ## M3 输入闭环
 

@@ -11,14 +11,16 @@ sources=(iOS/Keyboard/FengYuSchema.swift Core/SwiftAdapter/InputEnginePlatform.s
     Core/SwiftAdapter/InputModels.swift Core/SwiftAdapter/InputService.swift)
 
 ./Scripts/generate-ios-dictionary.sh
-for test in candidates custom-phrases; do
+for test in candidates custom-phrases user-frequency; do
     test_sources=("${sources[@]}")
     if [[ "$test" == custom-phrases ]]; then
         test_sources+=(Platform/macOS/Configuration/CustomWords.swift)
     fi
+    smoke_source="Scripts/ios-$test-smoke.swift"
+    if [[ "$test" == user-frequency ]]; then smoke_source="Scripts/user-frequency-smoke.swift"; fi
     xcrun --sdk iphonesimulator swiftc -O -target "$arch-apple-ios17.0-simulator" \
         -sdk "$sdk" -module-cache-path "$test_root/modules" \
-        "${test_sources[@]}" "Scripts/ios-$test-smoke.swift" \
+        "${test_sources[@]}" "$smoke_source" \
         -o "$test_root/$test"
     xcrun simctl spawn "$device" "$test_root/$test" "$project_root/iOS/Resources/fy.dict.yaml"
 done

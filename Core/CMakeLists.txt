@@ -13,3 +13,8 @@ target_compile_definitions(fy_engine_dictionary_smoke PRIVATE
   FY_DICTIONARY_PATH="${CMAKE_SOURCE_DIR}/Resources/fy.dict.yaml")
 target_link_libraries(fy_engine_dictionary_smoke PRIVATE fy_engine)
 add_test(NAME dictionary_smoke COMMAND fy_engine_dictionary_smoke)
+
+find_package(Threads REQUIRED)
+add_executable(fy_engine_user_frequency tests/user_frequency.cpp)
+target_link_libraries(fy_engine_user_frequency PRIVATE fy_engine Threads::Threads)
+add_test(NAME user_frequency COMMAND fy_engine_user_frequency)

@@ -47,9 +47,10 @@ struct CandidateSmoke {
                     while try pick.readSnapshot().menu.candidates.count <= selected {
                         precondition(pick.loadMoreCandidates())
                     }
+                    let selectedText = try pick.readSnapshot().menu.candidates[selected].text
                     precondition(pick.selectCandidate(atAbsoluteIndex: selected))
                     let committed = try pick.readSnapshot().commitText
-                    precondition(committed == expected[selected])
+                    precondition(committed == selectedText)
                 }
                 session.process(keyCode: 0xFF08)
                 precondition(!session.loadMoreCandidates(generation: generation))

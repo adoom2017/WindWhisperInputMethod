@@ -2,6 +2,14 @@
 
 风语（WindWhisper）支持 Windows、macOS 和 iOS，提供小鹤音形、小鹤双拼和全拼输入。
 
+## 自动词频学习
+
+全拼、小鹤双拼和小鹤音形均按「输入方案＋本次编码＋所选词条」记录使用次数，次数更多的候选优先显示，同次数保留原有排序。例如输入 `d` 后经常选择「得」，下次输入 `d` 时「得」会排到前面。不同方案、不同编码分别学习。
+
+点击、数字键、空格选词及音形自动上屏均会学习；翻页后的选择同样生效。简繁显示切换共用词条记录，取消输入和直接提交原始编码不会学习。记录仅保存在本地，重新启动后继续生效。
+
+词频文件为用户数据目录中的 `user_frequency.tsv`：Windows 与 `custom_words.tsv` 同目录；macOS 位于 `~/Library/Application Support/com.shendongchun.inputmethod.windwhisper/User`；iOS 使用键盘当前用户数据目录（可访问 App Group 时使用共享目录）。三端使用相同记录格式，但不会自动跨设备同步。
+
 ## Windows 使用说明
 
 ### 系统要求
