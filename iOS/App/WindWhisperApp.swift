@@ -1,8 +1,8 @@
 import SwiftUI
 
 private enum KeyboardPreferences {
-    static let schemaKey = "schema"
-    static let appGroupIdentifier = "group.com.shendongchun.windwhisper"
+    static let schemaKey = KeyboardSharedPreferences.schemaKey
+    static let appGroupIdentifier = KeyboardSharedPreferences.appGroupIdentifier
 }
 
 @main
@@ -30,6 +30,12 @@ struct SettingsView: View {
     )
     private var schema = "flypyShape"
 
+    @AppStorage(
+        KeyboardSharedPreferences.hapticIntensityKey,
+        store: UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier)
+    )
+    private var hapticIntensity = KeyboardSharedPreferences.defaultHapticIntensity
+
     var body: some View {
         NavigationStack {
             Form {
@@ -51,12 +57,29 @@ struct SettingsView: View {
 
                 Section {
                     Label(
-                        "请前往“设置 → 通用 → 键盘 → 键盘 → 风语”开启完全访问。",
+                        "建议前往“设置 → 通用 → 键盘 → 风语”开启“允许完全访问”。",
                         systemImage: "gear"
                     )
                         .foregroundStyle(.secondary)
                 } header: {
                     Text("设置风语键盘")
+                } footer: {
+                    Text("开启后可获得按键震动等完整的第三方键盘系统能力。不开启时仍可正常输入、显示候选并读取宿主配置。")
+                }
+
+                Section("按键反馈") {
+                    HStack {
+                        Text("震动强度")
+                        Spacer()
+                        Text("\(Int(hapticIntensity * 100))%")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                    }
+                    Slider(value: $hapticIntensity, in: 0...1, step: 0.05)
+                        .accessibilityLabel("震动强度")
+                        .accessibilityValue("\(Int(hapticIntensity * 100))%")
+                    Text("设为 0% 可关闭按键震动。关闭“允许完全访问”时，系统可能不提供第三方键盘的震动反馈。")
+                        .foregroundStyle(.secondary)
                 }
 
                 Section("隐私") {

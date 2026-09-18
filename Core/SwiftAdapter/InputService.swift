@@ -28,6 +28,9 @@ enum InputEngineError: Error, LocalizedError {
 struct InputServicePaths: Sendable {
     let sharedData: URL
     let userData: URL
+    /// Static/custom dictionary data. This may live in an App Group and is
+    /// intentionally separate from writable runtime data in `userData`.
+    let customWords: URL?
     let logs: URL
 
     static func applicationDefaults(bundle: Bundle = .main) throws -> Self {
@@ -60,6 +63,7 @@ struct InputServicePaths: Sendable {
         return Self(
             sharedData: sharedData,
             userData: userData,
+            customWords: userData.appendingPathComponent("custom_words.tsv"),
             logs: logsRoot
                 .appendingPathComponent(identifier, isDirectory: true)
         )
@@ -70,6 +74,7 @@ struct InputServicePaths: Sendable {
         return Self(
             sharedData: sharedData,
             userData: userData,
+            customWords: userData.appendingPathComponent("custom_words.tsv"),
             logs: root.appendingPathComponent("Logs", isDirectory: true)
         )
     }
@@ -329,7 +334,12 @@ private final class NativeDictionary: @unchecked Sendable {
     private var candidateCacheOrder = [CandidateCacheKey]()
     private let candidateCacheCapacity = 128
 
-    init(sharedData: URL, userData: URL, enabledSchemas: Set<FengYuSchema>, buildsRankedIndexes: Bool = false) throws {
+    init(
+        sharedData: URL,
+        customWords: URL?,
+        enabledSchemas: Set<FengYuSchema>,
+        buildsRankedIndexes: Bool = false
+    ) throws {
         self.buildsRankedIndexes = buildsRankedIndexes
         let dictionaryURL = sharedData.appendingPathComponent("fy.dict.yaml")
         guard FileManager.default.fileExists(atPath: dictionaryURL.path) else {
@@ -351,7 +361,7 @@ private final class NativeDictionary: @unchecked Sendable {
         )
         let shape = allEntries.filter { $0.source == .flypy }
         var languageModelBuilder = NativeStatisticalLanguageModel.Builder()
-        let customURL = userData.appendingPathComponent("custom_words.tsv")
+        let customURL = customWords
 #if os(iOS)
         baseShapeEntries = needsShape ? shape.map(\.entry) : []
         var shapeEntries = baseShapeEntries
@@ -359,7 +369,7 @@ private final class NativeDictionary: @unchecked Sendable {
 #else
         var shapeEntries = needsShape ? shape.map(\.entry) : []
 #endif
-        if needsShape, FileManager.default.fileExists(atPath: customURL.path) {
+        if needsShape, let customURL, FileManager.default.fileExists(atPath: customURL.path) {
 #if os(iOS)
             customEntries = try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000)
             shapeEntries.insert(contentsOf: customEntries, at: 0)
@@ -1004,14 +1014,15 @@ final class InputService: @unchecked Sendable {
         let fileManager = FileManager.default
         try fileManager.createDirectory(at: paths.userData, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: paths.logs, withIntermediateDirectories: true)
-        let customWords = paths.userData.appendingPathComponent("custom_words.tsv")
-        if !fileManager.fileExists(atPath: customWords.path) {
+        if let customWords = paths.customWords,
+           customWords.deletingLastPathComponent() == paths.userData,
+           !fileManager.fileExists(atPath: customWords.path) {
             try "# 词条<Tab>编码<Tab>可选权重\n".write(to: customWords, atomically: true, encoding: .utf8)
         }
         userFrequency = NativeUserFrequency(userData: paths.userData)
         dictionary = try NativeDictionary(
             sharedData: paths.sharedData,
-            userData: paths.userData,
+            customWords: paths.customWords,
             enabledSchemas: enabledSchemas,
             buildsRankedIndexes: candidateLimit == nil
         )
@@ -1020,7 +1031,8 @@ final class InputService: @unchecked Sendable {
 
 #if os(iOS)
     func reloadCustomWords() throws {
-        try dictionary.reloadCustomWords(at: paths.userData.appendingPathComponent("custom_words.tsv"))
+        guard let customWords = paths.customWords else { return }
+        try dictionary.reloadCustomWords(at: customWords)
     }
 
 #endif

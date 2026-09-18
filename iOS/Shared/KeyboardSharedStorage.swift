@@ -1,16 +1,30 @@
 import Foundation
 
-enum KeyboardSharedStorage {
+enum KeyboardSharedPreferences {
     static let appGroupIdentifier = "group.com.shendongchun.windwhisper"
+    static let schemaKey = "schema"
+    static let hapticIntensityKey = "hapticIntensity"
+    static let defaultHapticIntensity = 0.9
 
-    static func userDataURL() throws -> URL {
+    static func normalizedHapticIntensity(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultHapticIntensity }
+        return min(max(value, 0), 1)
+    }
+}
+
+enum KeyboardSharedStorage {
+    static func sharedContainerURL() throws -> URL {
         guard let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: appGroupIdentifier
+            forSecurityApplicationGroupIdentifier: KeyboardSharedPreferences.appGroupIdentifier
         ) else {
             throw CocoaError(.fileNoSuchFile, userInfo: [
-                NSLocalizedDescriptionKey: "无法访问共享词库，请确认风语键盘已开启完全访问。"
+                NSLocalizedDescriptionKey: "无法读取宿主 App 的共享输入数据。"
             ])
         }
-        return container.appendingPathComponent("User", isDirectory: true)
+        return container
+    }
+
+    static func userDataURL() throws -> URL {
+        try sharedContainerURL().appendingPathComponent("User", isDirectory: true)
     }
 }

@@ -2,8 +2,18 @@ import UIKit
 import OSLog
 
 private enum KeyboardPreferences {
-    static let schemaKey = "schema"
-    static let appGroupIdentifier = "group.com.shendongchun.windwhisper"
+    static let schemaKey = KeyboardSharedPreferences.schemaKey
+    static let appGroupIdentifier = KeyboardSharedPreferences.appGroupIdentifier
+
+    static var hapticIntensity: CGFloat {
+        guard let defaults = UserDefaults(suiteName: appGroupIdentifier),
+              defaults.object(forKey: KeyboardSharedPreferences.hapticIntensityKey) != nil else {
+            return CGFloat(KeyboardSharedPreferences.defaultHapticIntensity)
+        }
+        return CGFloat(KeyboardSharedPreferences.normalizedHapticIntensity(
+            defaults.double(forKey: KeyboardSharedPreferences.hapticIntensityKey)
+        ))
+    }
 
     static var selectedSchemaIdentifier: String {
         UserDefaults(suiteName: appGroupIdentifier)?.string(forKey: schemaKey)
@@ -17,6 +27,7 @@ private actor KeyboardInputRuntime {
     private var service: InputService?
     private var loadedSchema: FengYuSchema?
     private var loadedUserData: URL?
+    private var loadedCustomWords: URL?
     private var customWordsData: Data?
 
     func makeSession(
@@ -26,7 +37,8 @@ private actor KeyboardInputRuntime {
         let service: InputService
         let reusedService: Bool
         if let cachedService = self.service, loadedSchema == schema,
-           loadedUserData == paths.userData {
+           loadedUserData == paths.userData,
+           loadedCustomWords == paths.customWords {
             service = cachedService
             reusedService = true
         } else {
@@ -38,6 +50,7 @@ private actor KeyboardInputRuntime {
             self.service = loadedService
             loadedSchema = schema
             loadedUserData = paths.userData
+            loadedCustomWords = paths.customWords
             customWordsData = nil
             service = loadedService
             reusedService = false
@@ -47,7 +60,7 @@ private actor KeyboardInputRuntime {
 
     func reloadCustomWordsIfChanged(for expectedService: InputService) throws -> Bool {
         guard loadedSchema == .flypy, let service, service === expectedService else { return false }
-        let url = service.paths.userData.appendingPathComponent("custom_words.tsv")
+        guard let url = service.paths.customWords else { return false }
         let data = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : Data()
         guard data != customWordsData else { return false }
         try service.reloadCustomWords()
@@ -328,6 +341,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var startupErrorDescription: String?
     private var requestedSchemaIdentifier: String?
     private var requestedUserData: URL?
+    private var requestedCustomWords: URL?
     private var layoutMode = LayoutMode.letters
     private var isShifted = false
     private var isCapsLocked = false
@@ -370,6 +384,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private let modeButton = KeyboardButton(type: .system)
     private let asciiButton = KeyboardButton(type: .system)
     private static let functionKeyTag = 1
+
+    private struct EngineConfiguration {
+        let paths: InputServicePaths
+        let schema: FengYuSchema
+        let usesSharedStorage: Bool
+    }
 
 #if CANDIDATE_UI_TEST
     var testDocumentProxy: (any UITextDocumentProxy)?
@@ -548,34 +568,67 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         #if CANDIDATE_UI_TEST
         return
         #else
-        let schemaIdentifier = KeyboardPreferences.selectedSchemaIdentifier
-        let paths: InputServicePaths
+        let configuration: EngineConfiguration
         do {
             let defaults = try InputServicePaths.applicationDefaults(bundle: .main)
-            paths = InputServicePaths(
-                sharedData: defaults.sharedData,
-                // The App Group is the sole source of custom words. Do not
-                // silently select an empty private dictionary based on an early
-                // hasFullAccess value; actual container access is authoritative.
-                userData: try KeyboardSharedStorage.userDataURL(),
-                logs: defaults.logs
-            )
+            if let sharedContainer = try? KeyboardSharedStorage.sharedContainerURL() {
+                migrateLegacyFrequencyIfNeeded(
+                    sharedContainer: sharedContainer,
+                    runtimeData: defaults.userData
+                )
+                let schema = FengYuSchema(
+                    rawValue: KeyboardPreferences.selectedSchemaIdentifier
+                ) ?? .flypy
+                configuration = EngineConfiguration(
+                    paths: InputServicePaths(
+                        sharedData: defaults.sharedData,
+                        userData: defaults.userData,
+                        customWords: sharedContainer
+                            .appendingPathComponent("User", isDirectory: true)
+                            .appendingPathComponent("custom_words.tsv"),
+                        logs: defaults.logs
+                    ),
+                    schema: schema,
+                    usesSharedStorage: true
+                )
+            } else {
+                // This is only a defensive fallback for a missing/mismatched
+                // App Group entitlement. With Apple's keyboard sandbox,
+                // full access is not required for read-only shared-container
+                // access, so a normal no-full-access keyboard should take the
+                // shared branch above and keep the host configuration.
+                configuration = EngineConfiguration(
+                    paths: InputServicePaths(
+                        sharedData: defaults.sharedData,
+                        userData: defaults.userData,
+                        customWords: nil,
+                        logs: defaults.logs
+                    ),
+                    schema: .flypy,
+                    usesSharedStorage: false
+                )
+            }
         } catch {
             requestedSchemaIdentifier = nil
             showStartupError(error.localizedDescription)
             return
         }
-        let schema = FengYuSchema(rawValue: schemaIdentifier) ?? .flypy
+        let schemaIdentifier = configuration.schema.rawValue
+        let paths = configuration.paths
+        let schema = configuration.schema
         guard requestedSchemaIdentifier != schemaIdentifier
-            || requestedUserData != paths.userData else { return }
+            || requestedUserData != paths.userData
+            || requestedCustomWords != paths.customWords else { return }
         if requestedSchemaIdentifier == schemaIdentifier, requestedUserData == paths.userData,
+           requestedCustomWords == paths.customWords,
            session != nil {
             return
         }
         requestedSchemaIdentifier = schemaIdentifier
         requestedUserData = paths.userData
+        requestedCustomWords = paths.customWords
         logger.notice(
-            "Loading shared dictionary schema=\(schema.rawValue, privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public)"
+            "Loading dictionary schema=\(schema.rawValue, privacy: .public) storage=\(configuration.usesSharedStorage ? "appGroup" : "private", privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public)"
         )
         clearMarkedComposition()
         session?.clearComposition()
@@ -613,6 +666,23 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             }
         }
         #endif
+    }
+
+    private func migrateLegacyFrequencyIfNeeded(sharedContainer: URL, runtimeData: URL) {
+        let source = sharedContainer
+            .appendingPathComponent("User", isDirectory: true)
+            .appendingPathComponent("user_frequency.tsv")
+        let destination = runtimeData.appendingPathComponent("user_frequency.tsv")
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: source.path),
+              !fileManager.fileExists(atPath: destination.path) else { return }
+        do {
+            try fileManager.createDirectory(at: runtimeData, withIntermediateDirectories: true)
+            let data = try Data(contentsOf: source)
+            try data.write(to: destination, options: .atomic)
+        } catch {
+            logger.error("Legacy frequency migration skipped: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     #if CANDIDATE_UI_TEST
@@ -1521,7 +1591,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         #if CANDIDATE_UI_TEST
         testFeedbackCount += 1
         #endif
-        keyFeedbackGenerator?.impactOccurred(intensity: 0.9)
+        let intensity = KeyboardPreferences.hapticIntensity
+        guard intensity > 0 else { return }
+        keyFeedbackGenerator?.impactOccurred(intensity: intensity)
         keyFeedbackGenerator?.prepare()
     }
 
