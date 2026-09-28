@@ -923,6 +923,14 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         suggestionCollectionView.showsHorizontalScrollIndicator = false
         suggestionCollectionView.alwaysBounceHorizontal = true
         suggestionCollectionView.backgroundColor = .clear
+        if #available(iOS 26.0, *) {
+            // The keyboard host can apply scroll-edge blur over this short strip.
+            // Keep candidates readable across its full height and at both ends.
+            suggestionCollectionView.topEdgeEffect.isHidden = true
+            suggestionCollectionView.bottomEdgeEffect.isHidden = true
+            suggestionCollectionView.leftEdgeEffect.isHidden = true
+            suggestionCollectionView.rightEdgeEffect.isHidden = true
+        }
         suggestionCollectionView.dataSource = self
         suggestionCollectionView.delegate = self
         suggestionCollectionView.register(
