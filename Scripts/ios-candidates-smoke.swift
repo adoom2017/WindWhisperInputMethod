@@ -9,6 +9,7 @@ struct CandidateSmoke {
         let paths = InputServicePaths.temporary(root: root, sharedData: shared)
         let service = try InputService(paths: paths, candidateLimit: nil)
         let bounded = try InputService(paths: paths, candidateLimit: 100_000)
+        try verifySimplifiedWords(paths: paths)
         var firstTimes = [Double](), batchTimes = [Double]()
         for schema in FengYuSchema.allCases {
             for code in ["a", "s", "z", "ni", "ui", "zhong", "nihao", "nihc", "woaini"] {
@@ -91,6 +92,33 @@ struct CandidateSmoke {
         }
         print("PASS: long sentences in full pinyin and double pinyin")
         try verifyFixtures(root: root.appendingPathComponent("fixtures"))
+    }
+
+    static func verifySimplifiedWords(paths: InputServicePaths) throws {
+        let words = [
+            ("电脑", "diannao", "dmnc"), ("电话", "dianhua", "dmhx"),
+            ("软件", "ruanjian", "rrjm"), ("手机", "shouji", "uzji"),
+            ("电视", "dianshi", "dmui"),
+        ]
+        for schema in [FengYuSchema.fullPinyin, .flypyPhonetic] {
+            // Match the keyboard, which loads only the selected schema.
+            let service = try InputService(paths: paths, enabledSchemas: [schema], candidateLimit: nil)
+            for (word, pinyin, doublePinyin) in words {
+                let session = try service.makeSession()
+                session.selectSchema(identifier: schema.rawValue)
+                let code = schema == .fullPinyin ? pinyin : doublePinyin
+                session.simulate(sequence: code)
+                let snapshot = try session.readSnapshot()
+                guard let index = snapshot.menu.candidates.firstIndex(where: { $0.text == word }) else {
+                    throw InputEngineError.smokeAssertion("missing simplified word: \(schema.rawValue) \(code) -> \(word)")
+                }
+                if word == "电脑" { precondition(index == 0, "电脑 must be the first candidate") }
+                precondition(session.selectCandidate(atAbsoluteIndex: index))
+                let committed = try session.readSnapshot()
+                precondition(committed.commitText == word && committed.composition == nil)
+                print("PASS simplified word: \(schema.rawValue) \(code) -> \(word) (rank \(index + 1))")
+            }
+        }
     }
 
     static func verifyFixtures(root: URL) throws {

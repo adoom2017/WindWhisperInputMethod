@@ -353,10 +353,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var backspaceRepeatTimer: Timer?
     private var backspaceHandledOnTouchDown = false
     private var appliedKeyboardAppearance: UIKeyboardAppearance?
-    private var hasMarkedComposition = false
-    private var markedCompositionText = ""
     private var customWordsRefreshTimer: Timer?
     private var hasActiveEngineComposition = false
+    private var isPublishingCommit = false
 #if DEBUG
     private var layoutLogSequence = 0
     private var lastLoggedViewBounds = CGRect.null
@@ -366,6 +365,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private let rootStack = UIStackView()
     private let keyboardBackdrop = UIView()
     private let keyboardRowsStack = KeyboardRowsStack()
+    private let suggestionBar = UIStackView()
+    private let compositionLabel = UILabel()
     private let suggestionCollectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
         layout.scrollDirection = .horizontal
@@ -501,6 +502,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         customWordsRefreshTimer?.invalidate()
         customWordsRefreshTimer = nil
         stopRepeatingBackspace()
+        cancelLocalComposition()
 #if DEBUG
         logLayoutState("viewWillDisappear animated=\(animated)")
 #endif
@@ -552,10 +554,15 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     override func textWillChange(_ textInput: UITextInput?) {
         super.textWillChange(textInput)
-        guard hasActiveEngineComposition || hasMarkedComposition else { return }
-        clearMarkedComposition()
+        guard !isPublishingCommit else { return }
+        cancelLocalComposition()
+    }
+
+    private func cancelLocalComposition() {
+        guard hasActiveEngineComposition else { return }
         session?.clearComposition()
         hasActiveEngineComposition = false
+        updateCompositionDisplay("")
         if session != nil { showQuickPunctuation() }
     }
 
@@ -630,7 +637,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         logger.notice(
             "Loading dictionary schema=\(schema.rawValue, privacy: .public) storage=\(configuration.usesSharedStorage ? "appGroup" : "private", privacy: .public) fullAccess=\(self.hasFullAccess, privacy: .public)"
         )
-        clearMarkedComposition()
+        updateCompositionDisplay("")
         session?.clearComposition()
         session = nil
         hasActiveEngineComposition = false
@@ -747,12 +754,76 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         precondition(candidateQueryGeneration == newGeneration && suggestionItems.count == newCount)
         precondition(suggestionCollectionView.contentOffset.x == 0)
         session?.clearComposition()
-        session?.simulate(sequence: "vvvvvv")
+        session?.simulate(sequence: "qzxvqq")
         refresh()
-        precondition(suggestionItems.isEmpty && hasActiveEngineComposition)
+        guard suggestionItems.isEmpty && hasActiveEngineComposition else {
+            throw InputEngineError.smokeAssertion("unmatched code: composition=\(compositionLabel.text ?? "nil"), candidates=\(suggestionItems.count)")
+        }
         insertNewline()
-        precondition(testLastCommit == "vvvvvv" && !hasActiveEngineComposition && !hasMarkedComposition)
-        return "PASS collection: \(count) items, \(created) additional cells, \(rounds) scroll batches, selection 6/33/last, stale batch rejected, query reset, Return commits unmatched code"
+        precondition(testLastCommit == "qzxvqq" && !hasActiveEngineComposition && compositionLabel.isHidden)
+        try verifyLocalComposition()
+        return "PASS collection: \(count) items, \(created) additional cells, \(rounds) scroll batches, selection 6/33/last, stale batch rejected, query reset, local composition and host cursor isolation"
+    }
+
+    private func verifyLocalComposition() throws {
+        let proxy = TouchTestDocumentProxy(text: "前后", cursor: 1)
+        testDocumentProxy = proxy
+        defer { testDocumentProxy = nil }
+        session?.clearComposition()
+
+        func typeCode(_ text: String) {
+            for character in text {
+                let button = UIButton()
+                button.setTitle(String(character), for: .normal)
+                keyPressed(button)
+            }
+        }
+
+        typeCode("ni")
+        precondition(compositionLabel.text == "ni" && !compositionLabel.isHidden)
+        precondition(proxy.text == "前后" && proxy.documentContextBeforeInput == "前")
+        deleteBackwardOnce()
+        precondition(compositionLabel.text == "n" && proxy.text == "前后")
+        deleteBackwardOnce()
+        precondition(compositionLabel.isHidden && proxy.text == "前后")
+        typeCode("ni")
+        guard case .candidate(let expected) = suggestionItems[0] else {
+            throw InputEngineError.smokeAssertion("missing local candidate")
+        }
+        space()
+        precondition(proxy.text == "前" + expected.text + "后")
+        precondition(proxy.documentContextBeforeInput == "前" + expected.text)
+        precondition(proxy.documentContextAfterInput == "后" && compositionLabel.isHidden)
+        typeCode("qzxvqq")
+        precondition(compositionLabel.text == "qzxvqq" && suggestionItems.isEmpty)
+        insertNewline()
+        precondition(proxy.documentContextBeforeInput == "前" + expected.text + "qzxvqq")
+        precondition(compositionLabel.isHidden)
+        typeCode("ni")
+        toggleASCII()
+        precondition(proxy.documentContextBeforeInput?.hasSuffix("qzxvqqni") == true)
+        precondition(compositionLabel.isHidden && session?.option("ascii_mode") == true)
+        typeCode("a")
+        precondition(proxy.documentContextBeforeInput?.hasSuffix("nia") == true)
+        toggleASCII()
+
+        // A search field may notify its delegate during insertion. A commit
+        // with a new syllable must retain that syllable through the callback.
+        proxy.onChange = { [weak self] _ in self?.textWillChange(nil) }
+        typeCode("birun")
+        precondition(proxy.documentContextBeforeInput?.hasSuffix("比如") == true)
+        precondition(compositionLabel.text == "n" && hasActiveEngineComposition)
+        let continued = try session!.readSnapshot()
+        precondition(continued.composition?.text == "n")
+        proxy.onChange = nil
+        let committed = proxy.text
+        textWillChange(nil)
+        precondition(compositionLabel.isHidden && !hasActiveEngineComposition)
+        precondition(proxy.text == committed)
+        typeCode("ni")
+        viewWillDisappear(false)
+        precondition(compositionLabel.isHidden && !hasActiveEngineComposition && proxy.text == committed)
+        precondition(proxy.markedTextCalls == 0 && proxy.cursorAdjustmentCalls == 0)
     }
     #endif
 
@@ -782,7 +853,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
         configureSuggestionBar()
         configureKeyboardRows()
-        rootStack.addArrangedSubview(suggestionCollectionView)
+        rootStack.addArrangedSubview(suggestionBar)
         rootStack.addArrangedSubview(keyboardRowsStack)
 
         view.addSubview(rootStack)
@@ -834,6 +905,21 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     private func configureSuggestionBar() {
+        suggestionBar.axis = .horizontal
+        suggestionBar.spacing = 8
+        compositionLabel.font = .monospacedSystemFont(ofSize: 15, weight: .medium)
+        compositionLabel.lineBreakMode = .byTruncatingHead
+        compositionLabel.isAccessibilityElement = true
+        compositionLabel.accessibilityLabel = "输入编码"
+        compositionLabel.accessibilityIdentifier = "compositionCode"
+        compositionLabel.setContentHuggingPriority(.required, for: .horizontal)
+        compositionLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        compositionLabel.isHidden = true
+        suggestionBar.addArrangedSubview(compositionLabel)
+        suggestionBar.addArrangedSubview(suggestionCollectionView)
+        compositionLabel.widthAnchor.constraint(
+            lessThanOrEqualTo: suggestionBar.widthAnchor, multiplier: 0.3
+        ).isActive = true
         suggestionCollectionView.showsHorizontalScrollIndicator = false
         suggestionCollectionView.alwaysBounceHorizontal = true
         suggestionCollectionView.backgroundColor = .clear
@@ -1240,6 +1326,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         guard appearance != appliedKeyboardAppearance else { return }
         appliedKeyboardAppearance = appearance
         view.backgroundColor = .clear
+        compositionLabel.textColor = keyForegroundColor.withAlphaComponent(0.7)
         suggestionCollectionView.backgroundColor = .clear
         suggestionCollectionView.reloadData()
         findButtons(in: rootStack).forEach { button in
@@ -1521,6 +1608,10 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     @objc private func toggleASCII() {
         guard let session else { return }
+        // Finish the visible code before entering literal English input.
+        if hasActiveEngineComposition, session.process(keyCode: 0xFF0D) {
+            refresh()
+        }
         _ = session.setOption("ascii_mode", enabled: session.option("ascii_mode") != true)
         if layoutMode != .letters { rebuildCharacterRows() }
         refresh()
@@ -1612,6 +1703,16 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             return
         }
         guard let snapshot = try? session.readSnapshot() else { return }
+        // Only committed text crosses into the host. Publish it before the
+        // next local composition: automatic commits can include both.
+        if let commit = snapshot.commitText, !commit.isEmpty {
+            #if CANDIDATE_UI_TEST
+            testLastCommit = commit
+            #endif
+            isPublishingCommit = true
+            textDocumentProxy.insertText(commit)
+            isPublishingCommit = false
+        }
         asciiButton.setTitle(snapshot.status.isASCIIMode ? "英" : "中", for: .normal)
         asciiButton.accessibilityValue = snapshot.status.isASCIIMode ? "英文模式" : "中文模式"
 
@@ -1622,44 +1723,17 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         hasMoreCandidateItems = snapshot.menu.hasMoreCandidates
         highlightedCandidateIndex = snapshot.menu.highlightedIndex
         let candidates = snapshot.menu.candidates
-        if snapshot.status.isASCIIMode || composition.isEmpty {
-            clearMarkedComposition()
-        } else if !hasMarkedComposition || markedCompositionText != composition {
-            // Mirror the uncommitted code in the host text field, like the
-            // native Chinese keyboards. The candidate strip below contains
-            // candidates only; it does not duplicate the raw code.
-            textDocumentProxy.setMarkedText(
-                composition,
-                selectedRange: NSRange(location: composition.utf16.count, length: 0)
-            )
-            hasMarkedComposition = true
-            markedCompositionText = composition
-        }
+        updateCompositionDisplay(composition)
         if composition.isEmpty && candidates.isEmpty {
             showQuickPunctuation()
         } else {
             showCandidates(candidates, resetPosition: isNewQuery)
         }
-        if let commit = snapshot.commitText {
-            #if CANDIDATE_UI_TEST
-            testLastCommit = commit
-            #endif
-            clearMarkedComposition()
-            textDocumentProxy.insertText(commit)
-        }
     }
 
-    /// Removes the temporary marked string without committing it into the host
-    /// document. This is important when the final composing character is
-    /// deleted: `unmarkText()` would first commit/remove its underline, making
-    /// the user press Backspace twice.
-    private func clearMarkedComposition() {
-        guard hasMarkedComposition else { return }
-        textDocumentProxy.setMarkedText(
-            "",
-            selectedRange: NSRange(location: 0, length: 0)
-        )
-        hasMarkedComposition = false
-        markedCompositionText = ""
+    private func updateCompositionDisplay(_ text: String) {
+        compositionLabel.text = text
+        compositionLabel.accessibilityValue = text
+        compositionLabel.isHidden = text.isEmpty
     }
 }

@@ -73,18 +73,38 @@ final class CandidateTestApp: UIResponder, UIApplicationDelegate {
     }
 }
 
-private final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
+final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     var onChange: ((String) -> Void)?
-    private var text = "" { didSet { onChange?(text) } }
-    var documentContextBeforeInput: String? { text }
-    var documentContextAfterInput: String? { "" }
+    private(set) var text: String
+    private var cursor: Int
+    private(set) var markedTextCalls = 0
+    private(set) var cursorAdjustmentCalls = 0
+    init(text: String = "", cursor: Int = 0) {
+        self.text = text
+        self.cursor = cursor
+        super.init()
+    }
+    var documentContextBeforeInput: String? { String(text.prefix(cursor)) }
+    var documentContextAfterInput: String? { String(text.dropFirst(cursor)) }
     var selectedText: String? { nil }
     var documentInputMode: UITextInputMode? { nil }
     let documentIdentifier = UUID()
     var hasText: Bool { !text.isEmpty }
-    func insertText(_ text: String) { self.text += text }
-    func deleteBackward() { if !text.isEmpty { text.removeLast() } }
-    func adjustTextPosition(byCharacterOffset offset: Int) {}
-    func setMarkedText(_ markedText: String, selectedRange: NSRange) {}
-    func unmarkText() {}
+    func insertText(_ text: String) {
+        self.text.insert(contentsOf: text, at: self.text.index(self.text.startIndex, offsetBy: cursor))
+        cursor += text.count
+        onChange?(self.text)
+    }
+    func deleteBackward() {
+        guard cursor > 0 else { return }
+        text.remove(at: text.index(text.startIndex, offsetBy: cursor - 1))
+        cursor -= 1
+        onChange?(text)
+    }
+    func adjustTextPosition(byCharacterOffset offset: Int) {
+        cursorAdjustmentCalls += 1
+        cursor = min(max(0, cursor + offset), text.count)
+    }
+    func setMarkedText(_ markedText: String, selectedRange: NSRange) { markedTextCalls += 1 }
+    func unmarkText() { markedTextCalls += 1 }
 }
