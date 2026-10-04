@@ -1,5 +1,10 @@
 #include <windows.h>
 
 #define IDI_FENGYU_IME 101
+// Activated explicitly around the settings UI (see CustomPhraseEditor.cpp) so
+// its controls use visual styles regardless of the host process manifest.
+// Not ID 2, which the loader would apply to the whole DLL.
+#define IDR_FENGYU_COMMON_CONTROLS 3
 
 IDI_FENGYU_IME ICON "../../../Resources/WindWhisperProfile.ico"
+IDR_FENGYU_COMMON_CONTROLS RT_MANIFEST "FengYuCommonControls.manifest"

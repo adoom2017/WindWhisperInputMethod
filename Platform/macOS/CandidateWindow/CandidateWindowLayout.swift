@@ -66,13 +66,13 @@ enum CandidateHorizontalLayout {
     ) -> CandidateWindowLayout {
         let primaryFont = NSFont.systemFont(ofSize: theme.primaryFontSize)
         let commentFont = NSFont.systemFont(ofSize: theme.commentFontSize)
-        let contentChromeWidth = theme.candidateHorizontalPadding * 2 + 20 + 6
+        let contentChromeWidth = theme.contentChromeWidth
         var minimumWidths = [CGFloat]()
         let desiredWidths = model.entries.map { entry in
             let textWidth = (entry.text as NSString).size(withAttributes: [.font: primaryFont]).width
             let commentWidth = ((entry.comment ?? "") as NSString)
                 .size(withAttributes: [.font: commentFont]).width
-            let commentGap: CGFloat = commentWidth > 0 ? 7 : 0
+            let commentGap: CGFloat = commentWidth > 0 ? CandidateWindowTheme.commentGap : 0
             minimumWidths.append(
                 min(
                     max(contentChromeWidth + min(textWidth + 2, 88), theme.minimumCandidateWidth),
@@ -173,16 +173,16 @@ enum CandidateVerticalLayout {
     ) -> CandidateWindowLayout {
         let primaryFont = NSFont.systemFont(ofSize: theme.primaryFontSize)
         let commentFont = NSFont.systemFont(ofSize: theme.commentFontSize)
-        let contentChromeWidth = theme.candidateHorizontalPadding * 2 + 20 + 6
+        let contentChromeWidth = theme.contentChromeWidth
         let desiredContentWidth = model.entries.map { entry in
             let textWidth = (entry.text as NSString).size(withAttributes: [.font: primaryFont]).width
             let commentWidth = ((entry.comment ?? "") as NSString)
                 .size(withAttributes: [.font: commentFont]).width
-            return contentChromeWidth + textWidth + (commentWidth > 0 ? 7 : 0) + commentWidth
+            return contentChromeWidth + textWidth + (commentWidth > 0 ? CandidateWindowTheme.commentGap : 0) + commentWidth
         }.max() ?? 0
         let panelWidth = min(
             max(desiredContentWidth + theme.horizontalPadding * 2, theme.minimumPanelWidth),
-            420
+            theme.maximumVerticalPanelWidth
         )
         let rowCount = CGFloat(model.entries.count)
         let rowGaps = theme.candidateSpacing * CGFloat(max(model.entries.count - 1, 0))

@@ -318,9 +318,11 @@ private final class NativeDictionary: @unchecked Sendable {
     private var shapeEntries: [NativeDictionaryEntry]
     private var customShapeTextsByCode: [String: Set<String>]
     private var shapeCodesByText: [String: [String]]
+    private var customShapeTexts: Set<String>
 #else
     private let shapeEntries: [NativeDictionaryEntry]
     private let shapeCodesByText: [String: [String]]
+    private let customShapeTexts: Set<String>
 #endif
     private let pinyinEntries: [NativeDictionaryEntry]
     private let flypyPhoneticEntries: [NativeDictionaryEntry]
@@ -368,15 +370,13 @@ private final class NativeDictionary: @unchecked Sendable {
         var customEntries = [NativeDictionaryEntry]()
 #else
         var shapeEntries = needsShape ? shape.map(\.entry) : []
+        var customEntries = [NativeDictionaryEntry]()
 #endif
         if needsShape, let customURL, FileManager.default.fileExists(atPath: customURL.path) {
-#if os(iOS)
             customEntries = try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000)
             shapeEntries.insert(contentsOf: customEntries, at: 0)
-#else
-            shapeEntries.insert(contentsOf: try Self.readCodedEntries(at: customURL, baseWeight: 3_000_000), at: 0)
-#endif
         }
+        customShapeTexts = Set(customEntries.map(\.text))
 #if os(iOS)
         customShapeTextsByCode = Dictionary(grouping: customEntries, by: \.code)
             .mapValues { Set($0.map(\.text)) }
@@ -532,11 +532,18 @@ private final class NativeDictionary: @unchecked Sendable {
         shapeRankedIndex = rankedIndex
         shapeCodesByText = codes
         customShapeTextsByCode = customTexts
+        customShapeTexts = Set(custom.map(\.text))
         candidateCache.removeAll()
         candidateCacheOrder.removeAll()
     }
 
 #endif
+    /// User phrases are committed exactly as written, so they bypass the
+    /// simplified/traditional conversion applied to dictionary candidates.
+    func isCustomPhrase(_ text: String, schema: FengYuSchema) -> Bool {
+        schema == .flypy && customShapeTexts.contains(text)
+    }
+
     func candidates(for code: String, schema: FengYuSchema, limit: Int = 100, frequencies: [String: Int] = [:]) -> [String] {
 #if os(iOS)
         candidateCacheLock.lock()
@@ -1400,7 +1407,7 @@ final class InputSession: @unchecked Sendable {
         if let limit = service.candidateLimit {
             var seen = Set<String>()
             candidates = service.dictionary.candidates(for: buffer, schema: schema, limit: limit, frequencies: frequencies).compactMap { text in
-                let converted = text.applyingTransform(transform, reverse: false) ?? text
+                let converted = convertedText(text, transform: transform)
                 guard seen.insert(converted).inserted else { return nil }
                 return SessionCandidate(text: converted, sourceText: text, comment: reverseLookupMarkerOffset == nil ? nil
                     : service.dictionary.shapeCodeComment(for: text, matchingPrefix: buffer))
@@ -1436,7 +1443,7 @@ final class InputSession: @unchecked Sendable {
 #if DEBUG && os(iOS)
                 let conversionStarted = ProcessInfo.processInfo.systemUptime
 #endif
-                let converted = text.applyingTransform(transform, reverse: false) ?? text
+                let converted = convertedText(text, transform: transform)
 #if DEBUG && os(iOS)
                 conversionMs += (ProcessInfo.processInfo.systemUptime - conversionStarted) * 1000
 #endif
@@ -1449,6 +1456,11 @@ final class InputSession: @unchecked Sendable {
         }
         hasMoreCandidates = candidateCursor.hasMore
         return appended
+    }
+
+    private func convertedText(_ text: String, transform: StringTransform) -> String {
+        if service.dictionary.isCustomPhrase(text, schema: schema) { return text }
+        return text.applyingTransform(transform, reverse: false) ?? text
     }
 
     private var learningCode: String {

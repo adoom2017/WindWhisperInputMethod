@@ -318,7 +318,7 @@ enum M7SmokeTest {
             titles.contains("简体中文"),
             titles.contains("候选排列"),
             titles.contains("候选主题"),
-            titles.contains("管理自定义词…"),
+            titles.contains("管理自定义词组…"),
             !titles.contains("刷新配置"),
             titles.contains("打开用户目录"),
             titles.contains("查看脱敏诊断…"),

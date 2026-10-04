@@ -236,8 +236,8 @@ private struct CustomWordsEditorView: View {
             Divider()
 
             Table($model.words, selection: $model.selection) {
-                TableColumn("词语") { $word in
-                    TextField("词语", text: $word.text)
+                TableColumn("词组") { $word in
+                    TextField("词组", text: $word.text)
                         .textFieldStyle(.plain)
                         .focused($focusedWordID, equals: word.id)
                 }
@@ -263,7 +263,7 @@ private struct CustomWordsEditorView: View {
                         Image(systemName: "text.badge.plus")
                             .font(.title)
                             .foregroundStyle(.secondary)
-                        Text("暂无自定义词")
+                        Text("暂无自定义词组")
                             .foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
@@ -340,7 +340,7 @@ final class CustomWordsEditorWindowController: NSWindowController, NSWindowDeleg
             rootView: CustomWordsEditorView(model: model)
         )
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "管理自定义词"
+        window.title = "管理自定义词组"
         window.styleMask = [.titled, .closable, .resizable]
         window.setContentSize(NSSize(width: 720, height: 480))
         window.contentMinSize = NSSize(width: 640, height: 400)
@@ -365,7 +365,7 @@ final class CustomWordsEditorWindowController: NSWindowController, NSWindowDeleg
         }
         let alert = NSAlert()
         alert.messageText = "放弃未保存的修改？"
-        alert.informativeText = "关闭后，本次对自定义词的修改不会保留。"
+        alert.informativeText = "关闭后，本次对自定义词组的修改不会保留。"
         alert.alertStyle = .warning
         alert.addButton(withTitle: "放弃修改")
         alert.addButton(withTitle: "继续编辑")

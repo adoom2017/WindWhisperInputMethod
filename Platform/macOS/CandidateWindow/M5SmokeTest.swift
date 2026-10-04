@@ -129,7 +129,7 @@ enum M5SmokeTest {
             layout.size.height == theme.verticalPadding * 2 + theme.candidateHeight,
             layout.candidateFrames.allSatisfy({ $0.minY == theme.verticalPadding }),
             layout.candidateFrames.allSatisfy({ $0.maxX <= layout.pageFrame.minX + 0.001 }),
-            layout.candidateFrames[3].width >= 78,
+            layout.candidateFrames[3].width >= theme.minimumCandidateWidth,
             layout.pageFrame.maxX <= layout.size.width + 0.001
         else {
             throw InputEngineError.smokeAssertion("horizontal candidate layout exceeded its bounds.")

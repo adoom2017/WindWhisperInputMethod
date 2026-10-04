@@ -28,6 +28,8 @@ public:
 private:
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     void Paint(HDC);
+    void ApplyFrameStyle();
+    std::vector<int> MeasureItems(HDC) const;
 
     HWND hwnd_{};
     DWORD last_error_ = ERROR_SUCCESS;
@@ -35,7 +37,10 @@ private:
     size_t highlighted_ = 0;
     size_t page_ = 0;
     size_t page_count_ = 0;
+    // True when DWM draws rounded corners and the border (Windows 11).
+    bool dwm_frame_ = false;
     CandidateWindowTheme theme_ = CandidateWindowTheme::Dark;
     std::vector<CandidateWindowItem> items_;
+    std::vector<int> item_widths_;
 };
 #endif

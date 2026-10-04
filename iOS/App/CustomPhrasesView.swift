@@ -50,13 +50,6 @@ struct CustomPhrasesView: View {
     var body: some View {
         List {
             Section {
-                if model.loaded && model.document.entries.isEmpty {
-                    ContentUnavailableView(
-                        "暂无自定义词组",
-                        systemImage: "text.badge.plus",
-                        description: Text("点击右上角添加常用词组和快捷编码。")
-                    )
-                }
                 ForEach(model.document.entries) { entry in
                     Button {
                         editingEntry = entry
@@ -72,7 +65,23 @@ struct CustomPhrasesView: View {
                 }
                 .onDelete(perform: model.delete)
             } footer: {
-                Text("仅用于小鹤音形。保存后风语键盘会自动更新。点击词组可编辑，向左滑动可删除。")
+                if !model.document.entries.isEmpty {
+                    Text("仅用于小鹤音形。保存后风语键盘会自动更新。点击词组可编辑，向左滑动可删除。")
+                }
+            }
+        }
+        .overlay {
+            if model.loaded && model.document.entries.isEmpty {
+                ContentUnavailableView {
+                    Label("暂无自定义词组", systemImage: "text.badge.plus")
+                } description: {
+                    Text("为常用的句子设置 1～4 个字母的编码，用小鹤音形打出编码即可上屏。")
+                } actions: {
+                    Button("添加词组") {
+                        editingEntry = CustomWordEntry(text: "", code: "")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
         }
         .navigationTitle("自定义词组")

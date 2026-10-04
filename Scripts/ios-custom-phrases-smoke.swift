@@ -2,9 +2,13 @@ import Foundation
 
 @main
 struct IOSCustomPhrasesSmoke {
-    static func check(_ condition: @autoclosure () throws -> Bool) throws {
+    static func check(
+        _ condition: @autoclosure () throws -> Bool,
+        file: StaticString = #fileID,
+        line: UInt = #line
+    ) throws {
         let result = try condition()
-        precondition(result)
+        precondition(result, file: file, line: line)
     }
 
     static func main() throws {

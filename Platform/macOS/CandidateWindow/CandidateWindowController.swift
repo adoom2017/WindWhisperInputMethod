@@ -87,8 +87,8 @@ final class CandidateWindowCoordinator {
         candidateView = CandidateListView(frame: contentBounds)
         if #available(macOS 26.0, *) {
             let glassView = NSGlassEffectView(frame: contentBounds)
-            glassView.style = .clear
-            glassView.cornerRadius = 15
+            glassView.style = .regular
+            glassView.cornerRadius = 8
             glassView.contentView = candidateView
             materialView = glassView
         } else {
@@ -189,7 +189,7 @@ final class CandidateWindowCoordinator {
 
     private func apply(theme: CandidateWindowTheme) {
         if #available(macOS 26.0, *), let glassView = materialView as? NSGlassEffectView {
-            glassView.style = .clear
+            glassView.style = .regular
             glassView.cornerRadius = theme.cornerRadius
             glassView.tintColor = nil
         } else if let effectView = materialView as? NSVisualEffectView {
@@ -300,13 +300,13 @@ final class CandidateListView: NSView {
         ).fill()
 
         theme.panelBorderColor.setStroke()
-        let borderInset: CGFloat = theme.increaseContrast ? 0.75 : 0.5
+        let borderInset = theme.panelBorderWidth / 2
         let border = NSBezierPath(
             roundedRect: bounds.insetBy(dx: borderInset, dy: borderInset),
             xRadius: max(theme.cornerRadius - borderInset, 0),
             yRadius: max(theme.cornerRadius - borderInset, 0)
         )
-        border.lineWidth = theme.increaseContrast ? 1.5 : 1
+        border.lineWidth = theme.panelBorderWidth
         border.stroke()
 
         for (index, entry) in model.entries.enumerated()
@@ -364,56 +364,30 @@ final class CandidateListView: NSView {
         let isHighlighted = index == model.highlightedIndex
         if isHighlighted {
             theme.highlightColor.setFill()
-            let highlightPath = NSBezierPath(
+            NSBezierPath(
                 roundedRect: frame,
-                xRadius: theme.cornerRadius - 4,
-                yRadius: theme.cornerRadius - 4
-            )
-            highlightPath.fill()
-            theme.highlightBorderColor.setStroke()
-            let highlightBorder = NSBezierPath(
-                roundedRect: frame.insetBy(dx: 0.5, dy: 0.5),
-                xRadius: theme.cornerRadius - 4.5,
-                yRadius: theme.cornerRadius - 4.5
-            )
-            highlightBorder.lineWidth = theme.increaseContrast ? 1.5 : 1
-            highlightBorder.stroke()
+                xRadius: CandidateWindowTheme.highlightCornerRadius,
+                yRadius: CandidateWindowTheme.highlightCornerRadius
+            ).fill()
         }
 
-        let primaryColor = NSColor.labelColor
-        let secondaryColor = NSColor.secondaryLabelColor
-        let shortcutBackground = isHighlighted
-            ? NSColor.selectedContentBackgroundColor
-            : NSColor.quaternaryLabelColor.withAlphaComponent(theme.increaseContrast ? 0.38 : 0.22)
-        let shortcutTextColor: NSColor = isHighlighted
-            ? .alternateSelectedControlTextColor
-            : secondaryColor
-
-        let shortcutRect = NSRect(
-            x: frame.minX + theme.candidateHorizontalPadding,
-            y: frame.midY - 9,
-            width: 18,
-            height: 18
-        )
-        shortcutBackground.setFill()
-        NSBezierPath(roundedRect: shortcutRect, xRadius: 5, yRadius: 5).fill()
+        let primaryColor = isHighlighted ? FengYuPalette.highlightText : FengYuPalette.textPrimary
         let shortcutAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(
                 ofSize: theme.shortcutFontSize,
-                weight: .medium
+                weight: isHighlighted ? .semibold : .regular
             ),
-            .foregroundColor: shortcutTextColor,
+            .foregroundColor: isHighlighted ? FengYuPalette.accent : FengYuPalette.textTertiary,
         ]
-        let shortcutSize = (entry.shortcut as NSString).size(withAttributes: shortcutAttributes)
-        (entry.shortcut as NSString).draw(
-            at: NSPoint(
-                x: shortcutRect.midX - shortcutSize.width / 2,
-                y: shortcutRect.midY - shortcutSize.height / 2
-            ),
-            withAttributes: shortcutAttributes
+        let shortcutRect = NSRect(
+            x: frame.minX + theme.candidateHorizontalPadding,
+            y: frame.minY,
+            width: CandidateWindowTheme.shortcutWidth,
+            height: frame.height
         )
+        drawCentered(entry.shortcut, in: shortcutRect, attributes: shortcutAttributes)
 
-        let contentX = shortcutRect.maxX + 6
+        let contentX = shortcutRect.maxX + CandidateWindowTheme.shortcutGap
         let contentWidth = max(frame.maxX - theme.candidateHorizontalPadding - contentX, 0)
         guard contentWidth > 0 else {
             return
@@ -422,37 +396,38 @@ final class CandidateListView: NSView {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineBreakMode = .byTruncatingTail
         let textAttributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(
-                ofSize: theme.primaryFontSize,
-                weight: isHighlighted ? .semibold : .regular
-            ),
+            .font: NSFont.systemFont(ofSize: theme.primaryFontSize),
             .foregroundColor: primaryColor,
             .paragraphStyle: paragraph,
         ]
         let commentAttributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: theme.commentFontSize),
-            .foregroundColor: secondaryColor,
+            .foregroundColor: FengYuPalette.textSecondary,
             .paragraphStyle: paragraph,
         ]
         let textNaturalWidth = (entry.text as NSString).size(withAttributes: textAttributes).width
         let comment = entry.comment ?? ""
         let commentNaturalWidth = (comment as NSString).size(withAttributes: commentAttributes).width
-        let commentGap: CGFloat = comment.isEmpty ? 0 : 7
+        let commentGap: CGFloat = comment.isEmpty ? 0 : CandidateWindowTheme.commentGap
 
-        let commentWidth: CGFloat
-        if comment.isEmpty {
-            commentWidth = 0
-        } else if textNaturalWidth + commentGap + commentNaturalWidth <= contentWidth {
-            commentWidth = commentNaturalWidth
-        } else {
+        // The candidate text keeps priority; the comment follows it directly and
+        // takes whatever width is left, truncating first.
+        var commentWidth: CGFloat = 0
+        if !comment.isEmpty, textNaturalWidth + commentGap + commentNaturalWidth > contentWidth {
             commentWidth = min(commentNaturalWidth, max(contentWidth * 0.36, 24))
+        } else if !comment.isEmpty {
+            commentWidth = commentNaturalWidth
         }
-        let textWidth = max(contentWidth - commentGap - commentWidth, 0)
+        let textWidth = min(ceil(textNaturalWidth), max(contentWidth - commentGap - commentWidth, 0))
+        if commentWidth > 0 {
+            commentWidth = min(commentNaturalWidth, max(contentWidth - textWidth - commentGap, 0))
+        }
+        let textHeight = ceil((entry.text as NSString).size(withAttributes: textAttributes).height)
         let textRect = NSRect(
             x: contentX,
-            y: frame.midY - 11,
+            y: round(frame.midY - textHeight / 2),
             width: textWidth,
-            height: 24
+            height: textHeight
         )
         (entry.text as NSString).draw(
             with: textRect,
@@ -461,11 +436,16 @@ final class CandidateListView: NSView {
         )
 
         if commentWidth > 0 {
+            // Align the comment's baseline with the candidate text so the two sizes read as one line.
+            let primaryFont = NSFont.systemFont(ofSize: theme.primaryFontSize)
+            let commentFont = NSFont.systemFont(ofSize: theme.commentFontSize)
+            let commentHeight = ceil((comment as NSString).size(withAttributes: commentAttributes).height)
+            let baseline = textRect.maxY + primaryFont.descender
             let commentRect = NSRect(
                 x: textRect.maxX + commentGap,
-                y: frame.midY - 8,
+                y: round(baseline - commentHeight - commentFont.descender),
                 width: commentWidth,
-                height: 20
+                height: commentHeight
             )
             (comment as NSString).draw(
                 with: commentRect,
@@ -479,21 +459,31 @@ final class CandidateListView: NSView {
         guard layout.showsPagination else {
             return
         }
-        let chromeRect = layout.pageFrame.insetBy(dx: 1, dy: 5)
-        let chromePath = NSBezierPath(roundedRect: chromeRect, xRadius: 9, yRadius: 9)
-        theme.paginationBackgroundColor.setFill()
-        chromePath.fill()
-        if theme.increaseContrast {
-            NSColor.separatorColor.setStroke()
-            chromePath.lineWidth = 1
-            chromePath.stroke()
+        theme.panelBorderColor.setFill()
+        let dividerRect: NSRect
+        switch layout.orientation {
+        case .horizontal:
+            dividerRect = NSRect(
+                x: layout.pageFrame.minX - theme.candidateSpacing / 2 - 0.5,
+                y: layout.pageFrame.minY + 7,
+                width: 1,
+                height: max(layout.pageFrame.height - 14, 0)
+            )
+        case .vertical:
+            dividerRect = NSRect(
+                x: theme.horizontalPadding + theme.candidateHorizontalPadding,
+                y: layout.pageFrame.minY - theme.candidateSpacing / 2 - 0.5,
+                width: max(bounds.width - (theme.horizontalPadding + theme.candidateHorizontalPadding) * 2, 0),
+                height: 1
+            )
         }
+        dividerRect.fill()
 
-        let enabledColor = NSColor.secondaryLabelColor
-        let disabledColor = NSColor.tertiaryLabelColor.withAlphaComponent(0.45)
+        let enabledColor = FengYuPalette.textSecondary
+        let disabledColor = FengYuPalette.textTertiary.withAlphaComponent(0.5)
         let controlAttributes: (NSColor) -> [NSAttributedString.Key: Any] = { color in
             [
-                .font: NSFont.systemFont(ofSize: 14, weight: .medium),
+                .font: NSFont.systemFont(ofSize: 15, weight: .regular),
                 .foregroundColor: color,
             ]
         }
@@ -506,8 +496,8 @@ final class CandidateListView: NSView {
             model.pageLabel,
             in: layout.pageFrame,
             attributes: [
-                .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
-                .foregroundColor: NSColor.secondaryLabelColor,
+                .font: NSFont.monospacedDigitSystemFont(ofSize: theme.commentFontSize, weight: .regular),
+                .foregroundColor: FengYuPalette.textSecondary,
             ]
         )
         drawCentered(

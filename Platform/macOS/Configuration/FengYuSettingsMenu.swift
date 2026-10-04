@@ -112,7 +112,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
 
         menu.addItem(.separator())
         menu.addItem(actionItem(
-            title: "管理自定义词…",
+            title: "管理自定义词组…",
             action: #selector(WindWhisperInputController.fengYuManageCustomWordsCommand(_:))
         ))
         menu.addItem(actionItem(
@@ -263,7 +263,7 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
             editor.window?.makeKeyAndOrderFront(nil)
         } catch {
             showMessage(
-                title: "无法读取自定义词",
+                title: "无法读取自定义词组",
                 message: "请检查 custom_words.tsv 的格式后重试。\n\n\(error.localizedDescription)",
                 style: .warning
             )
@@ -274,14 +274,14 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         isApplyingCustomWords = false
         if let errorMessage {
             showMessage(
-                title: "自定义词已保存，但未能应用",
-                message: "请检查自定义词内容后重新保存。\n\n\(errorMessage)",
+                title: "自定义词组已保存，但未能应用",
+                message: "请检查自定义词组内容后重新保存。\n\n\(errorMessage)",
                 style: .warning
             )
         } else {
             NotificationCenter.default.post(name: .fengYuWillRefreshConfiguration, object: self)
             NotificationCenter.default.post(name: .fengYuDidRefreshConfiguration, object: self)
-            showMessage(title: "保存完成", message: "自定义词已经生效。")
+            showMessage(title: "保存完成", message: "自定义词组已经生效。")
         }
     }
 

@@ -83,6 +83,31 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         case status(String)
     }
 
+    /// Brand colors from docs/DESIGN_SYSTEM.md. Keys keep the system keyboard
+    /// look; the brand only marks the selected candidate.
+    private enum KeyboardPalette {
+        static func highlightFill(dark: Bool) -> UIColor {
+            dark ? rgb(0x33434D) : rgb(0xE4EDF1)
+        }
+
+        static func highlightText(dark: Bool) -> UIColor {
+            dark ? rgb(0xE3EEF4) : rgb(0x163F55)
+        }
+
+        static func secondaryText(dark: Bool) -> UIColor {
+            dark ? rgb(0x9A9DA3) : rgb(0x6E7076)
+        }
+
+        private static func rgb(_ hex: UInt32) -> UIColor {
+            UIColor(
+                red: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: 1
+            )
+        }
+    }
+
     private final class SuggestionCell: UICollectionViewCell {
         static let reuseIdentifier = "SuggestionCell"
         #if CANDIDATE_UI_TEST
@@ -352,7 +377,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var keyFeedbackGenerator: UIImpactFeedbackGenerator?
     private var backspaceRepeatTimer: Timer?
     private var backspaceHandledOnTouchDown = false
-    private var appliedKeyboardAppearance: UIKeyboardAppearance?
+    private var appliedDarkAppearance: Bool?
     private var customWordsRefreshTimer: Timer?
     private var hasActiveEngineComposition = false
     private var isPublishingCommit = false
@@ -1318,7 +1343,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         button.layer.cornerRadius = Metrics.keyCornerRadius
         button.layer.cornerCurve = .continuous
         button.layer.shadowColor = UIColor.black.cgColor
-        button.layer.shadowOpacity = textDocumentProxy.keyboardAppearance == .dark ? 0 : 0.16
+        button.layer.shadowOpacity = usesDarkAppearance ? 0 : 0.16
         button.layer.shadowRadius = 0
         button.layer.shadowOffset = CGSize(width: 0, height: 1)
     }
@@ -1330,9 +1355,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     private func applyColors() {
-        let appearance = textDocumentProxy.keyboardAppearance
-        guard appearance != appliedKeyboardAppearance else { return }
-        appliedKeyboardAppearance = appearance
+        let isDark = usesDarkAppearance
+        guard isDark != appliedDarkAppearance else { return }
+        appliedDarkAppearance = isDark
         view.backgroundColor = .clear
         compositionLabel.textColor = keyForegroundColor.withAlphaComponent(0.7)
         suggestionCollectionView.backgroundColor = .clear
@@ -1358,18 +1383,28 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
     }
 
+    /// Many hosts report `.default`; the system then draws the keyboard to
+    /// match the trait collection, so follow it instead of assuming light.
+    private var usesDarkAppearance: Bool {
+        switch textDocumentProxy.keyboardAppearance {
+        case .dark: true
+        case .light: false
+        default: traitCollection.userInterfaceStyle == .dark
+        }
+    }
+
     private var keyBackgroundColor: UIColor {
-        textDocumentProxy.keyboardAppearance == .dark
+        usesDarkAppearance
             ? UIColor(red: 0.38, green: 0.39, blue: 0.42, alpha: 1)
             : .white
     }
 
     private var keyForegroundColor: UIColor {
-        textDocumentProxy.keyboardAppearance == .dark ? .white : .black
+        usesDarkAppearance ? .white : .black
     }
 
     private var functionKeyBackgroundColor: UIColor {
-        textDocumentProxy.keyboardAppearance == .dark
+        usesDarkAppearance
             ? UIColor(red: 0.28, green: 0.29, blue: 0.32, alpha: 1)
             : UIColor(red: 0.91, green: 0.92, blue: 0.94, alpha: 1)
     }
@@ -1420,21 +1455,23 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         else { selected = false }
         switch item {
         case .punctuation(let text):
+            cell.label.attributedText = nil
             cell.label.text = text
             cell.label.font = .systemFont(ofSize: 21)
             cell.accessibilityLabel = text
         case .candidate(let candidate):
-            cell.label.text = candidate.comment.map { "\(candidate.text) \($0)" } ?? candidate.text
-            cell.label.font = .systemFont(ofSize: 19)
+            cell.label.attributedText = candidateTitle(candidate, selected: selected)
             cell.accessibilityLabel = "候选词 \(candidate.text)"
         case .status(let text):
+            cell.label.attributedText = nil
             cell.label.text = text
             cell.label.font = .systemFont(ofSize: 15, weight: .medium)
             cell.accessibilityLabel = text
         }
-        cell.label.textColor = keyForegroundColor
+        if case .candidate = item {} else { cell.label.textColor = keyForegroundColor }
         cell.contentView.backgroundColor = selected ? selectedCandidateBackgroundColor : .clear
-        cell.contentView.layer.cornerRadius = selected ? 8 : 0
+        cell.contentView.layer.cornerRadius = selected ? 6 : 0
+        cell.contentView.layer.cornerCurve = .continuous
         cell.accessibilityTraits = selected ? [.button, .selected] : .button
         cell.isAccessibilityElement = true
         if case .status = item { cell.accessibilityTraits = .staticText }
@@ -1464,15 +1501,18 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         sizeForItemAt indexPath: IndexPath
     ) -> CGSize {
         _ = collectionViewLayout
-        let text: String
+        let textWidth: CGFloat
         switch suggestionItems[indexPath.item] {
-        case .punctuation(let value), .status(let value): text = value
-        case .candidate(let value): text = value.comment.map { "\(value.text) \($0)" } ?? value.text
+        case .punctuation(let value):
+            textWidth = (value as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: 21)]).width
+        case .status(let value):
+            textWidth = (value as NSString).size(withAttributes: [
+                .font: UIFont.systemFont(ofSize: 15, weight: .medium)
+            ]).width
+        case .candidate(let value):
+            textWidth = candidateTitle(value, selected: false).size().width
         }
-        let width = ceil((text as NSString).size(withAttributes: [
-            .font: UIFont.systemFont(ofSize: 19)
-        ]).width) + 20
-        return CGSize(width: max(50, width), height: 28)
+        return CGSize(width: max(44, ceil(textWidth) + 20), height: Metrics.suggestionHeight)
     }
 
     func collectionView(
@@ -1518,10 +1558,25 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         insertPunctuation(punctuation)
     }
 
+    /// Candidate text with its comment set smaller and dimmer, so the code hint
+    /// never competes with the word itself.
+    private func candidateTitle(_ candidate: CandidateSnapshot, selected: Bool) -> NSAttributedString {
+        let title = NSMutableAttributedString(string: candidate.text, attributes: [
+            .font: UIFont.systemFont(ofSize: 19),
+            .foregroundColor: selected ? KeyboardPalette.highlightText(dark: usesDarkAppearance) : keyForegroundColor
+        ])
+        if let comment = candidate.comment, !comment.isEmpty {
+            title.append(NSAttributedString(string: " " + comment, attributes: [
+                .font: UIFont.systemFont(ofSize: 13),
+                .foregroundColor: KeyboardPalette.secondaryText(dark: usesDarkAppearance),
+                .baselineOffset: 1
+            ]))
+        }
+        return title
+    }
+
     private var selectedCandidateBackgroundColor: UIColor {
-        textDocumentProxy.keyboardAppearance == .dark
-            ? UIColor.white.withAlphaComponent(0.16)
-            : .white
+        KeyboardPalette.highlightFill(dark: usesDarkAppearance)
     }
 
     @objc private func keyPressed(_ sender: UIButton) {

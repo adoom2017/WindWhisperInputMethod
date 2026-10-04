@@ -2,10 +2,28 @@ import UIKit
 
 @main
 final class CandidateTestApp: UIResponder, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = CandidateTestSceneDelegate.self
+        return configuration
+    }
+}
+
+/// iOS 27 terminates apps that create windows outside the scene lifecycle.
+final class CandidateTestSceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
-        let window = UIWindow(frame: UIScreen.main.bounds)
+    func scene(
+        _ scene: UIScene,
+        willConnectTo session: UISceneSession,
+        options connectionOptions: UIScene.ConnectionOptions
+    ) {
+        guard let windowScene = scene as? UIWindowScene else { return }
+        let window = UIWindow(windowScene: windowScene)
         let host = UIViewController()
         host.view.backgroundColor = .systemGray5
         if ProcessInfo.processInfo.arguments.contains("--keyboard-extension-test") {
@@ -26,7 +44,7 @@ final class CandidateTestApp: UIResponder, UIApplicationDelegate {
             window.makeKeyAndVisible()
             self.window = window
             field.becomeFirstResponder()
-            return true
+            return
         }
         let controller = KeyboardViewController()
         let isTouchTest = ProcessInfo.processInfo.arguments.contains("--keyboard-touch-test")
@@ -53,7 +71,7 @@ final class CandidateTestApp: UIResponder, UIApplicationDelegate {
         controller.didMove(toParent: host)
         window.makeKeyAndVisible()
         self.window = window
-        if isTouchTest { return true }
+        if isTouchTest { return }
         Task { @MainActor in
             do {
                 try "RUNNING".write(to: FileManager.default.temporaryDirectory.appendingPathComponent("candidate-ui-result.txt"), atomically: true, encoding: .utf8)
@@ -69,7 +87,6 @@ final class CandidateTestApp: UIResponder, UIApplicationDelegate {
                 exit(1)
             }
         }
-        return true
     }
 }
 

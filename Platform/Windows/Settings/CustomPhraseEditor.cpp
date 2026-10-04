@@ -4,6 +4,7 @@
 #ifdef _WIN32
 #include <commctrl.h>
 #include <commdlg.h>
+#include <uxtheme.h>
 
 #include <charconv>
 #include <iterator>
@@ -26,6 +27,13 @@ constexpr int kCancel = 1009;
 constexpr int kStatus = 1010;
 constexpr int kImport = 1011;
 constexpr int kExport = 1012;
+constexpr WORD kCommonControlsManifest = 3;  // IDR_FENGYU_COMMON_CONTROLS
+
+// Client area in device-independent pixels; controls are laid out on a
+// 24px margin and scaled with the window's DPI.
+constexpr int kClientWidth = 720;
+constexpr int kClientHeight = 540;
+constexpr int kMargin = 24;
 
 struct EditorState {
     std::filesystem::path path;
@@ -39,6 +47,9 @@ struct EditorState {
     HWND remove = nullptr;
     HWND status = nullptr;
     HFONT font = nullptr;
+    HFONT heading_font = nullptr;
+    HWND hint = nullptr;
+    UINT dpi = 96;
     int selected = -1;
     bool dirty = false;
     bool form_dirty = false;
@@ -378,12 +389,32 @@ void SetFont(HWND control, HFONT font) {
     }
 }
 
+int Scale(const EditorState *state, int value) {
+    return MulDiv(value, static_cast<int>(state->dpi), 96);
+}
+
+// The system message font (Microsoft YaHei UI on Chinese Windows) at the
+// window's DPI, instead of the bitmap-era DEFAULT_GUI_FONT.
+HFONT CreateMessageFont(UINT dpi, double scale, LONG weight) {
+    NONCLIENTMETRICSW metrics{sizeof(metrics)};
+    if (!SystemParametersInfoForDpi(SPI_GETNONCLIENTMETRICS, sizeof(metrics),
+                                    &metrics, 0, dpi)) {
+        return nullptr;
+    }
+    LOGFONTW font = metrics.lfMessageFont;
+    font.lfHeight = static_cast<LONG>(font.lfHeight * scale);
+    if (weight) font.lfWeight = weight;
+    font.lfQuality = CLEARTYPE_QUALITY;
+    return CreateFontIndirectW(&font);
+}
+
 HWND AddControl(EditorState *state, DWORD extended_style,
                 const wchar_t *class_name, const wchar_t *text, DWORD style,
                 int x, int y, int width, int height, int id) {
     HWND control = CreateWindowExW(
         extended_style, class_name, text, WS_CHILD | WS_VISIBLE | style,
-        x, y, width, height, state->window,
+        Scale(state, x), Scale(state, y), Scale(state, width),
+        Scale(state, height), state->window,
         reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
         GetModuleHandleW(nullptr), nullptr);
     SetFont(control, state->font);
@@ -391,65 +422,83 @@ HWND AddControl(EditorState *state, DWORD extended_style,
 }
 
 void CreateControls(EditorState *state) {
-    state->font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
-    AddControl(state, 0, L"STATIC", L"自定义词组", 0,
-               20, 16, 160, 22, 0);
+    state->dpi = GetDpiForWindow(state->window);
+    if (state->dpi == 0) state->dpi = 96;
+    state->font = CreateMessageFont(state->dpi, 1.0, 0);
+    if (!state->font) {
+        state->font = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+    }
+    state->heading_font = CreateMessageFont(state->dpi, 1.45, FW_SEMIBOLD);
+
+    constexpr int content = kClientWidth - kMargin * 2;
+    HWND heading = AddControl(state, 0, L"STATIC", L"自定义词组", 0,
+                              kMargin, 20, content, 30, 0);
+    if (state->heading_font) SetFont(heading, state->heading_font);
+    state->hint = AddControl(
+        state, 0, L"STATIC",
+        L"编码仅支持英文字母和撇号；权重越高，候选越靠前。", 0,
+        kMargin, 52, content, 20, 0);
+
     state->list = AddControl(
         state, WS_EX_CLIENTEDGE, WC_LISTVIEWW, L"",
         LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | WS_TABSTOP,
-        20, 42, 704, 258, kList);
+        kMargin, 84, content, 220, kList);
     ListView_SetExtendedListViewStyle(
-        state->list,
-        LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_DOUBLEBUFFER);
+        state->list, LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
+    SetWindowTheme(state->list, L"Explorer", nullptr);
     for (const auto &column : {
-             std::tuple<int, int, const wchar_t *>{0, 315, L"词组"},
-             std::tuple<int, int, const wchar_t *>{1, 235, L"编码"},
-             std::tuple<int, int, const wchar_t *>{2, 130, L"权重"}}) {
+             std::tuple<int, int, const wchar_t *>{0, 340, L"词组"},
+             std::tuple<int, int, const wchar_t *>{1, 200, L"编码"},
+             std::tuple<int, int, const wchar_t *>{2, 110, L"权重"}}) {
         LVCOLUMNW value{};
         value.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
         value.iSubItem = std::get<0>(column);
-        value.cx = std::get<1>(column);
+        value.cx = Scale(state, std::get<1>(column));
         value.pszText = const_cast<wchar_t *>(std::get<2>(column));
         SendMessageW(state->list, LVM_INSERTCOLUMNW,
                      static_cast<WPARAM>(value.iSubItem),
                      reinterpret_cast<LPARAM>(&value));
     }
 
-    AddControl(state, 0, L"STATIC", L"词组", 0, 20, 316, 260, 20, 0);
-    AddControl(state, 0, L"STATIC", L"编码", 0, 300, 316, 180, 20, 0);
-    AddControl(state, 0, L"STATIC", L"权重（可选）", 0,
-               500, 316, 180, 20, 0);
+    AddControl(state, 0, L"STATIC", L"词组", 0, kMargin, 320, 300, 20, 0);
+    AddControl(state, 0, L"STATIC", L"编码", 0, 340, 320, 196, 20, 0);
+    AddControl(state, 0, L"STATIC", L"权重（可选）", 0, 552, 320, 144, 20, 0);
     state->text = AddControl(state, WS_EX_CLIENTEDGE, L"EDIT", L"",
                              ES_AUTOHSCROLL | WS_TABSTOP,
-                             20, 338, 260, 28, kText);
+                             kMargin, 342, 300, 28, kText);
     state->code = AddControl(state, WS_EX_CLIENTEDGE, L"EDIT", L"",
                              ES_AUTOHSCROLL | WS_TABSTOP,
-                             300, 338, 180, 28, kCode);
+                             340, 342, 196, 28, kCode);
     state->weight = AddControl(state, WS_EX_CLIENTEDGE, L"EDIT", L"",
                                ES_AUTOHSCROLL | ES_NUMBER | WS_TABSTOP,
-                               500, 338, 224, 28, kWeight);
+                               552, 342, 144, 28, kWeight);
+    SendMessageW(state->code, EM_SETCUEBANNER, FALSE,
+                 reinterpret_cast<LPARAM>(L"例如 shlx"));
+    SendMessageW(state->weight, EM_SETCUEBANNER, FALSE,
+                 reinterpret_cast<LPARAM>(L"自动"));
 
+    // Row actions on the left, file transfer on the right.
     AddControl(state, 0, L"BUTTON", L"新增", WS_TABSTOP,
-               20, 382, 90, 30, kNew);
+               kMargin, 386, 84, 30, kNew);
     state->apply = AddControl(state, 0, L"BUTTON", L"添加词组", WS_TABSTOP,
-                              120, 382, 110, 30, kApply);
+                              kMargin + 92, 386, 104, 30, kApply);
     state->remove = AddControl(state, 0, L"BUTTON", L"删除", WS_TABSTOP,
-                               240, 382, 90, 30, kDelete);
+                               kMargin + 204, 386, 84, 30, kDelete);
     EnableWindow(state->remove, FALSE);
-    AddControl(state, 0, L"BUTTON", L"导入", WS_TABSTOP,
-               340, 382, 90, 30, kImport);
-    AddControl(state, 0, L"BUTTON", L"导出", WS_TABSTOP,
-               440, 382, 90, 30, kExport);
-    AddControl(state, 0, L"STATIC",
-               L"编码仅支持英文字母和撇号；权重越高，候选越靠前。",
-               0, 20, 422, 704, 22, 0);
+    AddControl(state, 0, L"BUTTON", L"导入…", WS_TABSTOP,
+               kClientWidth - kMargin - 176, 386, 84, 30, kImport);
+    AddControl(state, 0, L"BUTTON", L"导出…", WS_TABSTOP,
+               kClientWidth - kMargin - 84, 386, 84, 30, kExport);
+
     state->status = AddControl(state, 0, L"STATIC", L"", SS_LEFT,
-                               20, 452, 704, 40, kStatus);
+                               kMargin, 430, content, 40, kStatus);
+    AddControl(state, 0, L"STATIC", L"", SS_ETCHEDHORZ,
+               0, 482, kClientWidth, 1, 0);
     AddControl(state, 0, L"BUTTON", L"保存并应用",
                BS_DEFPUSHBUTTON | WS_TABSTOP,
-               486, 508, 112, 32, kSave);
+               kClientWidth - kMargin - 224, 498, 112, 30, kSave);
     AddControl(state, 0, L"BUTTON", L"取消", WS_TABSTOP,
-               612, 508, 112, 32, kCancel);
+               kClientWidth - kMargin - 104, 498, 104, 30, kCancel);
     RefreshList(state);
 }
 
@@ -514,14 +563,21 @@ LRESULT CALLBACK EditorWindowProc(HWND window, UINT message,
         }
         return 0;
     }
-    case WM_CTLCOLORSTATIC:
-        if (reinterpret_cast<HWND>(lparam) == state->status &&
-            state->status_error) {
-            SetTextColor(reinterpret_cast<HDC>(wparam), RGB(185, 28, 28));
-            SetBkMode(reinterpret_cast<HDC>(wparam), TRANSPARENT);
-            return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
+    case WM_CTLCOLORSTATIC: {
+        const HWND control = reinterpret_cast<HWND>(lparam);
+        const HDC dc = reinterpret_cast<HDC>(wparam);
+        // Static text shares the window background; the hint is secondary
+        // text and errors use a muted red.
+        SetBkMode(dc, TRANSPARENT);
+        if (control == state->status && state->status_error) {
+            SetTextColor(dc, RGB(0xB4, 0x2A, 0x22));
+        } else if (control == state->hint) {
+            SetTextColor(dc, GetSysColor(COLOR_GRAYTEXT));
+        } else {
+            SetTextColor(dc, GetSysColor(COLOR_WINDOWTEXT));
         }
-        break;
+        return reinterpret_cast<LRESULT>(GetSysColorBrush(COLOR_WINDOW));
+    }
     case WM_CLOSE:
         if (ConfirmDiscard(state)) DestroyWindow(window);
         return 0;
@@ -549,7 +605,43 @@ bool EnsureEditorClass() {
 
 }  // namespace
 
+// Activates this DLL's Common Controls v6 manifest for the editor's lifetime,
+// so it gets visual styles even inside hosts without that manifest.
+class CommonControlsActivation final {
+public:
+    CommonControlsActivation() {
+        HMODULE module = nullptr;
+        if (!GetModuleHandleExW(
+                GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                    GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCWSTR>(&ShowCustomPhraseEditor), &module)) {
+            return;
+        }
+        ACTCTXW context{sizeof(context)};
+        context.dwFlags =
+            ACTCTX_FLAG_HMODULE_VALID | ACTCTX_FLAG_RESOURCE_NAME_VALID;
+        context.hModule = module;
+        context.lpResourceName = MAKEINTRESOURCEW(kCommonControlsManifest);
+        context_ = CreateActCtxW(&context);
+        if (context_ != INVALID_HANDLE_VALUE &&
+            !ActivateActCtx(context_, &cookie_)) {
+            cookie_ = 0;
+        }
+    }
+    ~CommonControlsActivation() {
+        if (cookie_) DeactivateActCtx(0, cookie_);
+        if (context_ != INVALID_HANDLE_VALUE) ReleaseActCtx(context_);
+    }
+    CommonControlsActivation(const CommonControlsActivation &) = delete;
+    CommonControlsActivation &operator=(const CommonControlsActivation &) = delete;
+
+private:
+    HANDLE context_ = INVALID_HANDLE_VALUE;
+    ULONG_PTR cookie_ = 0;
+};
+
 CustomPhraseEditorResult ShowCustomPhraseEditor(HWND owner) {
+    CommonControlsActivation activation;
     INITCOMMONCONTROLSEX controls{sizeof(controls), ICC_LISTVIEW_CLASSES};
     InitCommonControlsEx(&controls);
     EditorState state;
@@ -565,10 +657,17 @@ CustomPhraseEditorResult ShowCustomPhraseEditor(HWND owner) {
                     L"风语输入法", MB_OK | MB_ICONERROR);
         return CustomPhraseEditorResult::Cancelled;
     }
+    constexpr DWORD style = WS_CAPTION | WS_SYSMENU;
+    constexpr DWORD extended_style = WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT;
+    const UINT dpi = owner && IsWindow(owner) ? GetDpiForWindow(owner)
+                                              : GetDpiForSystem();
+    RECT frame{0, 0, MulDiv(kClientWidth, static_cast<int>(dpi), 96),
+               MulDiv(kClientHeight, static_cast<int>(dpi), 96)};
+    AdjustWindowRectExForDpi(&frame, style, FALSE, extended_style, dpi);
     const HWND window = CreateWindowExW(
-        WS_EX_DLGMODALFRAME | WS_EX_CONTROLPARENT, kEditorClass,
-        L"管理自定义词组", WS_CAPTION | WS_SYSMENU,
-        CW_USEDEFAULT, CW_USEDEFAULT, 760, 600, owner, nullptr,
+        extended_style, kEditorClass, L"管理自定义词组", style,
+        CW_USEDEFAULT, CW_USEDEFAULT, frame.right - frame.left,
+        frame.bottom - frame.top, owner, nullptr,
         GetModuleHandleW(nullptr), &state);
     if (!window) return CustomPhraseEditorResult::Cancelled;
 
@@ -605,6 +704,10 @@ CustomPhraseEditorResult ShowCustomPhraseEditor(HWND owner) {
     if (owner && IsWindow(owner)) {
         EnableWindow(owner, TRUE);
         SetForegroundWindow(owner);
+    }
+    if (state.heading_font) DeleteObject(state.heading_font);
+    if (state.font && state.font != GetStockObject(DEFAULT_GUI_FONT)) {
+        DeleteObject(state.font);
     }
     return state.result;
 }

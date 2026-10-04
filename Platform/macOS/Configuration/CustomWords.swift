@@ -38,7 +38,7 @@ enum CustomWordsStoreError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case let .invalidLine(line):
-            "自定义词文件第 \(line) 行格式不正确。每行应为“词语、编码、可选权重”三列。"
+            "自定义词组文件第 \(line) 行格式不正确。每行应为“词语、编码、可选权重”三列。"
         case let .emptyText(index):
             "第 \(index) 个词条的词语不能为空。"
         case let .invalidText(index):

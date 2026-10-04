@@ -37,6 +37,7 @@ final class InputModeIndicatorCoordinator {
     static let displayDuration: TimeInterval = 0.8
     static let revealDuration: TimeInterval = 0.1
     static let fadeDuration: TimeInterval = 0.12
+    static let cornerRadius: CGFloat = 8
 
     private let panel: CandidatePanel
     private let materialView: NSView
@@ -55,8 +56,8 @@ final class InputModeIndicatorCoordinator {
         indicatorView = InputModeIndicatorView(frame: bounds)
         if #available(macOS 26.0, *) {
             let glassView = NSGlassEffectView(frame: bounds)
-            glassView.style = .clear
-            glassView.cornerRadius = 15
+            glassView.style = .regular
+            glassView.cornerRadius = Self.cornerRadius
             glassView.contentView = indicatorView
             materialView = glassView
         } else {
@@ -65,7 +66,7 @@ final class InputModeIndicatorCoordinator {
             effectView.blendingMode = CandidatePanelConfiguration.blendingMode
             effectView.state = .active
             effectView.wantsLayer = true
-            effectView.layer?.cornerRadius = 15
+            effectView.layer?.cornerRadius = Self.cornerRadius
             effectView.layer?.cornerCurve = .continuous
             effectView.layer?.masksToBounds = true
             effectView.addSubview(indicatorView)
@@ -234,64 +235,45 @@ final class InputModeIndicatorView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
 
-        if reduceTransparency {
-            let backgroundPath = NSBezierPath(roundedRect: bounds, xRadius: 15, yRadius: 15)
-            NSColor.windowBackgroundColor.withAlphaComponent(0.96).setFill()
-            backgroundPath.fill()
+        // Chinese is a solid accent tile, English an outlined neutral one, so the
+        // two states differ in fill rather than in two similar hues.
+        let radius = InputModeIndicatorCoordinator.cornerRadius
+        let isChinese = state == .chinese
+        let fill: NSColor
+        if isChinese {
+            fill = FengYuPalette.accent
+        } else {
+            fill = reduceTransparency ? FengYuPalette.surface : FengYuPalette.surfaceTranslucent
         }
+        fill.setFill()
+        NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
 
-        if increaseContrast {
-            let borderRect = bounds.insetBy(dx: 0.5, dy: 0.5)
-            let borderPath = NSBezierPath(roundedRect: borderRect, xRadius: 14.5, yRadius: 14.5)
-            borderPath.lineWidth = 1
-            NSColor.separatorColor.setStroke()
+        if !isChinese || increaseContrast {
+            let lineWidth: CGFloat = increaseContrast ? 1.5 : 1
+            let borderRect = bounds.insetBy(dx: lineWidth / 2, dy: lineWidth / 2)
+            let borderPath = NSBezierPath(
+                roundedRect: borderRect,
+                xRadius: radius - lineWidth / 2,
+                yRadius: radius - lineWidth / 2
+            )
+            borderPath.lineWidth = lineWidth
+            (increaseContrast ? NSColor.separatorColor : FengYuPalette.border).setStroke()
             borderPath.stroke()
         }
 
-        let badgeRect = bounds.insetBy(dx: 7, dy: 7)
-        let badgePath = NSBezierPath(roundedRect: badgeRect, xRadius: 10, yRadius: 10)
-        let shadow = NSShadow()
-        shadow.shadowColor = NSColor.black.withAlphaComponent(0.16)
-        shadow.shadowBlurRadius = 3
-        shadow.shadowOffset = NSSize(width: 0, height: -1)
-
-        NSGraphicsContext.saveGraphicsState()
-        shadow.set()
-        badgeColor.setFill()
-        badgePath.fill()
-        NSGraphicsContext.restoreGraphicsState()
-
-        let highlightPath = NSBezierPath(
-            roundedRect: badgeRect.insetBy(dx: 0.5, dy: 0.5),
-            xRadius: 9.5,
-            yRadius: 9.5
-        )
-        highlightPath.lineWidth = 1
-        NSColor.white.withAlphaComponent(increaseContrast ? 0.42 : 0.24).setStroke()
-        highlightPath.stroke()
-
         let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 17, weight: .semibold),
-            .foregroundColor: NSColor.white,
+            .font: NSFont.systemFont(ofSize: 20, weight: .medium),
+            .foregroundColor: isChinese ? FengYuPalette.onAccent : FengYuPalette.textPrimary,
         ]
         let text = state.displayText as NSString
         let size = text.size(withAttributes: attributes)
         text.draw(
             at: NSPoint(
                 x: floor((bounds.width - size.width) / 2),
-                y: floor((bounds.height - size.height) / 2) + 0.5
+                y: floor((bounds.height - size.height) / 2)
             ),
             withAttributes: attributes
         )
-    }
-
-    private var badgeColor: NSColor {
-        switch state {
-        case .chinese:
-            .systemBlue
-        case .english:
-            .systemIndigo
-        }
     }
 }
 
