@@ -8,13 +8,22 @@
 4. 词库读取和配置解析在初始化时完成，任何 AppKit 更新都回到主线程。用户词频在查询时检查文件时间戳，外部更新后才重载；候选提交时同步合并并原子保存，避免键盘进程退出丢失选择。
 5. 前端不实现双拼或辅码算法，它们由输入引擎根据词库索引处理。
 
-## 双平台迁移边界
+## 目录与平台边界
 
-- `Core/` 是跨平台 C++17 核心、C ABI、golden tests 与过渡期 Swift adapter 的唯一目录。
-- `Platform/macOS/` 只包含 InputMethodKit、AppKit、macOS 设置和安装集成。
-- `Platform/Windows/` 只包含 TSF、Win32/DirectWrite、Windows 设置和注册集成。
-- macOS 当前生产算法仍在 `Core/SwiftAdapter`；C++ 核心达到等价测试覆盖后再切换 C ABI。
+| 目录 | 职责 | 平台 |
+| --- | --- | --- |
+| `Core/` | C++17 引擎、C ABI、golden tests；`Core/SwiftAdapter` 为 Swift 引擎 | 共享 |
+| `Platform/macOS/` | InputMethodKit、AppKit 候选窗、设置与安装集成 | macOS |
+| `Platform/Windows/` | TSF COM 服务、Win32/GDI 候选窗、注册表设置、自定义词组编辑器 | Windows |
+| `iOS/` | SwiftUI 宿主 App、键盘扩展、App Group 共享存储 | iOS |
+| `Installer/` | macOS PKG 脚本、Windows WiX MSI | macOS / Windows |
+| `Resources/` | 词库、图标与本地化资源 | 共享 |
+| `Scripts/` | 构建、打包、测试与资源生成 | 以 macOS / iOS 为主 |
+
+- Xcode 工程直接引用 `Platform/macOS` 与 `Core/SwiftAdapter`；Windows 只通过根 `CMakeLists.txt` 构建，不依赖 AppKit 或 InputMethodKit。
+- macOS 与 iOS 的生产算法在 `Core/SwiftAdapter`；Windows 使用 C++ 核心。C++ 核心达到等价测试覆盖后再让 Apple 平台切换到 C ABI。
 - Windows 不得依赖 Swift adapter，也不得复制另一套输入算法。
+- 三端界面颜色与尺寸遵循 [视觉规范](DESIGN_SYSTEM.md)。
 
 ## 组件边界
 
@@ -55,7 +64,8 @@ Process Exit   ──► destroy sessions ──► finalize engine
 
 ## 数据目录策略
 
-- Shared data：应用包内只读资源，仅含合并后的 `fy.dict.yaml`。
+- Shared data：应用包内只读资源，仅含合并后的 `fy.dict.yaml`。每行为 `词条<Tab>编码<Tab>权重<Tab>来源<Tab>原始顺序`，来源为 `flypy`、`pinyin` 或 `essay`。
+- 用户词条写入 `custom_words.tsv`（`词组<Tab>编码<Tab>可选权重`），以更高基础权重参与小鹤音形排序，并在三端都原样上屏、不做繁简转换。Windows 把它以来源 `custom` 并入 C++ 引擎词库，引擎据此跳过转换。
 - User data：用户可写配置、用户词典、安装信息与覆盖文件。
 - Logs：独立目录并可清理；默认不含输入明文。
 
@@ -98,9 +108,10 @@ Process Exit   ──► destroy sessions ──► finalize engine
 - `WindWhisperInputController` 在文本状态写入 client 后读取插入点屏幕矩形，再刷新候选窗；优先使用 `attributes(forCharacterIndex:lineHeightRectangle:)` 返回的输入行矩形，并以当前插入点、selected range 和 marked range 的 `firstRect` 作为兼容回退。鼠标选择由 controller 调用 session，重新读取完整快照并同时更新文本和窗口。
 - 键盘数字、方向键、PageUp/PageDown 和 `-`/`=` 仍经过统一按键映射进入 input-engine。前端不自行计算页码、高亮或反查编码，因此键盘和鼠标不会形成第二套候选状态。
 - controller 停用、关闭、提交、client/session 缺失或快照读取失败时立即隐藏面板，避免跨应用残留。
-- macOS 26 以 `NSGlassEffectView` clear 样式作为内容根视图，由系统玻璃直接控制圆角且关闭矩形 panel 阴影；macOS 13—15 回退到 popover / behind-window / active 的 `NSVisualEffectView`。`CandidateWindowTheme` 集中提供圆角、间距、字体、颜色、宽度上限和动画时长，并根据降低透明度、增强对比度和减少动态效果生成安全降级。
-- `CandidateHorizontalLayout` 是不依赖 window/session 的纯布局边界：先测量候选正文和注释，再在 760pt 上限内按比例压缩，输出候选、页码和前后翻页命中区域。竖排不进入首版，但布局边界已独立，后续可新增策略而不改 input engine 或 controller。
+- macOS 26 以 `NSGlassEffectView` regular 样式作为内容根视图并关闭矩形 panel 阴影；macOS 13—15 回退到 popover / behind-window / active 的 `NSVisualEffectView`。系统材质之上再绘制约 90% 不透明的品牌底色，保证任何背景下的文字对比度。`CandidateWindowTheme` 与 `FengYuPalette` 集中提供圆角、间距、字体、颜色、宽度上限和动画时长，并根据降低透明度、增强对比度和减少动态效果生成安全降级。
+- `CandidateHorizontalLayout` 与 `CandidateVerticalLayout` 是不依赖 window/session 的纯布局边界：先测量候选正文和注释，在宽度上限内按比例压缩，输出候选、页码和前后翻页命中区域。
 - 候选窗首次出现只做 80ms 可中断淡入；后续按键更新直接替换快照并重排，隐藏立即执行，因此动画不在输入热路径上形成等待。
+- Windows 候选窗共用同一视觉规范：Windows 11 由 DWM 绘制圆角与边框，Windows 10 为直角加系统阴影；高对比度模式直接使用系统颜色。窗口尺寸与绘制共用一次测量，超出屏幕时压缩最宽的候选并以省略号截断。
 
 ## M7 设置、状态与维护
 
