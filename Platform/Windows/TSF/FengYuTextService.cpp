@@ -241,7 +241,7 @@ std::string LoadBundledDictionary() {
                 const std::string weight = second == std::string::npos
                                                 ? "3000000"
                                                 : line.substr(second + 1);
-                contents += text + "\t" + code + "\t" + weight + "\tflypy\t" +
+                contents += text + "\t" + code + "\t" + weight + "\tcustom\t" +
                             std::to_string(order++) + "\n";
             }
         }

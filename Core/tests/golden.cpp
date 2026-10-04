@@ -94,6 +94,43 @@ int main() {
     CHECK(equals(shape_snapshot.commit, shape_snapshot.commit_len, "丙"));
     fy_session_destroy(shape_session);
     fy_engine_destroy(shape_engine);
+
+    // Custom phrases commit exactly as written; dictionary rows still follow
+    // the simplified/traditional option.
+    const char *custom_dictionary =
+        "這\tzh\t100\tflypy\t0\n"
+        "這個\tzg\t100\tcustom\t1\n"
+        "这\tzz\t100\tcustom\t2\n";
+    auto *custom_engine = fy_engine_create(custom_dictionary, std::strlen(custom_dictionary));
+    auto *custom_session = fy_session_create(custom_engine);
+    CHECK(custom_session != nullptr);
+    CHECK(fy_session_select_schema(custom_session, "flypyShape", 10));
+    fy_snapshot custom_snapshot{};
+    CHECK(type(custom_session, "zh"));
+    CHECK(fy_session_snapshot(custom_session, &custom_snapshot));
+    CHECK(custom_snapshot.candidate_count == 1);
+    CHECK(equals(custom_snapshot.candidates[0].text, custom_snapshot.candidates[0].text_len, "这"));
+    fy_session_reset(custom_session);
+    CHECK(type(custom_session, "zg"));
+    CHECK(fy_session_snapshot(custom_session, &custom_snapshot));
+    CHECK(equals(custom_snapshot.candidates[0].text, custom_snapshot.candidates[0].text_len, "這個"));
+    CHECK(fy_session_select_candidate(custom_session, 0));
+    CHECK(fy_session_snapshot(custom_session, &custom_snapshot));
+    CHECK(equals(custom_snapshot.commit, custom_snapshot.commit_len, "這個"));
+    fy_session_reset(custom_session);
+    CHECK(type(custom_session, "zz"));
+    CHECK(fy_session_set_option(custom_session, "traditional", 11, 1));
+    CHECK(fy_session_snapshot(custom_session, &custom_snapshot));
+    CHECK(equals(custom_snapshot.candidates[0].text, custom_snapshot.candidates[0].text_len, "这"));
+    CHECK(fy_session_select_candidate(custom_session, 0));
+    CHECK(fy_session_snapshot(custom_session, &custom_snapshot));
+    CHECK(equals(custom_snapshot.commit, custom_snapshot.commit_len, "这"));
+    fy_session_reset(custom_session);
+    CHECK(type(custom_session, "zh"));
+    CHECK(fy_session_snapshot(custom_session, &custom_snapshot));
+    CHECK(equals(custom_snapshot.candidates[0].text, custom_snapshot.candidates[0].text_len, "這"));
+    fy_session_destroy(custom_session);
+    fy_engine_destroy(custom_engine);
     fy_engine *engine = fy_engine_create(nullptr, 0);
     CHECK(engine != nullptr);
     fy_session *session = fy_session_create(engine);

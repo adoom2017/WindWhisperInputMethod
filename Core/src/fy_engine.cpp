@@ -32,6 +32,8 @@ struct Entry {
     int order = 0;
     Kind kind = Kind::Pinyin;
     std::string source_text;
+    // User phrases are committed exactly as written, without script conversion.
+    bool custom = false;
 };
 
 std::string lower_ascii(std::string text) {
@@ -267,10 +269,16 @@ std::string traditionalize_text(const std::string &text) {
 }
 
 void add_entry(fy_engine *engine, std::string text, std::string code,
-               int weight, int order, Entry::Kind kind) {
+               int weight, int order, Entry::Kind kind, bool custom = false) {
     if (text.empty() || code.empty()) return;
     engine->entries.push_back({std::move(text), lower_ascii(std::move(code)), {},
-                               weight, order, kind});
+                               weight, order, kind, {}, custom});
+}
+
+std::string display_text(const Entry &entry, bool traditional) {
+    if (entry.custom) return entry.source_text;
+    return traditional ? traditionalize_text(entry.source_text)
+                       : simplify_text(entry.source_text);
 }
 
 void add_defaults(fy_engine *engine) {
@@ -487,8 +495,7 @@ void refresh(fy_session *session) {
         });
     for (Entry &entry : session->matches) {
         entry.source_text = entry.text;
-        entry.text = session->traditional ? traditionalize_text(entry.text)
-                                          : simplify_text(entry.text);
+        entry.text = display_text(entry, session->traditional);
     }
     // Prefix matching can return the same visible phrase through both its
     // short code and full code (for example 为什么: wsm/wsme).  Keep the
@@ -546,8 +553,9 @@ fy_engine *fy_engine_create(const char *data, size_t length) {
                 try { order = std::stoi(fields[4]); } catch (...) {}
             }
             const std::string source = fields.size() >= 4 ? fields[3] : "pinyin";
-            if (source == "flypy") {
-                add_entry(engine, fields[0], fields[1], weight, order, Entry::Kind::Shape);
+            if (source == "flypy" || source == "custom") {
+                add_entry(engine, fields[0], fields[1], weight, order, Entry::Kind::Shape,
+                          source == "custom");
             } else if (source == "pinyin") {
                 add_entry(engine, fields[0], fields[1], weight, order, Entry::Kind::Pinyin);
                 const auto chars = utf8_chars(fields[0]);
@@ -777,7 +785,6 @@ int fy_session_select_candidate(fy_session *session, size_t index) {
         session->schema == "flypy" ? "flypyShape" : session->schema,
         lower_ascii(session->code), selected.source_text);
     session->commit = selected.text;
-    if (session->traditional) session->commit = traditionalize_text(session->commit);
     session->code.clear();
     session->matches.clear();
     session->page = 0;
@@ -812,8 +819,7 @@ int fy_session_set_option(
     if (option == "traditional") {
         session->traditional = value != 0;
         for (Entry &entry : session->matches) {
-            entry.text = session->traditional ? traditionalize_text(entry.text)
-                                              : simplify_text(entry.text);
+            entry.text = display_text(entry, session->traditional);
         }
     } else if (option == "full_shape") {
         session->full_shape = value != 0;
