@@ -21,7 +21,6 @@ public:
     void ShowAt(POINT, UINT dpi, const std::vector<CandidateWindowItem>&,
                 size_t highlighted, size_t page, size_t page_count);
     void Hide();
-    HWND hwnd() const { return hwnd_; }
     DWORD last_error() const { return last_error_; }
     ~CandidateWindow();
 

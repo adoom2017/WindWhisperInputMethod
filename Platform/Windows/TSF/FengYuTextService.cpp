@@ -316,9 +316,6 @@ public:
         BeginEngineLoad();
     }
 
-    void SetSchema(const char *schema) {
-        if (schema && *schema) schema_ = schema;
-    }
     void ReloadSchema() { schema_ = ReadConfiguredSchema(); }
     const char *schema() const { return schema_.c_str(); }
     void SetCandidateTheme(bool light) {

@@ -40,6 +40,7 @@ typedef struct fy_snapshot {
 // valid until the next call that mutates or snapshots that session. A commit is
 // delivered by exactly one successful snapshot.
 
+// Returns NULL when the dictionary contains no usable entries.
 FY_API fy_engine *fy_engine_create(const char *dictionary_utf8, size_t length);
 // Configure before creating sessions. UTF-8 directory; history is shared by
 // processes using that directory. Without a path, learning is memory-only.
@@ -54,7 +55,6 @@ FY_API int fy_session_page(fy_session *session, int delta);
 FY_API int fy_session_set_option(fy_session *session, const char *name, size_t name_len, int value);
 FY_API int fy_session_select_schema(fy_session *session, const char *schema, size_t schema_len);
 FY_API int fy_session_snapshot(fy_session *session, fy_snapshot *out);
-FY_API void fy_snapshot_free(fy_snapshot *snapshot);
 
 #ifdef __cplusplus
 }

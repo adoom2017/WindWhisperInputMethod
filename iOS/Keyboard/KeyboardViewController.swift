@@ -2,11 +2,8 @@ import UIKit
 import OSLog
 
 private enum KeyboardPreferences {
-    static let schemaKey = KeyboardSharedPreferences.schemaKey
-    static let appGroupIdentifier = KeyboardSharedPreferences.appGroupIdentifier
-
     static var hapticIntensity: CGFloat {
-        guard let defaults = UserDefaults(suiteName: appGroupIdentifier),
+        guard let defaults = UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier),
               defaults.object(forKey: KeyboardSharedPreferences.hapticIntensityKey) != nil else {
             return CGFloat(KeyboardSharedPreferences.defaultHapticIntensity)
         }
@@ -16,7 +13,8 @@ private enum KeyboardPreferences {
     }
 
     static var selectedSchemaIdentifier: String {
-        UserDefaults(suiteName: appGroupIdentifier)?.string(forKey: schemaKey)
+        UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier)?
+            .string(forKey: KeyboardSharedPreferences.schemaKey)
             ?? "flypyShape"
     }
 }
@@ -167,12 +165,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             return super.hitTest(point, with: event)
         }
 
-#if DEBUG
-        private static let sizingLogger = Logger(
-            subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard",
-            category: "Keyboard"
-        )
-#endif
 
         override var intrinsicContentSize: CGSize {
             CGSize(width: UIView.noIntrinsicMetric, height: Metrics.inputViewHeight)
@@ -185,11 +177,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
         override func systemLayoutSizeFitting(_ targetSize: CGSize) -> CGSize {
             let fittedSize = super.systemLayoutSizeFitting(targetSize)
-#if DEBUG
-            SelfSizingInputView.sizingLogger.notice(
-                "One-argument systemLayoutSizeFitting target=\(String(describing: targetSize), privacy: .public) super=\(String(describing: fittedSize), privacy: .public) returnedHeight=\(Metrics.inputViewHeight, privacy: .public)"
-            )
-#endif
             return CGSize(width: fittedSize.width, height: Metrics.inputViewHeight)
         }
 
@@ -295,11 +282,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     /// handles haptics through the button's `.touchDown` control event.
     private final class KeyboardButton: UIButton {
         private var restingTransform = CGAffineTransform.identity
-#if DEBUG
-        static let touchLogger = Logger(
-            subsystem: "com.shendongchun.inputmethod.windwhisper.ios.keyboard", category: "Touch"
-        )
-#endif
 
         override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             var ancestor = superview
@@ -313,22 +295,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
 
         override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-#if DEBUG
-            if let point = touches.first?.location(in: self) {
-                Self.touchLogger.notice("KeyboardTouch opaque-v1 began visualInside=\(self.bounds.contains(point), privacy: .public) regionInside=\(self.point(inside: point, with: event), privacy: .public)")
-            }
-#endif
             super.touchesBegan(touches, with: event)
             restingTransform = transform
             setPressedAppearance(true)
         }
 
         override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-#if DEBUG
-            if let point = touches.first?.location(in: self) {
-                Self.touchLogger.notice("KeyboardTouch opaque-v1 ended visualInside=\(self.bounds.contains(point), privacy: .public) regionInside=\(self.point(inside: point, with: event), privacy: .public) tracking=\(self.isTracking, privacy: .public)")
-            }
-#endif
             super.touchesEnded(touches, with: event)
             setPressedAppearance(false)
         }
@@ -381,11 +353,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var customWordsRefreshTimer: Timer?
     private var hasActiveEngineComposition = false
     private var isPublishingCommit = false
-#if DEBUG
-    private var layoutLogSequence = 0
-    private var lastLoggedViewBounds = CGRect.null
-    private var lastLoggedRootFrame = CGRect.null
-#endif
 
     private let rootStack = UIStackView()
     private let keyboardBackdrop = UIView()
@@ -443,21 +410,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     override func viewDidLoad() {
         super.viewDidLoad()
         configureKeyFeedback()
-#if DEBUG
-        logger.notice(
-            "Self-sizing input view allowsSelfSizing=\((self.view as? UIInputView)?.allowsSelfSizing ?? false, privacy: .public) intrinsic=\(String(describing: self.view.intrinsicContentSize), privacy: .public) initialFrame=\(String(describing: self.view.frame), privacy: .public) preferredContentSize=\(String(describing: self.preferredContentSize), privacy: .public) inputView=\(String(describing: self.inputView), privacy: .public) sameView=\(self.inputView === self.view, privacy: .public)"
-        )
-        logLayoutState("viewDidLoad.begin")
-#endif
         inputView?.allowsSelfSizing = true
         inputView?.invalidateIntrinsicContentSize()
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (controller: KeyboardViewController, _) in
             controller.applyColors()
         }
         buildView()
-#if DEBUG
-        logLayoutState("viewDidLoad.end")
-#endif
         startEngine()
     }
 
@@ -475,13 +433,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
                                         width: view.bounds.width,
                                         height: max(0, view.bounds.maxY - rootStack.frame.minY))
         updateHostPresentationVisibility()
-#if DEBUG
-        guard layoutLogSequence < 20,
-              view.bounds != lastLoggedViewBounds || rootStack.frame != lastLoggedRootFrame else { return }
-        lastLoggedViewBounds = view.bounds
-        lastLoggedRootFrame = rootStack.frame
-        logLayoutState("viewDidLayoutSubviews")
-#endif
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -491,9 +442,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         setHostPresentationVisible(false)
         view.setNeedsLayout()
         startEngine()
-#if DEBUG
-        logLayoutState("viewWillAppear animated=\(animated)")
-#endif
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -518,9 +466,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             }
         }
         keyFeedbackGenerator?.prepare()
-#if DEBUG
-        logLayoutState("viewDidAppear animated=\(animated)")
-#endif
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -528,50 +473,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         customWordsRefreshTimer = nil
         stopRepeatingBackspace()
         cancelLocalComposition()
-#if DEBUG
-        logLayoutState("viewWillDisappear animated=\(animated)")
-#endif
         super.viewWillDisappear(animated)
     }
 
-    override func viewWillTransition(
-        to size: CGSize,
-        with coordinator: any UIViewControllerTransitionCoordinator
-    ) {
-#if DEBUG
-        logger.notice(
-            "Layout transition target=\(String(describing: size), privacy: .public) current=\(String(describing: self.view.frame), privacy: .public)"
-        )
-#endif
-        super.viewWillTransition(to: size, with: coordinator)
-    }
-
-#if DEBUG
-    private func logLayoutState(_ phase: String) {
-        layoutLogSequence += 1
-        let viewOnScreen = view.convert(view.bounds, to: nil)
-        let superviewDescription = view.superview.map {
-            "\(type(of: $0)) frame=\($0.frame) bounds=\($0.bounds)"
-        } ?? "nil"
-        var ancestorDescriptions: [String] = []
-        var ancestor = view.superview
-        while let current = ancestor, ancestorDescriptions.count < 6 {
-            ancestorDescriptions.append(
-                "\(type(of: current)){frame=\(current.frame),bg=\(String(describing: current.backgroundColor)),opaque=\(current.isOpaque),alpha=\(current.alpha),hidden=\(current.isHidden)}"
-            )
-            ancestor = current.superview
-        }
-        let ambiguityDescription: String
-        if view.window != nil, !view.bounds.isEmpty {
-            ambiguityDescription = String(view.hasAmbiguousLayout || rootStack.hasAmbiguousLayout)
-        } else {
-            ambiguityDescription = "not-checked-before-window"
-        }
-        logger.notice(
-            "Layout #\(self.layoutLogSequence) \(phase, privacy: .public) view=\(String(describing: self.view.frame), privacy: .public) viewOnScreen=\(String(describing: viewOnScreen), privacy: .public) root=\(String(describing: self.rootStack.frame), privacy: .public) safeArea=\(String(describing: self.view.safeAreaInsets), privacy: .public) superview=\(superviewDescription, privacy: .public) ancestors=\(ancestorDescriptions.joined(separator: " -> "), privacy: .public) window=\(String(describing: self.view.window?.frame), privacy: .public) windowBG=\(String(describing: self.view.window?.backgroundColor), privacy: .public) ambiguous=\(ambiguityDescription, privacy: .public)"
-        )
-    }
-#endif
 
     deinit {
         startupTask?.cancel()
@@ -922,11 +826,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         rootStack.layer.opacity = shouldBeVisible ? 1 : 0
         keyboardBackdrop.layer.opacity = shouldBeVisible ? 1 : 0
         CATransaction.commit()
-#if DEBUG
-        logger.notice(
-            "Host presentation visibility visible=\(shouldBeVisible, privacy: .public) hostHeight=\(self.view.bounds.height, privacy: .public) expectedHeight=\(Metrics.inputViewHeight, privacy: .public)"
-        )
-#endif
     }
 
     private func configureSuggestionBar() {

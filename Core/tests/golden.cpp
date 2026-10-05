@@ -131,7 +131,16 @@ int main() {
     CHECK(equals(custom_snapshot.candidates[0].text, custom_snapshot.candidates[0].text_len, "這"));
     fy_session_destroy(custom_session);
     fy_engine_destroy(custom_engine);
-    fy_engine *engine = fy_engine_create(nullptr, 0);
+    CHECK(fy_engine_create(nullptr, 0) == nullptr);
+    const char *pinyin_dictionary =
+        "你好\tnihao\t1000000\tpinyin\t0\n"
+        "还是一样\thaishiyiyang\t1000000\tpinyin\t1\n"
+        "我们可以一起\twomenkeyiyiqi\t1000000\tpinyin\t2\n"
+        "你\tni\t2000000\tpinyin\t3\n"
+        "倪\tni\t1999000\tpinyin\t4\n"
+        "你\tnirx\t2000001\tflypy\t5\n"
+        "倪\tnire\t1999997\tflypy\t6\n";
+    fy_engine *engine = fy_engine_create(pinyin_dictionary, std::strlen(pinyin_dictionary));
     CHECK(engine != nullptr);
     fy_session *session = fy_session_create(engine);
     CHECK(session != nullptr);

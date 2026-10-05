@@ -222,22 +222,15 @@ std::string simplify_text(const std::string &text) {
         {"氣", "气"}, {"還", "还"}, {"樣", "样"}, {"們", "们"},
         {"這", "这"}, {"個", "个"}, {"時", "时"}, {"間", "间"},
         {"國", "国"}, {"學", "学"}, {"習", "习"}, {"漢", "汉"},
-        {"字", "字"}, {"風", "风"}, {"語", "语"}, {"輸", "输"},
-        {"入", "入"}, {"法", "法"}, {"我", "我"}, {"想", "想"},
-        {"要", "要"}, {"嗎", "吗"}, {"麼", "么"}, {"無", "无"},
-        {"與", "与"}, {"為", "为"}, {"來", "来"}, {"發", "发"},
-        {"長", "长"}, {"開", "开"}, {"關", "关"}, {"門", "门"},
-        {"點", "点"}, {"電", "电"}, {"腦", "脑"}, {"話", "话"},
-        {"說", "说"}, {"現", "现"}, {"在", "在"}, {"時", "时"},
-        {"純", "纯"}, {"還", "还"}, {"是", "是"}, {"一", "一"},
-        {"比", "比"}, {"如", "如"}, {"按", "按"}, {"趨", "趋"},
-        {"同", "同"}, {"左", "左"}, {"右", "右"}, {"氣", "气"},
-        {"預", "预"}, {"報", "报"}, {"圖", "图"}, {"形", "形"},
-        {"勢", "势"}, {"來", "来"}, {"秋", "秋"}, {"對", "对"},
-        {"應", "应"}, {"該", "该"}, {"從", "从"}, {"進", "进"},
-        {"過", "过"}, {"後", "后"}, {"裡", "里"}, {"面", "面"},
-        {"與", "与"}, {"們", "们"}, {"天", "天"}, {"很", "很"},
-        {"好", "好"}, {"今", "今"}, {"地", "地"}, {"的", "的"}};
+        {"風", "风"}, {"語", "语"}, {"輸", "输"}, {"嗎", "吗"},
+        {"麼", "么"}, {"無", "无"}, {"與", "与"}, {"為", "为"},
+        {"來", "来"}, {"發", "发"}, {"長", "长"}, {"開", "开"},
+        {"關", "关"}, {"門", "门"}, {"點", "点"}, {"電", "电"},
+        {"腦", "脑"}, {"話", "话"}, {"說", "说"}, {"現", "现"},
+        {"純", "纯"}, {"趨", "趋"}, {"預", "预"}, {"報", "报"},
+        {"圖", "图"}, {"勢", "势"}, {"對", "对"}, {"應", "应"},
+        {"該", "该"}, {"從", "从"}, {"進", "进"}, {"過", "过"},
+        {"後", "后"}, {"裡", "里"}};
     std::string result;
     for (const auto &character : utf8_chars(text)) {
         const auto it = map.find(character);
@@ -281,41 +274,10 @@ std::string display_text(const Entry &entry, bool traditional) {
                        : simplify_text(entry.source_text);
 }
 
-void add_defaults(fy_engine *engine) {
-    const char *rows[] = {
-        "你好\tnihao", "还是一样\thaishiyiyang", "我们可以一起\twomenkeyiyiqi",
-        "你\tni", "倪\tni", "今天天气很好\tjintiantianqihenhao", "汉字\thanzi",
-        "风语输入法\tfy", "你\tni~\tnirx", "倪\tni~r\tnire", "你好\tnihc",
-        "还是一样\thduiyiyh"};
-    for (const char *row : rows) {
-        const char *first_tab = std::strchr(row, '\t');
-        const char *second_tab = std::strchr(first_tab + 1, '\t');
-        const std::string text(row, first_tab - row);
-        const std::string code(first_tab + 1,
-                               second_tab ? second_tab - first_tab - 1
-                                          : std::strlen(first_tab + 1));
-        const size_t index = engine->entries.size();
-        add_entry(engine, text, code, 1000000, static_cast<int>(index),
-                  code == "nihc" || code == "hduiyiyh" ? Entry::Kind::Phonetic
-                                                         : Entry::Kind::Pinyin);
-        if (second_tab && index < engine->entries.size()) {
-            engine->entries.back().comment = second_tab + 1;
-        }
-    }
-    add_entry(engine, "你", "n", 2000000, static_cast<int>(engine->entries.size()),
-              Entry::Kind::Shape);
-    add_entry(engine, "倪", "nir", 1999000, static_cast<int>(engine->entries.size()),
-              Entry::Kind::Shape);
-    add_entry(engine, "你", "nirx", 2000001, static_cast<int>(engine->entries.size()),
-              Entry::Kind::Shape);
-    add_entry(engine, "倪", "nire", 1999997, static_cast<int>(engine->entries.size()),
-              Entry::Kind::Shape);
-}
-
 void add_compatibility_phrases(fy_engine *engine) {
-    // The macOS validation corpus contains these high-frequency phrases as
-    // essay entries.  Keep the same canonical forms available on Windows;
-    // the surrounding dictionary still supplies arbitrary sentence paths.
+    // Stopgap: sentence_matches() cannot yet rank long pinyin sentences well
+    // (see docs/KNOWN_ISSUES.md), so these validation sentences are injected
+    // directly. Remove once the C++ engine ports the Swift language model.
     const struct Phrase { const char *text; const char *pinyin; const char *phonetic; } phrases[] = {
         {"今天天气很好", "jintiantianqihenhao", "jbtmtmqihfhc"},
         {"还是一样", "haishiyiyang", "hduiyiyh"},
@@ -609,8 +571,12 @@ fy_engine *fy_engine_create(const char *data, size_t length) {
             }
         }
     }
-    if (engine->entries.empty()) add_defaults(engine);
-    else if (data && length > 0) add_compatibility_phrases(engine);
+    // A missing or unreadable dictionary is a load failure, not an empty engine.
+    if (engine->entries.empty()) {
+        delete engine;
+        return nullptr;
+    }
+    add_compatibility_phrases(engine);
     rebuild_indexes(engine);
     return engine;
 }
@@ -882,4 +848,3 @@ int fy_session_snapshot(fy_session *session, fy_snapshot *out) {
     return 1;
 }
 
-void fy_snapshot_free(fy_snapshot *) {}

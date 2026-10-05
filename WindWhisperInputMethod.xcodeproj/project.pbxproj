@@ -68,7 +68,6 @@
 		A2000000000000000000001E /* CandidateWindowTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowTheme.swift; sourceTree = "<group>"; };
 		A2000000000000000000001F /* CandidateWindowLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CandidateWindowLayout.swift; sourceTree = "<group>"; };
 		A20000000000000000000020 /* M5SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M5SmokeTest.swift; sourceTree = "<group>"; };
-		A20000000000000000000021 /* M6SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M6SmokeTest.swift; sourceTree = "<group>"; };
 		A20000000000000000000022 /* FengYuSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSettings.swift; sourceTree = "<group>"; };
 		A20000000000000000000023 /* FengYuSettingsMenu.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FengYuSettingsMenu.swift; sourceTree = "<group>"; };
 		A20000000000000000000024 /* M7SmokeTest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = M7SmokeTest.swift; sourceTree = "<group>"; };

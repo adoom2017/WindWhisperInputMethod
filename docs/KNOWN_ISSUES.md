@@ -6,3 +6,4 @@
 - 输入法更新后，macOS 偶尔会短暂保留输入源图标或注册缓存；重新切换输入源或登录会话可刷新。
 - 卸载默认保留用户词典和设置，彻底删除用户数据必须由用户单独确认。
 - Windows x64 端已可通过 MSI 安装使用（Windows 10/11），但目前只有 x64 构建，候选窗仍使用 GDI 绘制（未迁移 DirectWrite），远程桌面、多显示器混合 DPI 等场景仍需真机验收。接续状态见 `docs/WINDOWS_HANDOFF.md`。
+- Windows（C++ 引擎）整句组词质量明显弱于 macOS/iOS：全拼或双拼连续输入长句时，常拼出生僻字组合（如 `jintiantianqihenhao`）。`fy_engine.cpp` 的 `add_compatibility_phrases()` 只为测试中的几句写死了结果；彻底解决需要把 Swift 端的语言模型打分和生僻字过滤移植到 C++ 引擎，届时删除该函数。

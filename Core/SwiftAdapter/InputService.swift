@@ -1390,9 +1390,7 @@ final class InputSession: @unchecked Sendable {
     }
 
     private func updateCandidates() {
-        let transform = StringTransform(
-            rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans"
-        )
+        let transform = scriptTransform
         queryGeneration &+= 1
         candidateCursor = nil
         hasMoreCandidates = false
@@ -1430,9 +1428,7 @@ final class InputSession: @unchecked Sendable {
         }
 #endif
         guard let candidateCursor, limit > 0 else { return false }
-        let transform = suppliedTransform ?? StringTransform(
-            rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans"
-        )
+        let transform = suppliedTransform ?? scriptTransform
         var appended = false
         let targetCount = candidates.count + limit
         while candidates.count < targetCount, candidateCursor.hasMore {
@@ -1456,6 +1452,10 @@ final class InputSession: @unchecked Sendable {
         }
         hasMoreCandidates = candidateCursor.hasMore
         return appended
+    }
+
+    private var scriptTransform: StringTransform {
+        StringTransform(rawValue: options["simplification"] == false ? "Hans-Hant" : "Hant-Hans")
     }
 
     private func convertedText(_ text: String, transform: StringTransform) -> String {
