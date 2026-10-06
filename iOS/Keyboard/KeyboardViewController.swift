@@ -366,6 +366,18 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var usesInlineComposition = KeyboardSharedPreferences.defaultInlineComposition
     /// The code currently shown as marked text in the host field.
     private var markedComposition = ""
+    /// iOS merges a keyboard's proxy calls until the host has applied them,
+    /// applying inserts first, then the last setMarkedText, then unmarkText.
+    /// After a commit over marked code the keyboard therefore holds further
+    /// writes until the host has settled (its echo, or a short timeout).
+    private var isHostSettling = false
+    private var hostSettleTimer: Timer?
+    private var pendingCommit = ""
+    private var pendingMarkedComposition: String?
+    /// Native text fields echo our own commit ~50-70 ms later; that echo must
+    /// not end the code typed after the commit. Hosts without the echo (Flutter)
+    /// leave the window open, so a caret move within it is ignored once.
+    private var ignoresHostEchoUntil: TimeInterval = 0
 
     private let rootStack = UIStackView()
     private let keyboardBackdrop = UIView()
@@ -500,7 +512,10 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     override func textWillChange(_ textInput: UITextInput?) {
         super.textWillChange(textInput)
         // With inline composition, end it in textDidChange once the host settles.
-        guard !isEditingHost, markedComposition.isEmpty else { return }
+        guard !isEditingHost, !isHostSettling, markedComposition.isEmpty,
+              pendingMarkedComposition == nil,
+              ProcessInfo.processInfo.systemUptime >= ignoresHostEchoUntil
+        else { return }
         cancelLocalComposition()
     }
 
@@ -519,7 +534,18 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         // caret) ends the composition. Hosts keep or drop the marked code
         // themselves; clearing it never leaves an orphaned marked range behind.
         // The document context excludes marked text, so it cannot tell us more.
-        guard !isEditingHost, !markedComposition.isEmpty else { return }
+        guard !isEditingHost else { return }
+        if isHostSettling {
+            // The host applied our commit; queued writes can follow now.
+            ignoresHostEchoUntil = 0
+            finishHostSettling()
+            return
+        }
+        guard !markedComposition.isEmpty else { return }
+        if ProcessInfo.processInfo.systemUptime < ignoresHostEchoUntil {
+            ignoresHostEchoUntil = 0
+            return
+        }
         cancelLocalComposition()
     }
 
@@ -724,7 +750,27 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             let button = UIButton()
             button.setTitle(String(character), for: .normal)
             keyPressed(button)
+            settleHost()
         }
+    }
+
+    private func typeTestCodeWithoutSettling(_ text: String) {
+        for character in text {
+            let button = UIButton()
+            button.setTitle(String(character), for: .normal)
+            keyPressed(button)
+        }
+    }
+
+    /// Lets deferred host writes (ours and a merging host's) finish, as between
+    /// two real key presses.
+    private func settleHost() {
+        let deadline = Date().addingTimeInterval(1)
+        repeat {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+            let proxyBusy = (testDocumentProxy as? TouchTestDocumentProxy)?.hasQueuedCalls == true
+            if !isHostSettling, pendingMarkedComposition == nil, pendingCommit.isEmpty, !proxyBusy { return }
+        } while Date() < deadline
     }
 
     private func verifyLocalComposition() throws {
@@ -783,48 +829,27 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     private func verifyInlineComposition() throws {
         usesInlineComposition = true
-        let proxy = TouchTestDocumentProxy(text: "前后", cursor: 1)
-        testDocumentProxy = proxy
         defer {
             testDocumentProxy = nil
             usesInlineComposition = false
         }
-        session?.clearComposition()
-
-        typeTestCode("ni")
-        precondition(proxy.text == "前ni后" && proxy.markedText == "ni" && compositionLabel.isHidden)
-        deleteBackwardOnce()
-        precondition(proxy.text == "前n后" && proxy.markedText == "n")
-        deleteBackwardOnce()
-        precondition(proxy.text == "前后" && proxy.markedText == nil && !hasActiveEngineComposition)
-
-        typeTestCode("ni")
-        guard case .candidate(let expected) = suggestionItems[0] else {
-            throw InputEngineError.smokeAssertion("missing inline candidate")
+        let hosts: [(TouchTestDocumentProxy.Host, Bool)] = [
+            (.uikit, false), (.uikit, true), (.legacyFlutter, true),
+        ]
+        for (host, merges) in hosts {
+            try verifyInlineComposition(
+                TouchTestDocumentProxy(text: "前后", cursor: 1, host: host, mergesCallsPerTurn: merges),
+                label: "\(host) merges=\(merges)"
+            )
         }
-        space()
-        precondition(proxy.text == "前" + expected.text + "后" && proxy.markedText == nil)
-
-        typeTestCode("qzxvqq")
-        insertNewline()
-        precondition(proxy.documentContextBeforeInput == "前" + expected.text + "qzxvqq")
-        precondition(proxy.markedText == nil)
-
-        typeTestCode("ni")
-        toggleASCII()
-        precondition(proxy.documentContextBeforeInput?.hasSuffix("qzxvqqni") == true && proxy.markedText == nil)
-        toggleASCII()
-
-        // An automatic commit that continues with a new syllable: the commit
-        // must land before the marked code, even if the host calls back mid-edit.
-        proxy.onChange = { [weak self] _ in self?.textWillChange(nil) }
-        typeTestCode("birun")
-        proxy.onChange = nil
-        precondition(proxy.documentContextBeforeInput?.hasSuffix("比如n") == true)
-        precondition(proxy.markedText == "n" && hasActiveEngineComposition)
 
         // The user moves the caret: the host keeps the code as plain text and
         // the keyboard drops its composition without deleting anything.
+        // (Wait out the echo window a host without echoes leaves open.)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+        let proxy = TouchTestDocumentProxy(text: "前后", cursor: 1)
+        testDocumentProxy = proxy
+        typeTestCode("ni")
         let beforeMove = proxy.text
         proxy.userMovesCaret(to: 1)
         textDidChange(nil)
@@ -834,23 +859,76 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
         // Dismissing the keyboard removes the uncommitted code.
         viewWillDisappear(false)
+        settleHost()
         precondition(proxy.text == beforeMove && proxy.markedText == nil && !hasActiveEngineComposition)
         precondition(proxy.cursorAdjustmentCalls == 0)
+    }
 
-        // A host that sends the caret home when marked text is cleared must
-        // still keep the caret after each commit.
-        let resettingProxy = TouchTestDocumentProxy(text: "前后", cursor: 1, resetsCaretWhenMarkedTextCleared: true)
-        testDocumentProxy = resettingProxy
-        typeTestCode("birun")
-        precondition(resettingProxy.documentContextBeforeInput == "前比如n" && resettingProxy.markedText == "n")
-        deleteBackwardOnce()
+    private func verifyInlineComposition(_ proxy: TouchTestDocumentProxy, label: String) throws {
+        func check(_ condition: Bool, _ step: String) throws {
+            guard condition else {
+                throw InputEngineError.smokeAssertion(
+                    "inline \(label) \(step): text=\(proxy.text) marked=\(proxy.markedText ?? "nil")"
+                )
+            }
+        }
+        testDocumentProxy = proxy
+        proxy.onHostEcho = { [weak self] in self?.textDidChange(nil) }
+        session?.clearComposition()
+
         typeTestCode("ni")
-        guard case .candidate(let candidate) = suggestionItems[0] else {
-            throw InputEngineError.smokeAssertion("missing candidate for caret-resetting host")
+        try check(proxy.text == "前ni后" && proxy.markedText == "ni" && compositionLabel.isHidden, "type")
+        deleteBackwardOnce()
+        settleHost()
+        try check(proxy.text == "前n后" && proxy.markedText == "n", "backspace")
+        deleteBackwardOnce()
+        settleHost()
+        try check(proxy.text == "前后" && proxy.markedText == nil && !hasActiveEngineComposition, "clear")
+
+        typeTestCode("ni")
+        guard case .candidate(let expected) = suggestionItems[0] else {
+            throw InputEngineError.smokeAssertion("missing inline candidate")
         }
         space()
-        precondition(resettingProxy.documentContextBeforeInput == "前比如" + candidate.text)
-        precondition(resettingProxy.text == "前比如" + candidate.text + "后")
+        settleHost()
+        try check(proxy.text == "前" + expected.text + "后" && proxy.markedText == nil, "space")
+
+        typeTestCode("qzxvqq")
+        insertNewline()
+        settleHost()
+        try check(proxy.documentContextBeforeInput == "前" + expected.text + "qzxvqq"
+            && proxy.markedText == nil, "return")
+
+        typeTestCode("ni")
+        toggleASCII()
+        settleHost()
+        try check(proxy.documentContextBeforeInput?.hasSuffix("qzxvqqni") == true
+            && proxy.markedText == nil, "ascii")
+        toggleASCII()
+
+        // An automatic commit that continues with a new syllable: the commit
+        // lands before the next code, even if the host calls back mid-edit.
+        proxy.onChange = { [weak self] _ in self?.textWillChange(nil) }
+        typeTestCode("birun")
+        proxy.onChange = nil
+        try check(proxy.documentContextBeforeInput?.hasSuffix("比如n") == true
+            && proxy.markedText == "n" && hasActiveEngineComposition, "auto commit")
+
+        try check(proxy.markedText == "n" && hasActiveEngineComposition, "echo")
+        deleteBackwardOnce()
+        settleHost()
+        try check(proxy.documentContextBeforeInput?.hasSuffix("比如") == true
+            && proxy.markedText == nil, "delete after commit")
+
+        // Typing on while the host is still applying a commit keeps the order.
+        typeTestCodeWithoutSettling("birun")
+        guard case .candidate(let next) = suggestionItems.first else {
+            throw InputEngineError.smokeAssertion("missing candidate after fast typing")
+        }
+        space()
+        settleHost()
+        try check(proxy.documentContextBeforeInput?.hasSuffix("比如比如" + next.text) == true
+            && proxy.markedText == nil, "fast typing")
     }
     #endif
 
@@ -1654,16 +1732,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private func deleteBackwardOnce() {
         if hasActiveEngineComposition,
            session?.process(keyCode: 0xFF08) == true {
-            if markedComposition.count == 1 {
-                // Deleting the last code character: unmark it and delete it like
-                // ordinary text. Clearing the marked text instead sends the caret
-                // to the start in some hosts (闲鱼's search field).
-                editHost {
-                    textDocumentProxy.unmarkText()
-                    textDocumentProxy.deleteBackward()
-                }
-                markedComposition = ""
-            }
             refresh()
         } else {
             textDocumentProxy.deleteBackward()
@@ -1812,8 +1880,13 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     /// An empty string removes it without committing: `unmarkText()` would leave
     /// the code in the document and cost the user an extra Backspace.
     private func setMarkedComposition(_ text: String) {
+        if isHostSettling {
+            pendingMarkedComposition = text
+            return
+        }
+        pendingMarkedComposition = nil
         guard text != markedComposition else { return }
-        editHost {
+        writeHost {
             textDocumentProxy.setMarkedText(
                 text,
                 selectedRange: NSRange(location: (text as NSString).length, length: 0)
@@ -1822,16 +1895,56 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         markedComposition = text
     }
 
-    /// Inserting while code is marked replaces the marked range in one step.
-    /// Clearing the marked text first makes some hosts (闲鱼's search field)
-    /// move the caret to the start; marking the commit and unmarking it loses
-    /// the commit when the next code is marked right after.
+    /// Commits over marked code the way Apple documents for custom keyboards:
+    /// mark the final text, then unmark it in place. `insertText` is not used
+    /// over marked text: Flutter hosts before flutter#191062 (闲鱼) insert at the
+    /// caret and leave the code behind as plain text.
     private func commitToHost(_ text: String) {
-        editHost { textDocumentProxy.insertText(text) }
+        if isHostSettling {
+            // Nothing is marked while settling; this follows the previous commit.
+            pendingCommit += text
+            return
+        }
+        let replacesMarkedCode = !markedComposition.isEmpty
+        writeHost {
+            if replacesMarkedCode {
+                textDocumentProxy.setMarkedText(
+                    text,
+                    selectedRange: NSRange(location: (text as NSString).length, length: 0)
+                )
+                textDocumentProxy.unmarkText()
+            } else {
+                textDocumentProxy.insertText(text)
+            }
+        }
         markedComposition = ""
+        if replacesMarkedCode {
+            ignoresHostEchoUntil = ProcessInfo.processInfo.systemUptime + 0.5
+            isHostSettling = true
+            hostSettleTimer?.invalidate()
+            hostSettleTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: false) { [weak self] _ in
+                MainActor.assumeIsolated { self?.finishHostSettling() }
+            }
+        }
     }
 
-    private func editHost(_ edit: () -> Void) {
+    private func finishHostSettling() {
+        hostSettleTimer?.invalidate()
+        hostSettleTimer = nil
+        guard isHostSettling else { return }
+        isHostSettling = false
+        if !pendingCommit.isEmpty {
+            let commit = pendingCommit
+            pendingCommit = ""
+            // Plain inserts before a mark keep their order when merged.
+            writeHost { textDocumentProxy.insertText(commit) }
+        }
+        if let pending = pendingMarkedComposition {
+            setMarkedComposition(pending)
+        }
+    }
+
+    private func writeHost(_ edit: () -> Void) {
         isEditingHost = true
         edit()
         isEditingHost = false

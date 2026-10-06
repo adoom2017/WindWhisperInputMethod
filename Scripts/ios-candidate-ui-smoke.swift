@@ -91,6 +91,20 @@ final class CandidateTestSceneDelegate: UIResponder, UIWindowSceneDelegate {
 }
 
 final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
+    enum Host {
+        /// UITextField: inserting replaces the marked range.
+        case uikit
+        /// Flutter before flutter#191062 (闲鱼): inserting goes in at the caret
+        /// and the marked code stays behind as plain text.
+        case legacyFlutter
+    }
+
+    private enum Call {
+        case insert(String)
+        case mark(String, NSRange)
+        case unmark
+    }
+
     var onChange: ((String) -> Void)?
     private(set) var text: String
     private var cursor: Int
@@ -98,13 +112,23 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     private(set) var markedRange: Range<Int>?
     private(set) var markedTextCalls = 0
     private(set) var cursorAdjustmentCalls = 0
-    /// Emulates hosts such as 闲鱼's search field, which move the caret to the
-    /// start of the document when marked text is cleared.
-    private let resetsCaretWhenMarkedTextCleared: Bool
-    init(text: String = "", cursor: Int = 0, resetsCaretWhenMarkedTextCleared: Bool = false) {
+    private let host: Host
+    /// iOS merges a keyboard's calls until the host applies them (modelled as
+    /// a 60 ms delivery delay): inserts first, then the last setMarkedText,
+    /// then unmarkText.
+    private let mergesCallsPerTurn: Bool
+    private var queuedCalls: [Call] = []
+    var hasQueuedCalls: Bool { !queuedCalls.isEmpty || isEchoPending }
+    /// UIKit hosts report a commit (unmarkText) back to the keyboard ~60 ms
+    /// later through textDidChange.
+    var onHostEcho: (() -> Void)?
+    private var isEchoPending = false
+
+    init(text: String = "", cursor: Int = 0, host: Host = .uikit, mergesCallsPerTurn: Bool = false) {
         self.text = text
         self.cursor = cursor
-        self.resetsCaretWhenMarkedTextCleared = resetsCaretWhenMarkedTextCleared
+        self.host = host
+        self.mergesCallsPerTurn = mergesCallsPerTurn
         super.init()
     }
     var markedText: String? {
@@ -116,18 +140,15 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     var documentInputMode: UITextInputMode? { nil }
     let documentIdentifier = UUID()
     var hasText: Bool { !text.isEmpty }
-    private func replaceMarkedOrCaret(with value: String) -> Int {
-        let range = markedRange ?? cursor..<cursor
-        var characters = Array(text)
-        characters.replaceSubrange(range, with: Array(value))
-        text = String(characters)
-        return range.lowerBound
+
+    func insertText(_ value: String) { perform(.insert(value)) }
+    func setMarkedText(_ value: String, selectedRange: NSRange) {
+        markedTextCalls += 1
+        perform(.mark(value, selectedRange))
     }
-    func insertText(_ value: String) {
-        let start = replaceMarkedOrCaret(with: value)
-        markedRange = nil
-        cursor = start + value.count
-        onChange?(text)
+    func unmarkText() {
+        markedTextCalls += 1
+        perform(.unmark)
     }
     func deleteBackward() {
         markedRange = nil
@@ -140,21 +161,60 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
         cursorAdjustmentCalls += 1
         cursor = min(max(0, cursor + offset), text.count)
     }
-    func setMarkedText(_ value: String, selectedRange: NSRange) {
-        markedTextCalls += 1
-        let start = replaceMarkedOrCaret(with: value)
-        markedRange = value.isEmpty ? nil : start..<(start + value.count)
-        cursor = value.isEmpty && resetsCaretWhenMarkedTextCleared ? 0 : start + selectedRange.location
-        onChange?(text)
-    }
-    func unmarkText() {
-        markedTextCalls += 1
-        markedRange = nil
-    }
     /// The user taps elsewhere: like UIKit, the host keeps the code as plain
     /// text and moves the caret.
     func userMovesCaret(to offset: Int) {
         markedRange = nil
         cursor = min(max(0, offset), text.count)
+    }
+
+    private func perform(_ call: Call) {
+        guard mergesCallsPerTurn else { return apply(call) }
+        queuedCalls.append(call)
+        guard queuedCalls.count == 1 else { return }
+        Timer.scheduledTimer(withTimeInterval: 0.06, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyQueuedCalls() }
+        }
+    }
+
+    private func applyQueuedCalls() {
+        let calls = queuedCalls
+        queuedCalls = []
+        for case .insert(let value) in calls { apply(.insert(value)) }
+        if let mark = calls.last(where: { if case .mark = $0 { true } else { false } }) { apply(mark) }
+        if calls.contains(where: { if case .unmark = $0 { true } else { false } }) { apply(.unmark) }
+    }
+
+    private func apply(_ call: Call) {
+        switch call {
+        case .insert(let value):
+            let range = host == .uikit ? (markedRange ?? cursor..<cursor) : cursor..<cursor
+            replace(range, with: value)
+            markedRange = nil
+            cursor = range.lowerBound + value.count
+        case .mark(let value, let selection):
+            let range = markedRange ?? cursor..<cursor
+            replace(range, with: value)
+            markedRange = value.isEmpty ? nil : range.lowerBound..<(range.lowerBound + value.count)
+            cursor = range.lowerBound + selection.location
+        case .unmark:
+            markedRange = nil
+            if host == .uikit, onHostEcho != nil {
+                isEchoPending = true
+                Timer.scheduledTimer(withTimeInterval: 0.06, repeats: false) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        self?.isEchoPending = false
+                        self?.onHostEcho?()
+                    }
+                }
+            }
+        }
+        onChange?(text)
+    }
+
+    private func replace(_ range: Range<Int>, with value: String) {
+        var characters = Array(text)
+        characters.replaceSubrange(range, with: Array(value))
+        text = String(characters)
     }
 }
