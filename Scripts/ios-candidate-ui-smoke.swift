@@ -98,9 +98,13 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     private(set) var markedRange: Range<Int>?
     private(set) var markedTextCalls = 0
     private(set) var cursorAdjustmentCalls = 0
-    init(text: String = "", cursor: Int = 0) {
+    /// Emulates hosts such as 闲鱼's search field, which move the caret to the
+    /// start of the document when marked text is cleared.
+    private let resetsCaretWhenMarkedTextCleared: Bool
+    init(text: String = "", cursor: Int = 0, resetsCaretWhenMarkedTextCleared: Bool = false) {
         self.text = text
         self.cursor = cursor
+        self.resetsCaretWhenMarkedTextCleared = resetsCaretWhenMarkedTextCleared
         super.init()
     }
     var markedText: String? {
@@ -140,7 +144,7 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
         markedTextCalls += 1
         let start = replaceMarkedOrCaret(with: value)
         markedRange = value.isEmpty ? nil : start..<(start + value.count)
-        cursor = start + selectedRange.location
+        cursor = value.isEmpty && resetsCaretWhenMarkedTextCleared ? 0 : start + selectedRange.location
         onChange?(text)
     }
     func unmarkText() {

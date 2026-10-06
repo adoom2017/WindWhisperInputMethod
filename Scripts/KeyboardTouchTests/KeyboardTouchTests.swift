@@ -109,6 +109,12 @@ final class KeyboardTouchTests: XCTestCase {
 
         app.buttons["n"].tap()
         XCTAssertEqual(value(), expected + "n", "A new code follows the committed text")
+        app.buttons["删除"].tap()
+        XCTAssertEqual(value(), expected, "Deleting the last code character keeps the committed text")
+
+        // A four-key shape code commits automatically and the next key continues.
+        for key in ["b", "i", "r", "u", "n"] { app.buttons[key].tap() }
+        XCTAssertEqual(value(), expected + "比如n", "Automatic commit keeps the caret after the text")
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.lifetime = .keepAlways
         add(screenshot)

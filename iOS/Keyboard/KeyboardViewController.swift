@@ -836,6 +836,21 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         viewWillDisappear(false)
         precondition(proxy.text == beforeMove && proxy.markedText == nil && !hasActiveEngineComposition)
         precondition(proxy.cursorAdjustmentCalls == 0)
+
+        // A host that sends the caret home when marked text is cleared must
+        // still keep the caret after each commit.
+        let resettingProxy = TouchTestDocumentProxy(text: "前后", cursor: 1, resetsCaretWhenMarkedTextCleared: true)
+        testDocumentProxy = resettingProxy
+        typeTestCode("birun")
+        precondition(resettingProxy.documentContextBeforeInput == "前比如n" && resettingProxy.markedText == "n")
+        deleteBackwardOnce()
+        typeTestCode("ni")
+        guard case .candidate(let candidate) = suggestionItems[0] else {
+            throw InputEngineError.smokeAssertion("missing candidate for caret-resetting host")
+        }
+        space()
+        precondition(resettingProxy.documentContextBeforeInput == "前比如" + candidate.text)
+        precondition(resettingProxy.text == "前比如" + candidate.text + "后")
     }
     #endif
 
@@ -1639,6 +1654,16 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private func deleteBackwardOnce() {
         if hasActiveEngineComposition,
            session?.process(keyCode: 0xFF08) == true {
+            if markedComposition.count == 1 {
+                // Deleting the last code character: unmark it and delete it like
+                // ordinary text. Clearing the marked text instead sends the caret
+                // to the start in some hosts (闲鱼's search field).
+                editHost {
+                    textDocumentProxy.unmarkText()
+                    textDocumentProxy.deleteBackward()
+                }
+                markedComposition = ""
+            }
             refresh()
         } else {
             textDocumentProxy.deleteBackward()
@@ -1754,10 +1779,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             #if CANDIDATE_UI_TEST
             testLastCommit = commit
             #endif
-            // Replace the marked code with the commit before marking any code
-            // that continues after it (for example 比如 + n from "birun").
-            setMarkedComposition("")
-            editHost { textDocumentProxy.insertText(commit) }
+            // Commit before marking any code that continues after it (for
+            // example 比如 + n from "birun").
+            commitToHost(commit)
         }
         asciiButton.setTitle(snapshot.status.isASCIIMode ? "英" : "中", for: .normal)
         asciiButton.accessibilityValue = snapshot.status.isASCIIMode ? "英文模式" : "中文模式"
@@ -1796,6 +1820,15 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             )
         }
         markedComposition = text
+    }
+
+    /// Inserting while code is marked replaces the marked range in one step.
+    /// Clearing the marked text first makes some hosts (闲鱼's search field)
+    /// move the caret to the start; marking the commit and unmarking it loses
+    /// the commit when the next code is marked right after.
+    private func commitToHost(_ text: String) {
+        editHost { textDocumentProxy.insertText(text) }
+        markedComposition = ""
     }
 
     private func editHost(_ edit: () -> Void) {
