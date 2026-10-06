@@ -94,6 +94,8 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     var onChange: ((String) -> Void)?
     private(set) var text: String
     private var cursor: Int
+    /// Character range of the marked (uncommitted) text, like a UITextField.
+    private(set) var markedRange: Range<Int>?
     private(set) var markedTextCalls = 0
     private(set) var cursorAdjustmentCalls = 0
     init(text: String = "", cursor: Int = 0) {
@@ -101,18 +103,30 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
         self.cursor = cursor
         super.init()
     }
+    var markedText: String? {
+        markedRange.map { String(Array(text)[$0]) }
+    }
     var documentContextBeforeInput: String? { String(text.prefix(cursor)) }
     var documentContextAfterInput: String? { String(text.dropFirst(cursor)) }
     var selectedText: String? { nil }
     var documentInputMode: UITextInputMode? { nil }
     let documentIdentifier = UUID()
     var hasText: Bool { !text.isEmpty }
-    func insertText(_ text: String) {
-        self.text.insert(contentsOf: text, at: self.text.index(self.text.startIndex, offsetBy: cursor))
-        cursor += text.count
-        onChange?(self.text)
+    private func replaceMarkedOrCaret(with value: String) -> Int {
+        let range = markedRange ?? cursor..<cursor
+        var characters = Array(text)
+        characters.replaceSubrange(range, with: Array(value))
+        text = String(characters)
+        return range.lowerBound
+    }
+    func insertText(_ value: String) {
+        let start = replaceMarkedOrCaret(with: value)
+        markedRange = nil
+        cursor = start + value.count
+        onChange?(text)
     }
     func deleteBackward() {
+        markedRange = nil
         guard cursor > 0 else { return }
         text.remove(at: text.index(text.startIndex, offsetBy: cursor - 1))
         cursor -= 1
@@ -122,6 +136,21 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
         cursorAdjustmentCalls += 1
         cursor = min(max(0, cursor + offset), text.count)
     }
-    func setMarkedText(_ markedText: String, selectedRange: NSRange) { markedTextCalls += 1 }
-    func unmarkText() { markedTextCalls += 1 }
+    func setMarkedText(_ value: String, selectedRange: NSRange) {
+        markedTextCalls += 1
+        let start = replaceMarkedOrCaret(with: value)
+        markedRange = value.isEmpty ? nil : start..<(start + value.count)
+        cursor = start + selectedRange.location
+        onChange?(text)
+    }
+    func unmarkText() {
+        markedTextCalls += 1
+        markedRange = nil
+    }
+    /// The user taps elsewhere: like UIKit, the host keeps the code as plain
+    /// text and moves the caret.
+    func userMovesCaret(to offset: Int) {
+        markedRange = nil
+        cursor = min(max(0, offset), text.count)
+    }
 }

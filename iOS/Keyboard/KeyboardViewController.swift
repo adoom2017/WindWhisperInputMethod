@@ -12,6 +12,14 @@ private enum KeyboardPreferences {
         ))
     }
 
+    static var inlineComposition: Bool {
+        guard let defaults = UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier),
+              defaults.object(forKey: KeyboardSharedPreferences.inlineCompositionKey) != nil else {
+            return KeyboardSharedPreferences.defaultInlineComposition
+        }
+        return defaults.bool(forKey: KeyboardSharedPreferences.inlineCompositionKey)
+    }
+
     static var selectedSchemaIdentifier: String {
         UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier)?
             .string(forKey: KeyboardSharedPreferences.schemaKey)
@@ -352,7 +360,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var appliedDarkAppearance: Bool?
     private var customWordsRefreshTimer: Timer?
     private var hasActiveEngineComposition = false
-    private var isPublishingCommit = false
+    /// True while this keyboard edits the host, so the host's synchronous
+    /// change callbacks are not mistaken for the user moving the caret.
+    private var isEditingHost = false
+    private var usesInlineComposition = KeyboardSharedPreferences.defaultInlineComposition
+    /// The code currently shown as marked text in the host field.
+    private var markedComposition = ""
 
     private let rootStack = UIStackView()
     private let keyboardBackdrop = UIView()
@@ -441,6 +454,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         // compact bounds. Wait for this presentation's layout before revealing it.
         setHostPresentationVisible(false)
         view.setNeedsLayout()
+        #if !CANDIDATE_UI_TEST
+        usesInlineComposition = KeyboardPreferences.inlineComposition
+        #endif
         startEngine()
     }
 
@@ -483,7 +499,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     override func textWillChange(_ textInput: UITextInput?) {
         super.textWillChange(textInput)
-        guard !isPublishingCommit else { return }
+        // With inline composition, end it in textDidChange once the host settles.
+        guard !isEditingHost, markedComposition.isEmpty else { return }
         cancelLocalComposition()
     }
 
@@ -498,6 +515,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     override func textDidChange(_ textInput: UITextInput?) {
         super.textDidChange(textInput)
         applyColors()
+        // A change this keyboard did not make (for example the user moving the
+        // caret) ends the composition. Hosts keep or drop the marked code
+        // themselves; clearing it never leaves an orphaned marked range behind.
+        // The document context excludes marked text, so it cannot tell us more.
+        guard !isEditingHost, !markedComposition.isEmpty else { return }
+        cancelLocalComposition()
     }
 
     private func startEngine() {
@@ -626,6 +649,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var testFeedbackCount = 0
 
     func verifyCandidateCollection(dictionary: URL) async throws -> String {
+        usesInlineComposition = false
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let engine = try InputService(paths: .temporary(root: root, sharedData: dictionary.deletingLastPathComponent()), enabledSchemas: [.flypy], candidateLimit: nil)
@@ -691,31 +715,33 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         insertNewline()
         precondition(testLastCommit == "qzxvqq" && !hasActiveEngineComposition && compositionLabel.isHidden)
         try verifyLocalComposition()
-        return "PASS collection: \(count) items, \(created) additional cells, \(rounds) scroll batches, selection 6/33/last, stale batch rejected, query reset, local composition and host cursor isolation"
+        try verifyInlineComposition()
+        return "PASS collection: \(count) items, \(created) additional cells, \(rounds) scroll batches, selection 6/33/last, stale batch rejected, query reset, local and inline composition"
+    }
+
+    private func typeTestCode(_ text: String) {
+        for character in text {
+            let button = UIButton()
+            button.setTitle(String(character), for: .normal)
+            keyPressed(button)
+        }
     }
 
     private func verifyLocalComposition() throws {
+        usesInlineComposition = false
         let proxy = TouchTestDocumentProxy(text: "前后", cursor: 1)
         testDocumentProxy = proxy
         defer { testDocumentProxy = nil }
         session?.clearComposition()
 
-        func typeCode(_ text: String) {
-            for character in text {
-                let button = UIButton()
-                button.setTitle(String(character), for: .normal)
-                keyPressed(button)
-            }
-        }
-
-        typeCode("ni")
+        typeTestCode("ni")
         precondition(compositionLabel.text == "ni" && !compositionLabel.isHidden)
         precondition(proxy.text == "前后" && proxy.documentContextBeforeInput == "前")
         deleteBackwardOnce()
         precondition(compositionLabel.text == "n" && proxy.text == "前后")
         deleteBackwardOnce()
         precondition(compositionLabel.isHidden && proxy.text == "前后")
-        typeCode("ni")
+        typeTestCode("ni")
         guard case .candidate(let expected) = suggestionItems[0] else {
             throw InputEngineError.smokeAssertion("missing local candidate")
         }
@@ -723,23 +749,23 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         precondition(proxy.text == "前" + expected.text + "后")
         precondition(proxy.documentContextBeforeInput == "前" + expected.text)
         precondition(proxy.documentContextAfterInput == "后" && compositionLabel.isHidden)
-        typeCode("qzxvqq")
+        typeTestCode("qzxvqq")
         precondition(compositionLabel.text == "qzxvqq" && suggestionItems.isEmpty)
         insertNewline()
         precondition(proxy.documentContextBeforeInput == "前" + expected.text + "qzxvqq")
         precondition(compositionLabel.isHidden)
-        typeCode("ni")
+        typeTestCode("ni")
         toggleASCII()
         precondition(proxy.documentContextBeforeInput?.hasSuffix("qzxvqqni") == true)
         precondition(compositionLabel.isHidden && session?.option("ascii_mode") == true)
-        typeCode("a")
+        typeTestCode("a")
         precondition(proxy.documentContextBeforeInput?.hasSuffix("nia") == true)
         toggleASCII()
 
         // A search field may notify its delegate during insertion. A commit
         // with a new syllable must retain that syllable through the callback.
         proxy.onChange = { [weak self] _ in self?.textWillChange(nil) }
-        typeCode("birun")
+        typeTestCode("birun")
         precondition(proxy.documentContextBeforeInput?.hasSuffix("比如") == true)
         precondition(compositionLabel.text == "n" && hasActiveEngineComposition)
         let continued = try session!.readSnapshot()
@@ -749,10 +775,67 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         textWillChange(nil)
         precondition(compositionLabel.isHidden && !hasActiveEngineComposition)
         precondition(proxy.text == committed)
-        typeCode("ni")
+        typeTestCode("ni")
         viewWillDisappear(false)
         precondition(compositionLabel.isHidden && !hasActiveEngineComposition && proxy.text == committed)
         precondition(proxy.markedTextCalls == 0 && proxy.cursorAdjustmentCalls == 0)
+    }
+
+    private func verifyInlineComposition() throws {
+        usesInlineComposition = true
+        let proxy = TouchTestDocumentProxy(text: "前后", cursor: 1)
+        testDocumentProxy = proxy
+        defer {
+            testDocumentProxy = nil
+            usesInlineComposition = false
+        }
+        session?.clearComposition()
+
+        typeTestCode("ni")
+        precondition(proxy.text == "前ni后" && proxy.markedText == "ni" && compositionLabel.isHidden)
+        deleteBackwardOnce()
+        precondition(proxy.text == "前n后" && proxy.markedText == "n")
+        deleteBackwardOnce()
+        precondition(proxy.text == "前后" && proxy.markedText == nil && !hasActiveEngineComposition)
+
+        typeTestCode("ni")
+        guard case .candidate(let expected) = suggestionItems[0] else {
+            throw InputEngineError.smokeAssertion("missing inline candidate")
+        }
+        space()
+        precondition(proxy.text == "前" + expected.text + "后" && proxy.markedText == nil)
+
+        typeTestCode("qzxvqq")
+        insertNewline()
+        precondition(proxy.documentContextBeforeInput == "前" + expected.text + "qzxvqq")
+        precondition(proxy.markedText == nil)
+
+        typeTestCode("ni")
+        toggleASCII()
+        precondition(proxy.documentContextBeforeInput?.hasSuffix("qzxvqqni") == true && proxy.markedText == nil)
+        toggleASCII()
+
+        // An automatic commit that continues with a new syllable: the commit
+        // must land before the marked code, even if the host calls back mid-edit.
+        proxy.onChange = { [weak self] _ in self?.textWillChange(nil) }
+        typeTestCode("birun")
+        proxy.onChange = nil
+        precondition(proxy.documentContextBeforeInput?.hasSuffix("比如n") == true)
+        precondition(proxy.markedText == "n" && hasActiveEngineComposition)
+
+        // The user moves the caret: the host keeps the code as plain text and
+        // the keyboard drops its composition without deleting anything.
+        let beforeMove = proxy.text
+        proxy.userMovesCaret(to: 1)
+        textDidChange(nil)
+        precondition(!hasActiveEngineComposition && proxy.text == beforeMove)
+        typeTestCode("a")
+        precondition(proxy.markedText == "a" && proxy.documentContextBeforeInput == "前a")
+
+        // Dismissing the keyboard removes the uncommitted code.
+        viewWillDisappear(false)
+        precondition(proxy.text == beforeMove && proxy.markedText == nil && !hasActiveEngineComposition)
+        precondition(proxy.cursorAdjustmentCalls == 0)
     }
     #endif
 
@@ -1671,9 +1754,10 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             #if CANDIDATE_UI_TEST
             testLastCommit = commit
             #endif
-            isPublishingCommit = true
-            textDocumentProxy.insertText(commit)
-            isPublishingCommit = false
+            // Replace the marked code with the commit before marking any code
+            // that continues after it (for example 比如 + n from "birun").
+            setMarkedComposition("")
+            editHost { textDocumentProxy.insertText(commit) }
         }
         asciiButton.setTitle(snapshot.status.isASCIIMode ? "英" : "中", for: .normal)
         asciiButton.accessibilityValue = snapshot.status.isASCIIMode ? "英文模式" : "中文模式"
@@ -1694,8 +1778,29 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     }
 
     private func updateCompositionDisplay(_ text: String) {
-        compositionLabel.text = text
+        compositionLabel.text = usesInlineComposition ? nil : text
         compositionLabel.accessibilityValue = text
-        compositionLabel.isHidden = text.isEmpty
+        compositionLabel.isHidden = usesInlineComposition || text.isEmpty
+        setMarkedComposition(usesInlineComposition ? text : "")
+    }
+
+    /// Mirrors the code into the host as marked text, like the system keyboards.
+    /// An empty string removes it without committing: `unmarkText()` would leave
+    /// the code in the document and cost the user an extra Backspace.
+    private func setMarkedComposition(_ text: String) {
+        guard text != markedComposition else { return }
+        editHost {
+            textDocumentProxy.setMarkedText(
+                text,
+                selectedRange: NSRange(location: (text as NSString).length, length: 0)
+            )
+        }
+        markedComposition = text
+    }
+
+    private func editHost(_ edit: () -> Void) {
+        isEditingHost = true
+        edit()
+        isEditingHost = false
     }
 }

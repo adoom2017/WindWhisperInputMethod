@@ -31,6 +31,12 @@ struct SettingsView: View {
     )
     private var hapticIntensity = KeyboardSharedPreferences.defaultHapticIntensity
 
+    @AppStorage(
+        KeyboardSharedPreferences.inlineCompositionKey,
+        store: UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier)
+    )
+    private var inlineComposition = KeyboardSharedPreferences.defaultInlineComposition
+
     @Environment(\.openURL) private var openURL
     @State private var trialText = ""
 
@@ -77,6 +83,14 @@ struct SettingsView: View {
                     }
                 } footer: {
                     Text("自定义词组仅在小鹤音形方案下生效。")
+                }
+
+                Section {
+                    Toggle("在输入框中显示编码", isOn: $inlineComposition)
+                } header: {
+                    Text("编码显示")
+                } footer: {
+                    Text("开启时，输入的编码像系统键盘一样显示在输入框里；关闭后显示在候选栏左侧。个别 App 中编码显示异常时，可以关闭此项。")
                 }
 
                 Section("按键反馈") {

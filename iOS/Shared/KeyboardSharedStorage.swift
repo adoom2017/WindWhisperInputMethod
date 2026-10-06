@@ -5,6 +5,10 @@ enum KeyboardSharedPreferences {
     static let schemaKey = "schema"
     static let hapticIntensityKey = "hapticIntensity"
     static let defaultHapticIntensity = 0.9
+    /// Show the uncommitted code in the host text field (like the system
+    /// keyboards) instead of above the keys.
+    static let inlineCompositionKey = "inlineComposition"
+    static let defaultInlineComposition = true
 
     static func normalizedHapticIntensity(_ value: Double) -> Double {
         guard value.isFinite else { return defaultHapticIntensity }

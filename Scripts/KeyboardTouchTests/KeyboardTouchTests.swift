@@ -74,6 +74,46 @@ final class KeyboardTouchTests: XCTestCase {
         verifyInstalledExtensionGapTaps(dark: true)
     }
 
+    /// Requires the extension installed and enabled; checks the code is shown
+    /// as marked text inside a real UITextField, like the system keyboards.
+    @MainActor
+    func testInstalledExtensionInlineComposition() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--keyboard-extension-test"]
+        app.launch()
+        let field = app.textFields["extensionText"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10))
+        field.tap()
+        let mode = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["中", "英"])).firstMatch
+        XCTAssertTrue(mode.waitForExistence(timeout: 10), "The keyboard engine must be ready")
+        if mode.label == "英" { mode.tap() }
+        func value() -> String { field.value as? String ?? "" }
+
+        app.buttons["n"].tap()
+        app.buttons["i"].tap()
+        XCTAssertEqual(value(), "ni", "The code is shown in the text field")
+        app.buttons["删除"].tap()
+        XCTAssertEqual(value(), "n")
+        app.buttons["删除"].tap()
+        XCTAssertEqual(value(), "", "Deleting the last code character leaves nothing behind")
+
+        app.buttons["n"].tap()
+        app.buttons["i"].tap()
+        let candidate = app.collectionViews.cells
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "候选词 ")).firstMatch
+        XCTAssertTrue(candidate.waitForExistence(timeout: 5))
+        let expected = String(candidate.label.dropFirst("候选词 ".count))
+        // The 中/英 toggle sits inside the space bar; tap away from it.
+        app.buttons["空格"].coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
+        XCTAssertEqual(value(), expected, "Space replaces the code with the candidate")
+
+        app.buttons["n"].tap()
+        XCTAssertEqual(value(), expected + "n", "A new code follows the committed text")
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
     @MainActor
     private func verifyInstalledExtensionGapTaps(dark: Bool) {
         let app = XCUIApplication()
