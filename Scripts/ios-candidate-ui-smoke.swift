@@ -26,6 +26,21 @@ final class CandidateTestSceneDelegate: UIResponder, UIWindowSceneDelegate {
         let window = UIWindow(windowScene: windowScene)
         let host = UIViewController()
         host.view.backgroundColor = .systemGray5
+        if ProcessInfo.processInfo.arguments.contains("--keyboard-extension-test"),
+           ProcessInfo.processInfo.arguments.contains("--text-view") {
+            // Multi-line hosts (SwiftUI TextField(axis: .vertical), notes) use UITextView.
+            let textView = UITextView(frame: CGRect(x: 20, y: 100, width: 300, height: 120))
+            textView.font = .systemFont(ofSize: 17)
+            textView.accessibilityIdentifier = "extensionText"
+            textView.autocorrectionType = .no
+            textView.autocapitalizationType = .none
+            host.view.addSubview(textView)
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            self.window = window
+            textView.becomeFirstResponder()
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("--keyboard-extension-test") {
             let field = UITextField(frame: CGRect(x: 20, y: 100, width: 300, height: 60))
             if ProcessInfo.processInfo.arguments.contains("--dark-keyboard") {
@@ -134,7 +149,10 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     var markedText: String? {
         markedRange.map { String(Array(text)[$0]) }
     }
-    var documentContextBeforeInput: String? { String(text.prefix(cursor)) }
+    /// Like iOS, the document context excludes marked text.
+    var documentContextBeforeInput: String? { String(text.prefix(markedRange?.lowerBound ?? cursor)) }
+    /// Everything before the caret, marked text included (test assertions).
+    var textBeforeCaret: String { String(text.prefix(cursor)) }
     var documentContextAfterInput: String? { String(text.dropFirst(cursor)) }
     var selectedText: String? { nil }
     var documentInputMode: UITextInputMode? { nil }

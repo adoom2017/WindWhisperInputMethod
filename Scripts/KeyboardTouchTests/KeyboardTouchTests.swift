@@ -78,10 +78,20 @@ final class KeyboardTouchTests: XCTestCase {
     /// as marked text inside a real UITextField, like the system keyboards.
     @MainActor
     func testInstalledExtensionInlineComposition() {
+        verifyInstalledExtensionInlineComposition(textView: false)
+    }
+
+    @MainActor
+    func testInstalledExtensionInlineCompositionInTextView() {
+        verifyInstalledExtensionInlineComposition(textView: true)
+    }
+
+    @MainActor
+    private func verifyInstalledExtensionInlineComposition(textView: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["--keyboard-extension-test"]
+        app.launchArguments = ["--keyboard-extension-test"] + (textView ? ["--text-view"] : [])
         app.launch()
-        let field = app.textFields["extensionText"]
+        let field = textView ? app.textViews["extensionText"] : app.textFields["extensionText"]
         XCTAssertTrue(field.waitForExistence(timeout: 10))
         field.tap()
         let mode = app.staticTexts.matching(NSPredicate(format: "label IN %@", ["中", "英"])).firstMatch
@@ -115,6 +125,16 @@ final class KeyboardTouchTests: XCTestCase {
         // A four-key shape code commits automatically and the next key continues.
         for key in ["b", "i", "r", "u", "n"] { app.buttons[key].tap() }
         XCTAssertEqual(value(), expected + "比如n", "Automatic commit keeps the caret after the text")
+
+        // Return commits the raw code in one press: the next code must not
+        // replace it, which it would if the code were still marked.
+        app.buttons["删除"].tap()
+        app.buttons["n"].tap()
+        app.buttons["i"].tap()
+        app.buttons["换行"].firstMatch.tap()
+        XCTAssertEqual(value(), expected + "比如ni")
+        app.buttons["a"].tap()
+        XCTAssertEqual(value(), expected + "比如nia", "One Return press commits the code")
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.lifetime = .keepAlways
         add(screenshot)

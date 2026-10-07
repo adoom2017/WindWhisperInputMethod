@@ -373,6 +373,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var isHostSettling = false
     private var hostSettleTimer: Timer?
     private var pendingCommit = ""
+    /// A raw-code commit inserted over its own marked code; verified once the
+    /// host settled, because legacy Flutter hosts insert a second copy.
+    private var rawCodeCommitCheck: (contextBefore: String, code: String)?
     private var pendingMarkedComposition: String?
     /// Native text fields echo our own commit ~50-70 ms later; that echo must
     /// not end the code typed after the commit. Hosts without the echo (Flutter)
@@ -855,7 +858,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         textDidChange(nil)
         precondition(!hasActiveEngineComposition && proxy.text == beforeMove)
         typeTestCode("a")
-        precondition(proxy.markedText == "a" && proxy.documentContextBeforeInput == "前a")
+        precondition(proxy.markedText == "a" && proxy.textBeforeCaret == "前a")
 
         // Dismissing the keyboard removes the uncommitted code.
         viewWillDisappear(false)
@@ -894,15 +897,18 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         try check(proxy.text == "前" + expected.text + "后" && proxy.markedText == nil, "space")
 
         typeTestCode("qzxvqq")
+        let callsBeforeReturn = proxy.markedTextCalls
         insertNewline()
         settleHost()
-        try check(proxy.documentContextBeforeInput == "前" + expected.text + "qzxvqq"
+        // Return never removes and re-inserts the code (that flickers).
+        try check(proxy.markedTextCalls == callsBeforeReturn, "return in place")
+        try check(proxy.textBeforeCaret == "前" + expected.text + "qzxvqq"
             && proxy.markedText == nil, "return")
 
         typeTestCode("ni")
         toggleASCII()
         settleHost()
-        try check(proxy.documentContextBeforeInput?.hasSuffix("qzxvqqni") == true
+        try check(proxy.textBeforeCaret.hasSuffix("qzxvqqni")
             && proxy.markedText == nil, "ascii")
         toggleASCII()
 
@@ -911,13 +917,13 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         proxy.onChange = { [weak self] _ in self?.textWillChange(nil) }
         typeTestCode("birun")
         proxy.onChange = nil
-        try check(proxy.documentContextBeforeInput?.hasSuffix("比如n") == true
+        try check(proxy.textBeforeCaret.hasSuffix("比如n") == true
             && proxy.markedText == "n" && hasActiveEngineComposition, "auto commit")
 
         try check(proxy.markedText == "n" && hasActiveEngineComposition, "echo")
         deleteBackwardOnce()
         settleHost()
-        try check(proxy.documentContextBeforeInput?.hasSuffix("比如") == true
+        try check(proxy.textBeforeCaret.hasSuffix("比如") == true
             && proxy.markedText == nil, "delete after commit")
 
         // Typing on while the host is still applying a commit keeps the order.
@@ -927,7 +933,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
         space()
         settleHost()
-        try check(proxy.documentContextBeforeInput?.hasSuffix("比如比如" + next.text) == true
+        try check(proxy.textBeforeCaret.hasSuffix("比如比如" + next.text) == true
             && proxy.markedText == nil, "fast typing")
     }
     #endif
@@ -1905,6 +1911,18 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             pendingCommit += text
             return
         }
+        if !markedComposition.isEmpty, text == markedComposition {
+            // Return commits the raw code. A bare unmarkText is unreliable (the
+            // underline can stay until a second press) and remove-then-insert
+            // flickers. UIKit hosts replace the marked code in place; legacy
+            // Flutter keeps it and inserts a copy, which finishHostSettling()
+            // removes.
+            rawCodeCommitCheck = (textDocumentProxy.documentContextBeforeInput ?? "", text)
+            writeHost { textDocumentProxy.insertText(text) }
+            markedComposition = ""
+            beginHostSettling()
+            return
+        }
         let replacesMarkedCode = !markedComposition.isEmpty
         writeHost {
             if replacesMarkedCode {
@@ -1920,11 +1938,15 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         markedComposition = ""
         if replacesMarkedCode {
             ignoresHostEchoUntil = ProcessInfo.processInfo.systemUptime + 0.5
-            isHostSettling = true
-            hostSettleTimer?.invalidate()
-            hostSettleTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: false) { [weak self] _ in
-                MainActor.assumeIsolated { self?.finishHostSettling() }
-            }
+            beginHostSettling()
+        }
+    }
+
+    private func beginHostSettling() {
+        isHostSettling = true
+        hostSettleTimer?.invalidate()
+        hostSettleTimer = Timer.scheduledTimer(withTimeInterval: 0.12, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.finishHostSettling() }
         }
     }
 
@@ -1933,11 +1955,22 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         hostSettleTimer = nil
         guard isHostSettling else { return }
         isHostSettling = false
+        if let check = rawCodeCommitCheck {
+            rawCodeCommitCheck = nil
+            let context = textDocumentProxy.documentContextBeforeInput ?? ""
+            let tail = String(check.contextBefore.suffix(16))
+            if context.hasSuffix(tail + check.code + check.code) {
+                writeHost {
+                    for _ in check.code { textDocumentProxy.deleteBackward() }
+                }
+            }
+        }
         if !pendingCommit.isEmpty {
             let commit = pendingCommit
             pendingCommit = ""
             // Plain inserts before a mark keep their order when merged.
             writeHost { textDocumentProxy.insertText(commit) }
+            ignoresHostEchoUntil = ProcessInfo.processInfo.systemUptime + 0.5
         }
         if let pending = pendingMarkedComposition {
             setMarkedComposition(pending)
