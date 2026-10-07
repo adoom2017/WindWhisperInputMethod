@@ -28,11 +28,16 @@ jobs:
       WINDWHISPER_APP_SIGN_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
       WINDWHISPER_INSTALLER_SIGN_IDENTITY: ${{ secrets.MACOS_INSTALLER_SIGNING_IDENTITY }}
       WINDWHISPER_NOTARY_PROFILE: windwhisper-ci
-      WINDWHISPER_NOTARY_KEYCHAIN: ${{ runner.temp }}/windwhisper-signing.keychain-db
-      KEYCHAIN_PATH: ${{ runner.temp }}/windwhisper-signing.keychain-db
       KEYCHAIN_PASSWORD: ${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
+      - name: Configure temporary signing paths
+        run: |
+          set -euo pipefail
+          keychain_path="$RUNNER_TEMP/windwhisper-signing.keychain-db"
+          echo "KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
+          echo "WINDWHISPER_NOTARY_KEYCHAIN=$keychain_path" >> "$GITHUB_ENV"
+
       - name: Check out release source
         uses: actions/checkout@v4
         with:
