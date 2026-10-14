@@ -25,6 +25,7 @@ public:
     ~CandidateWindow();
 
 private:
+    friend struct CandidateWindowTestAccess;
     static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
     void Paint(HDC);
     void ApplyFrameStyle();

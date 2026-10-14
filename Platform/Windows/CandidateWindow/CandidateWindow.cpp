@@ -87,10 +87,13 @@ HFONT CreateUiFont(UINT dpi, int logical_height, int weight = FW_NORMAL,
 int TextWidth(HDC dc, HFONT font, const std::wstring &text) {
     if (text.empty()) return 0;
     HGDIOBJ previous = SelectObject(dc, font);
-    SIZE size{};
-    GetTextExtentPoint32W(dc, text.c_str(), static_cast<int>(text.size()), &size);
+    RECT bounds{};
+    // Measure with the same formatting API used to paint (including fallback
+    // fonts and glyph overhang), so a fitting word never becomes an ellipsis.
+    DrawTextW(dc, text.c_str(), static_cast<int>(text.size()), &bounds,
+              DT_CALCRECT | DT_SINGLELINE | DT_NOPREFIX);
     SelectObject(dc, previous);
-    return size.cx;
+    return bounds.right - bounds.left;
 }
 
 void FillRoundRect(HDC dc, const RECT &rect, int diameter, COLORREF color) {
@@ -190,19 +193,28 @@ CandidateWindow::~CandidateWindow() {
 std::vector<int> CandidateWindow::MeasureItems(HDC dc) const {
     HFONT primary = CreateUiFont(dpi_, kPrimaryFontSize);
     HFONT secondary = CreateUiFont(dpi_, kSecondaryFontSize);
+    HFONT index_bold = CreateUiFont(dpi_, kSecondaryFontSize, FW_SEMIBOLD);
     std::vector<int> widths;
     widths.reserve(items_.size());
     for (size_t index = 0; index < items_.size(); ++index) {
         const auto &item = items_[index];
-        int width = Scale(kItemPadding * 2 + kIndexGap, dpi_) +
-                    TextWidth(dc, secondary, std::to_wstring(index + 1)) +
-                    TextWidth(dc, primary, item.text);
+        const std::wstring number = std::to_wstring(index + 1);
+        // Highlighted indices are semibold and can be wider than regular
+        // indices. Reserve both widths, even when the highlight changes.
+        const int number_width = std::max(TextWidth(dc, secondary, number),
+                                          TextWidth(dc, index_bold, number));
+        const int candidate_width = Scale(kItemPadding * 2 + kIndexGap, dpi_) +
+                                    number_width + TextWidth(dc, primary, item.text);
+        int width = candidate_width;
         if (!item.comment.empty()) {
             width += Scale(kCommentGap, dpi_) + TextWidth(dc, secondary, item.comment);
         }
-        widths.push_back(std::clamp(width, Scale(kMinItemWidth, dpi_),
-                                    Scale(kMaxItemWidth, dpi_)));
+        // The soft cap trims long comments, not the candidate itself. Long
+        // phrases may use more space as long as the monitor can accommodate it.
+        widths.push_back(std::max({Scale(kMinItemWidth, dpi_), candidate_width,
+                                  std::min(width, Scale(kMaxItemWidth, dpi_))}));
     }
+    DeleteObject(index_bold);
     DeleteObject(secondary);
     DeleteObject(primary);
     return widths;
@@ -328,7 +340,8 @@ void CandidateWindow::Paint(HDC dc) {
         const int content_right = cell.right - padding;
         const int text_width = TextWidth(buffer, primary, item.text);
         RECT text_rect{content_left, cell.top,
-                       std::min(content_right, content_left + text_width), cell.bottom};
+                       item.comment.empty() ? content_right
+                           : std::min(content_right, content_left + text_width), cell.bottom};
         DrawTextIn(buffer, primary, highlighted ? palette.highlight_text : palette.text,
                    item.text, text_rect, DT_LEFT | DT_END_ELLIPSIS);
         if (!item.comment.empty()) {
