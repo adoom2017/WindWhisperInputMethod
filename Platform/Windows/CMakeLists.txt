@@ -32,6 +32,10 @@ if(WIN32)
   target_link_libraries(fy_input_mode_icon_test PRIVATE user32 gdi32 advapi32)
   add_test(NAME input_mode_icon COMMAND fy_input_mode_icon_test)
 
+  add_executable(fy_candidate_window_test CandidateWindow/CandidateWindow.cpp CandidateWindow/CandidateWindowTest.cpp)
+  target_link_libraries(fy_candidate_window_test PRIVATE user32 gdi32 dwmapi)
+  add_test(NAME candidate_window COMMAND fy_candidate_window_test)
+
   # The registration helper is invoked several times by Windows Installer.
   # Build it as a GUI-subsystem executable so those background custom actions
   # never flash console windows during install, upgrade, or uninstall.
