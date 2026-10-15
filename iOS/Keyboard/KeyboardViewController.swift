@@ -1071,9 +1071,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
                 Array("zxcvbnm").map(String.init)
             ]
         case .numbers:
+            // Chinese mode: writing punctuation is Chinese, functional symbols
+            // stay half-width like the hardware-keyboard engine (ADR-008).
             rows = usesChineseSymbols ? [
                 Array("1234567890").map(String.init),
-                ["－", "／", "：", "；", "（", "）", "￥", "＆", "＠"],
+                ["-", "/", "：", "；", "（", "）", "￥", "&", "@"],
                 ["。", "，", "？", "！", "‘’", "“”"]
             ] : [
                 Array("1234567890").map(String.init),
@@ -1082,8 +1084,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             ]
         case .symbols:
             rows = usesChineseSymbols ? [
-                ["【", "】", "｛", "｝", "＃", "％", "＾", "＊", "＋", "＝"],
-                ["＿", "＼", "｜", "～", "《", "》", "€", "£", "￥"],
+                ["【", "】", "{", "}", "#", "%", "^", "*", "+", "="],
+                ["_", "\\", "|", "~", "《", "》", "€", "£", "$"],
                 ["·", "……", "，", "。", "？", "！"]
             ] : [
                 ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="],
