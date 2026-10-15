@@ -52,6 +52,15 @@ FY_API void fy_session_reset(fy_session *session);
 FY_API int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers);
 FY_API int fy_session_select_candidate(fy_session *session, size_t index);
 FY_API int fy_session_page(fy_session *session, int delta);
+// Tells the session that the host received text without going through it
+// (keys the engine passed through), so context rules such as "3." keeping a
+// half-width period still apply. An empty text clears that context.
+FY_API void fy_session_note_host_text(fy_session *session, const char *text, size_t length);
+// Options: "traditional", "full_shape" (full-width letters, digits and
+// symbols), "ascii_punct" (English instead of Chinese punctuation), and the
+// per-key Chinese forms "punct_bracket" ([ ] → 【】), "punct_angle" (< > → 《》),
+// "punct_backslash" (\ → 、), "punct_caret" (^ → ……), "punct_underscore"
+// (_ → ——), all on by default, plus "punct_yuan" ($ → ￥), off by default.
 FY_API int fy_session_set_option(fy_session *session, const char *name, size_t name_len, int value);
 FY_API int fy_session_select_schema(fy_session *session, const char *schema, size_t schema_len);
 FY_API int fy_session_snapshot(fy_session *session, fy_snapshot *out);

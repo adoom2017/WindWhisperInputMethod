@@ -1110,8 +1110,19 @@ final class InputSession: @unchecked Sendable {
         "zh_simp": true,
         "zh_trad": false,
         "ascii_punct": false,
+        "punct_bracket": true,
+        "punct_angle": true,
+        "punct_backslash": true,
+        "punct_caret": true,
+        "punct_underscore": true,
+        "punct_yuan": false,
     ]
     private var leftShiftPending = false
+    // Last ASCII character that reached the host literally; lets "3." and
+    // "12:30" keep half-width separators after a digit.
+    private var previousLiteral: Character?
+    private var doubleQuoteOpen = false
+    private var singleQuoteOpen = false
     private let pageSize = 5
     private let candidateBatchSize = 32
 
@@ -1134,6 +1145,8 @@ final class InputSession: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         pendingCommit = nil
+        let previousLiteral = self.previousLiteral
+        self.previousLiteral = nil
 
         if keyCode == Key.shiftLeft {
             if modifierMask & InputEngineModifierMask.release != 0 {
@@ -1248,14 +1261,21 @@ final class InputSession: @unchecked Sendable {
                 }
                 return true
             }
-            if character == "'", schema == .fullPinyin {
+            if character == "'", schema == .fullPinyin, !buffer.isEmpty {
                 buffer.append(character)
                 updateCandidates()
                 return true
             }
-            if let punctuation = punctuation(for: character) {
-                if !buffer.isEmpty { commitSelectedCandidate(suffix: punctuation) }
-                else { pendingCommit = punctuation }
+            let output = punctuation(for: character, after: previousLiteral)
+            if output == nil || output == String(character) {
+                self.previousLiteral = character
+            }
+            if !buffer.isEmpty {
+                commitSelectedCandidate(suffix: output ?? String(character))
+                return true
+            }
+            if let output {
+                pendingCommit = output
                 return true
             }
         }
@@ -1298,6 +1318,7 @@ final class InputSession: @unchecked Sendable {
     func clearComposition() {
         lock.lock()
         clearComposition(keepingCommit: false)
+        previousLiteral = nil
         lock.unlock()
     }
 
@@ -1536,20 +1557,51 @@ final class InputSession: @unchecked Sendable {
         return false
     }
 
-    private func punctuation(for character: Character) -> String? {
-        let ascii = String(character)
-        if options["ascii_punct"] == true { return ascii }
-        let mapping: [Character: String] = [
-            ",": "，", ".": "。", "/": "、", "?": "？", ";": "；", ":": "：",
-            "!": "！", "(": "（", ")": "）", "[": "【", "]": "】",
-        ]
-        if let mapped = mapping[character] { return mapped }
-        if options["full_shape"] == true, let scalar = character.unicodeScalars.first,
-            scalar.value >= 0x21, scalar.value <= 0x7E,
-            let fullWidth = UnicodeScalar(scalar.value + 0xFEE0)
-        {
+    /// Chinese punctuation for writing; functional symbols such as `@ # % / $`
+    /// stay ASCII unless full-width characters are enabled. `nil` means the key
+    /// should reach the host unchanged.
+    private func punctuation(for character: Character, after previous: Character?) -> String? {
+        guard character.isASCII, let scalar = character.unicodeScalars.first,
+            scalar.value >= 0x21, scalar.value <= 0x7E
+        else { return nil }
+        if options["ascii_punct"] != true {
+            if previous?.isASCII == true, previous?.isNumber == true,
+                character == "." || character == ":"
+            {
+                return String(character)
+            }
+            switch character {
+            case "\"":
+                doubleQuoteOpen.toggle()
+                return doubleQuoteOpen ? "\u{201C}" : "\u{201D}"
+            case "'":
+                singleQuoteOpen.toggle()
+                return singleQuoteOpen ? "\u{2018}" : "\u{2019}"
+            default:
+                if let (option, mapped) = Self.optionalPunctuation[character] {
+                    if options[option] == true { return mapped }
+                } else if let mapped = Self.chinesePunctuation[character] {
+                    return mapped
+                }
+            }
+        }
+        if options["full_shape"] == true, let fullWidth = UnicodeScalar(scalar.value + 0xFEE0) {
             return String(fullWidth)
         }
         return nil
     }
+
+    private static let chinesePunctuation: [Character: String] = [
+        ",": "，", ".": "。", "?": "？", "!": "！", ":": "：", ";": "；",
+        "(": "（", ")": "）",
+    ]
+
+    /// Punctuation the user can individually keep as ASCII (or, for `$`, opt
+    /// into); keyed by the option that enables the Chinese form.
+    private static let optionalPunctuation: [Character: (String, String)] = [
+        "[": ("punct_bracket", "【"), "]": ("punct_bracket", "】"),
+        "<": ("punct_angle", "《"), ">": ("punct_angle", "》"),
+        "\\": ("punct_backslash", "、"), "^": ("punct_caret", "……"),
+        "_": ("punct_underscore", "——"), "$": ("punct_yuan", "￥"),
+    ]
 }

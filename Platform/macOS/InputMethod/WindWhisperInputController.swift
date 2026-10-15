@@ -76,6 +76,20 @@ final class WindWhisperInputController: IMKInputController, @unchecked Sendable 
             FengYuSettingsMenuController.shared.selectSchema(.fullPinyin)
         case #selector(fengYuToggleFullWidthCommand(_:)):
             FengYuSettingsMenuController.shared.toggleFullWidth()
+        case #selector(fengYuToggleASCIIPunctuationCommand(_:)):
+            FengYuSettingsMenuController.shared.toggleASCIIPunctuation()
+        case #selector(fengYuToggleBracketPunctuationCommand(_:)):
+            FengYuSettingsMenuController.shared.togglePunctuationConversion(.bracket)
+        case #selector(fengYuToggleAnglePunctuationCommand(_:)):
+            FengYuSettingsMenuController.shared.togglePunctuationConversion(.angle)
+        case #selector(fengYuToggleBackslashPunctuationCommand(_:)):
+            FengYuSettingsMenuController.shared.togglePunctuationConversion(.backslash)
+        case #selector(fengYuToggleCaretPunctuationCommand(_:)):
+            FengYuSettingsMenuController.shared.togglePunctuationConversion(.caret)
+        case #selector(fengYuToggleUnderscorePunctuationCommand(_:)):
+            FengYuSettingsMenuController.shared.togglePunctuationConversion(.underscore)
+        case #selector(fengYuToggleYuanPunctuationCommand(_:)):
+            FengYuSettingsMenuController.shared.togglePunctuationConversion(.yuan)
         case #selector(fengYuToggleSimplifiedChineseCommand(_:)):
             FengYuSettingsMenuController.shared.toggleSimplifiedChinese()
         case #selector(fengYuSelectHorizontalOrientationCommand(_:)):
@@ -479,6 +493,34 @@ extension WindWhisperInputController {
 
     @objc func fengYuToggleFullWidthCommand(_ command: Any) {
         FengYuSettingsMenuController.shared.toggleFullWidth()
+    }
+
+    @objc func fengYuToggleASCIIPunctuationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.toggleASCIIPunctuation()
+    }
+
+    @objc func fengYuToggleBracketPunctuationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.togglePunctuationConversion(.bracket)
+    }
+
+    @objc func fengYuToggleAnglePunctuationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.togglePunctuationConversion(.angle)
+    }
+
+    @objc func fengYuToggleBackslashPunctuationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.togglePunctuationConversion(.backslash)
+    }
+
+    @objc func fengYuToggleCaretPunctuationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.togglePunctuationConversion(.caret)
+    }
+
+    @objc func fengYuToggleUnderscorePunctuationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.togglePunctuationConversion(.underscore)
+    }
+
+    @objc func fengYuToggleYuanPunctuationCommand(_ command: Any) {
+        FengYuSettingsMenuController.shared.togglePunctuationConversion(.yuan)
     }
 
     @objc func fengYuToggleSimplifiedChineseCommand(_ command: Any) {

@@ -19,6 +19,8 @@ enum FengYuDiagnostics {
         engineVersion=\(runtime.version)
         selectedSchema=\(settings.schema.rawValue)
         fullWidth=\(settings.usesFullWidth)
+        asciiPunctuation=\(settings.usesASCIIPunctuation)
+        punctuationConversions=\(settings.punctuationConversions.map(\.rawValue).sorted().joined(separator: ","))
         simplifiedChinese=\(settings.usesSimplifiedChinese)
         candidateOrientation=\(settings.candidateOrientation.rawValue)
         colorScheme=\(settings.colorScheme.rawValue)
@@ -84,6 +86,25 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
             state: settings.usesFullWidth
         )
         menu.addItem(fullWidth)
+
+        menu.addItem(actionItem(
+            title: "英文标点",
+            action: #selector(WindWhisperInputController.fengYuToggleASCIIPunctuationCommand(_:)),
+            state: settings.usesASCIIPunctuation
+        ))
+
+        let punctuationHeading = NSMenuItem(title: "中文标点", action: nil, keyEquivalent: "")
+        punctuationHeading.isEnabled = false
+        menu.addItem(punctuationHeading)
+        for conversion in PunctuationConversion.allCases {
+            let item = actionItem(
+                title: conversion.displayName,
+                action: punctuationAction(for: conversion),
+                state: settings.punctuationConversions.contains(conversion)
+            )
+            item.indentationLevel = 1
+            menu.addItem(item)
+        }
 
         let simplified = actionItem(
             title: "简体中文",
@@ -170,6 +191,17 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
         }
     }
 
+    private func punctuationAction(for conversion: PunctuationConversion) -> Selector {
+        switch conversion {
+        case .bracket: #selector(WindWhisperInputController.fengYuToggleBracketPunctuationCommand(_:))
+        case .angle: #selector(WindWhisperInputController.fengYuToggleAnglePunctuationCommand(_:))
+        case .backslash: #selector(WindWhisperInputController.fengYuToggleBackslashPunctuationCommand(_:))
+        case .caret: #selector(WindWhisperInputController.fengYuToggleCaretPunctuationCommand(_:))
+        case .underscore: #selector(WindWhisperInputController.fengYuToggleUnderscorePunctuationCommand(_:))
+        case .yuan: #selector(WindWhisperInputController.fengYuToggleYuanPunctuationCommand(_:))
+        }
+    }
+
     private func orientationAction(for orientation: CandidateOrientation) -> Selector {
         switch orientation {
         case .horizontal: #selector(WindWhisperInputController.fengYuSelectHorizontalOrientationCommand(_:))
@@ -192,6 +224,20 @@ final class FengYuSettingsMenuController: NSObject, NSMenuDelegate, @unchecked S
 
     func toggleFullWidth() {
         store.update { $0.usesFullWidth.toggle() }
+        rebuildMenu()
+    }
+
+    func toggleASCIIPunctuation() {
+        store.update { $0.usesASCIIPunctuation.toggle() }
+        rebuildMenu()
+    }
+
+    func togglePunctuationConversion(_ conversion: PunctuationConversion) {
+        store.update {
+            if $0.punctuationConversions.remove(conversion) == nil {
+                $0.punctuationConversions.insert(conversion)
+            }
+        }
         rebuildMenu()
     }
 

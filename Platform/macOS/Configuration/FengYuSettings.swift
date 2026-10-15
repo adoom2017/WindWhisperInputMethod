@@ -40,9 +40,39 @@ enum CandidateColorScheme: String, CaseIterable, Sendable {
     }
 }
 
+/// Chinese-mode punctuation that can be individually switched between its
+/// Chinese form and the plain ASCII key.
+enum PunctuationConversion: String, CaseIterable, Sendable {
+    case bracket
+    case angle
+    case backslash
+    case caret
+    case underscore
+    case yuan
+
+    var optionName: String { "punct_\(rawValue)" }
+
+    var displayName: String {
+        switch self {
+        case .bracket: "[ ] 输出【】"
+        case .angle: "< > 输出《》"
+        case .backslash: "\\ 输出、"
+        case .caret: "^ 输出……"
+        case .underscore: "_ 输出——"
+        case .yuan: "$ 输出￥"
+        }
+    }
+
+    static let defaults: Set<PunctuationConversion> = [
+        .bracket, .angle, .backslash, .caret, .underscore,
+    ]
+}
+
 struct FengYuSettingsSnapshot: Equatable, Sendable {
     var schema: FengYuSchema
     var usesFullWidth: Bool
+    var usesASCIIPunctuation = false
+    var punctuationConversions = PunctuationConversion.defaults
     var usesSimplifiedChinese: Bool
     var candidateOrientation: CandidateOrientation
     var colorScheme: CandidateColorScheme
@@ -64,10 +94,14 @@ struct FengYuSettingsSnapshot: Equatable, Sendable {
         }
         let optionsApplied = [
             session.setOption("full_shape", enabled: usesFullWidth),
+            session.setOption("ascii_punct", enabled: usesASCIIPunctuation),
             session.setOption("simplification", enabled: usesSimplifiedChinese),
             session.setOption("zh_trad", enabled: !usesSimplifiedChinese),
             session.setOption("zh_simp", enabled: usesSimplifiedChinese),
         ].allSatisfy { $0 }
+            && PunctuationConversion.allCases.allSatisfy {
+                session.setOption($0.optionName, enabled: punctuationConversions.contains($0))
+            }
         guard optionsApplied else {
             throw InputEngineError.runtime(
                 code: -3,
@@ -90,6 +124,8 @@ final class FengYuSettingsStore: @unchecked Sendable {
         // v2 keeps the current schema selection isolated from older preference formats.
         static let schema = "settings.schema.v2"
         static let fullWidth = "settings.fullWidth.v1"
+        static let asciiPunctuation = "settings.asciiPunctuation.v1"
+        static let punctuationConversions = "settings.punctuationConversions.v1"
         static let simplified = "settings.simplified.v1"
         static let orientation = "settings.candidateOrientation.v1"
         static let colorScheme = "settings.colorScheme.v1"
@@ -114,6 +150,8 @@ final class FengYuSettingsStore: @unchecked Sendable {
         let keys = [
             Key.schema,
             Key.fullWidth,
+            Key.asciiPunctuation,
+            Key.punctuationConversions,
             Key.simplified,
             Key.orientation,
             Key.colorScheme,
@@ -133,6 +171,9 @@ final class FengYuSettingsStore: @unchecked Sendable {
                     ?? FengYuSettingsSnapshot.defaults.schema,
                 usesFullWidth: boolValue(forKey: Key.fullWidth)
                     ?? FengYuSettingsSnapshot.defaults.usesFullWidth,
+                usesASCIIPunctuation: boolValue(forKey: Key.asciiPunctuation)
+                    ?? FengYuSettingsSnapshot.defaults.usesASCIIPunctuation,
+                punctuationConversions: punctuationConversions(),
                 usesSimplifiedChinese: boolValue(forKey: Key.simplified)
                     ?? FengYuSettingsSnapshot.defaults.usesSimplifiedChinese,
                 candidateOrientation: enumValue(CandidateOrientation.self, forKey: Key.orientation)
@@ -165,6 +206,8 @@ final class FengYuSettingsStore: @unchecked Sendable {
             [
                 Key.schema,
                 Key.fullWidth,
+                Key.asciiPunctuation,
+                Key.punctuationConversions,
                 Key.simplified,
                 Key.orientation,
                 Key.colorScheme,
@@ -183,6 +226,9 @@ final class FengYuSettingsStore: @unchecked Sendable {
                 ?? FengYuSettingsSnapshot.defaults.schema,
             usesFullWidth: boolValue(forKey: Key.fullWidth)
                 ?? FengYuSettingsSnapshot.defaults.usesFullWidth,
+            usesASCIIPunctuation: boolValue(forKey: Key.asciiPunctuation)
+                ?? FengYuSettingsSnapshot.defaults.usesASCIIPunctuation,
+            punctuationConversions: punctuationConversions(),
             usesSimplifiedChinese: boolValue(forKey: Key.simplified)
                 ?? FengYuSettingsSnapshot.defaults.usesSimplifiedChinese,
             candidateOrientation: enumValue(CandidateOrientation.self, forKey: Key.orientation)
@@ -195,6 +241,11 @@ final class FengYuSettingsStore: @unchecked Sendable {
     private func write(_ snapshot: FengYuSettingsSnapshot) {
         defaults.set(snapshot.schema.rawValue, forKey: Key.schema)
         defaults.set(snapshot.usesFullWidth, forKey: Key.fullWidth)
+        defaults.set(snapshot.usesASCIIPunctuation, forKey: Key.asciiPunctuation)
+        defaults.set(
+            snapshot.punctuationConversions.map(\.rawValue).sorted(),
+            forKey: Key.punctuationConversions
+        )
         defaults.set(snapshot.usesSimplifiedChinese, forKey: Key.simplified)
         defaults.set(snapshot.candidateOrientation.rawValue, forKey: Key.orientation)
         defaults.set(snapshot.colorScheme.rawValue, forKey: Key.colorScheme)
@@ -206,6 +257,13 @@ final class FengYuSettingsStore: @unchecked Sendable {
     ) -> Value?
     where Value.RawValue == String {
         defaults.string(forKey: key).flatMap(Value.init(rawValue:))
+    }
+
+    private func punctuationConversions() -> Set<PunctuationConversion> {
+        guard let values = defaults.stringArray(forKey: Key.punctuationConversions) else {
+            return PunctuationConversion.defaults
+        }
+        return Set(values.compactMap(PunctuationConversion.init(rawValue:)))
     }
 
     private func boolValue(forKey key: String) -> Bool? {

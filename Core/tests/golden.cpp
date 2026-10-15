@@ -230,6 +230,49 @@ int main() {
     CHECK(fy_session_snapshot(session, &snapshot));
     CHECK(equals(snapshot.commit, snapshot.commit_len, "你好！"));
 
+    // Half-width Chinese mode: writing punctuation converts, functional
+    // symbols and digits stay ASCII for the host.
+    CHECK(fy_session_set_option(session, "full_shape", 10, 0));
+    const auto commits = [&](uint32_t key, const char *expected) {
+        return fy_session_process_key(session, key, 0) &&
+               fy_session_snapshot(session, &snapshot) &&
+               equals(snapshot.commit, snapshot.commit_len, expected);
+    };
+    CHECK(commits(',', "，"));
+    CHECK(commits('\\', "、"));
+    CHECK(commits('^', "……"));
+    CHECK(commits('_', "——"));
+    CHECK(commits('<', "《"));
+    CHECK(commits('"', "“"));
+    CHECK(commits('"', "”"));
+    CHECK(commits('\'', "‘"));
+    CHECK(commits('\'', "’"));
+    for (uint32_t key : {'@', '#', '%', '/', '$', '1', '+', '&'}) {
+        CHECK(!fy_session_process_key(session, key, 0));
+    }
+    // "3." and "12:30": the digit went to the host, the separator stays ASCII.
+    fy_session_note_host_text(session, "3", 1);
+    CHECK(commits('.', "."));
+    CHECK(commits('.', "。"));
+    fy_session_note_host_text(session, "2", 1);
+    CHECK(commits(':', ":"));
+    fy_session_note_host_text(session, nullptr, 0);
+    CHECK(commits(':', "："));
+    CHECK(type(session, "nihao"));
+    CHECK(fy_session_process_key(session, '@', 0));
+    CHECK(fy_session_snapshot(session, &snapshot));
+    CHECK(equals(snapshot.commit, snapshot.commit_len, "你好@"));
+    CHECK(fy_session_set_option(session, "ascii_punct", 11, 1));
+    CHECK(!fy_session_process_key(session, ',', 0));
+    CHECK(fy_session_set_option(session, "ascii_punct", 11, 0));
+    CHECK(fy_session_set_option(session, "punct_underscore", 16, 0));
+    CHECK(fy_session_set_option(session, "punct_yuan", 10, 1));
+    CHECK(!fy_session_process_key(session, '_', 0));
+    CHECK(commits('$', "￥"));
+    CHECK(commits('[', "【"));
+    CHECK(fy_session_set_option(session, "punct_underscore", 16, 1));
+    CHECK(fy_session_set_option(session, "punct_yuan", 10, 0));
+
     fy_session_destroy(other);
     fy_session_destroy(session);
     fy_engine_destroy(engine);

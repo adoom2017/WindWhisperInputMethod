@@ -115,7 +115,7 @@ Process Exit   ──► destroy sessions ──► finalize engine
 
 ## M7 设置、状态与维护
 
-- `FengYuSettingsStore` 是设置唯一来源，使用版本化 `UserDefaults` key 保存方案、全角、简繁、候选方向和颜色主题；未知枚举值自动回退产品默认，不让损坏偏好阻止输入。
+- `FengYuSettingsStore` 是设置唯一来源，使用版本化 `UserDefaults` key 保存方案、全角、英文标点、简繁、候选方向和颜色主题；未知枚举值自动回退产品默认，不让损坏偏好阻止输入。
 - `IMKInputController.menu()` 返回风语设置菜单，设置只出现在系统输入法菜单中，不创建额外常驻状态栏图标。方案、候选排列和候选主题以顶层叶子按分组排列，规避 `TextInputMenuAgent` 不转发嵌套叶子 action 的限制；菜单 target 不访问 marked text 或候选内容。
 - 新输入引擎 session 由 `NativeRuntime.makeSession()` 统一应用设置；现有 controller 监听进程内通知，在设置变化前先提交组合，再更新自身 session。刷新配置时先完整加载新词库，成功后原子替换服务并重建所有 session；加载失败则继续使用旧服务。
 - Swift 直接设置简繁、全角等运行时选项，不依赖桥接层或外部词库。

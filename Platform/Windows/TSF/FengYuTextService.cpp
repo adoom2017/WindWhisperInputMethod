@@ -28,7 +28,41 @@ volatile LONG g_server_lock_count = 0;
 
 constexpr wchar_t kSettingsPath[] = L"Software\\WindWhisper\\InputMethod";
 constexpr wchar_t kSchemaValue[] = L"Schema";
-constexpr wchar_t kFullWidthValue[] = L"FullWidth";
+// "FullWidth" used to follow the Chinese/English mode toggle; width is now an
+// independent setting that defaults to half-width, so it uses a fresh value.
+constexpr wchar_t kFullWidthValue[] = L"CharacterFullWidth";
+constexpr wchar_t kAsciiPunctuationValue[] = L"AsciiPunctuation";
+
+// Per-key Chinese punctuation: menu id, registry value, engine option and
+// the FyPunctuationOptions field it mirrors.
+struct PunctuationToggle {
+    UINT command;
+    const wchar_t *value;
+    const char *option;
+    const wchar_t *label;
+    bool FyPunctuationOptions::*field;
+};
+constexpr PunctuationToggle kPunctuationToggles[] = {
+    {152, L"PunctuationBracket", "punct_bracket", L"[ ] 输出【】",
+     &FyPunctuationOptions::bracket},
+    {153, L"PunctuationAngle", "punct_angle", L"< > 输出《》",
+     &FyPunctuationOptions::angle},
+    {154, L"PunctuationBackslash", "punct_backslash", L"\\ 输出、",
+     &FyPunctuationOptions::backslash},
+    {155, L"PunctuationCaret", "punct_caret", L"^ 输出……",
+     &FyPunctuationOptions::caret},
+    {156, L"PunctuationUnderscore", "punct_underscore", L"_ 输出——",
+     &FyPunctuationOptions::underscore},
+    {157, L"PunctuationYuan", "punct_yuan", L"$ 输出￥",
+     &FyPunctuationOptions::yuan},
+};
+
+const PunctuationToggle *FindPunctuationToggle(UINT command) {
+    for (const auto &toggle : kPunctuationToggles) {
+        if (toggle.command == command) return &toggle;
+    }
+    return nullptr;
+}
 constexpr wchar_t kTraditionalValue[] = L"Traditional";
 constexpr wchar_t kCandidateLightThemeValue[] = L"CandidateLightTheme";
 constexpr wchar_t kFlypyShapeDisplayName[] = L"小鹤音形";
@@ -322,15 +356,23 @@ public:
         candidate_window_.SetTheme(light ? CandidateWindowTheme::Light
                                          : CandidateWindowTheme::Dark);
     }
-    void SetPreferences(bool full_width, bool traditional) {
+    void SetPreferences(bool full_width, const FyPunctuationOptions &punctuation,
+                        bool traditional) {
         full_width_ = full_width;
+        punctuation_ = punctuation;
         traditional_ = traditional;
-        for (const auto &entry : sessions_) {
-            fy_session_set_option(entry.second->session, "full_shape", 10,
-                                  full_width_ ? 1 : 0);
-            fy_session_set_option(entry.second->session, "traditional", 11,
-                                  traditional_ ? 1 : 0);
+        for (const auto &entry : sessions_) ApplyPreferences(entry.second->session);
+    }
+
+    void ApplyPreferences(fy_session *session) const {
+        fy_session_set_option(session, "full_shape", 10, full_width_ ? 1 : 0);
+        fy_session_set_option(session, "ascii_punct", 11,
+                              punctuation_.chinese ? 0 : 1);
+        for (const auto &toggle : kPunctuationToggles) {
+            fy_session_set_option(session, toggle.option, strlen(toggle.option),
+                                  punctuation_.*toggle.field ? 1 : 0);
         }
+        fy_session_set_option(session, "traditional", 11, traditional_ ? 1 : 0);
     }
 
     ~FengYuTextServiceState() {
@@ -357,10 +399,7 @@ public:
         if (!created->session) {
             return nullptr;
         }
-        fy_session_set_option(created->session, "full_shape", 10,
-                              full_width_ ? 1 : 0);
-        fy_session_set_option(created->session, "traditional", 11,
-                              traditional_ ? 1 : 0);
+        ApplyPreferences(created->session);
         sessions_.emplace(context, created);
         return created;
     }
@@ -415,7 +454,8 @@ private:
     std::unordered_map<ITfContext *, std::shared_ptr<FengYuContextSession>> sessions_;
     CandidateWindow candidate_window_;
     std::string schema_ = "flypyShape";
-    bool full_width_ = true;
+    bool full_width_ = false;
+    FyPunctuationOptions punctuation_;
     bool traditional_ = false;
 };
 
@@ -655,11 +695,13 @@ public:
         HMENU menu = CreatePopupMenu();
         HMENU schemes = CreatePopupMenu();
         HMENU widths = CreatePopupMenu();
+        HMENU punctuation = CreatePopupMenu();
         HMENU scripts = CreatePopupMenu();
         HMENU themes = CreatePopupMenu();
-        if (!menu || !schemes || !widths || !scripts || !themes) {
+        if (!menu || !schemes || !widths || !punctuation || !scripts || !themes) {
             if (themes) DestroyMenu(themes);
             if (scripts) DestroyMenu(scripts);
+            if (punctuation) DestroyMenu(punctuation);
             if (widths) DestroyMenu(widths);
             if (schemes) DestroyMenu(schemes);
             if (menu) DestroyMenu(menu);
@@ -687,6 +729,21 @@ public:
                     111, L"半角");
         AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(widths),
                     L"字符宽度");
+        const FyPunctuationOptions options =
+            service_ ? service_->punctuation_ : FyPunctuationOptions{};
+        AppendMenuW(punctuation, MF_STRING | (options.chinese ? MF_CHECKED : 0),
+                    150, L"中文标点");
+        AppendMenuW(punctuation, MF_STRING | (!options.chinese ? MF_CHECKED : 0),
+                    151, L"英文标点");
+        AppendMenuW(punctuation, MF_SEPARATOR, 0, nullptr);
+        for (const auto &toggle : kPunctuationToggles) {
+            AppendMenuW(punctuation,
+                        MF_STRING | (options.*toggle.field ? MF_CHECKED : 0) |
+                            (options.chinese ? 0 : MF_GRAYED),
+                        toggle.command, toggle.label);
+        }
+        AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(punctuation),
+                    L"标点");
         const bool traditional = service_ && service_->traditional_;
         AppendMenuW(scripts, MF_STRING | (!traditional ? MF_CHECKED : 0),
                     120, L"简体中文");
@@ -713,6 +770,14 @@ public:
         } else if (command == 110 || command == 111) {
             result = service_
                          ? service_->SetFullWidthFromLanguageBar(command == 110)
+                         : E_FAIL;
+        } else if (command == 150 || command == 151) {
+            result = service_
+                         ? service_->SetAsciiPunctuationFromLanguageBar(command == 151)
+                         : E_FAIL;
+        } else if (FindPunctuationToggle(command)) {
+            result = service_
+                         ? service_->TogglePunctuationFromLanguageBar(command)
                          : E_FAIL;
         } else if (command == 120 || command == 121) {
             result = service_
@@ -749,6 +814,14 @@ public:
     HRESULT STDMETHODCALLTYPE OnMenuSelect(UINT id) override {
         if (id == 110 || id == 111) {
             return service_ ? service_->SetFullWidthFromLanguageBar(id == 110)
+                            : E_FAIL;
+        }
+        if (id == 150 || id == 151) {
+            return service_ ? service_->SetAsciiPunctuationFromLanguageBar(id == 151)
+                            : E_FAIL;
+        }
+        if (FindPunctuationToggle(id)) {
+            return service_ ? service_->TogglePunctuationFromLanguageBar(id)
                             : E_FAIL;
         }
         if (id == 120 || id == 121) {
@@ -1338,11 +1411,16 @@ HRESULT FengYuTextService::ActivateEx(
     }
     if (SUCCEEDED(result)) {
         state_->ReloadSchema();
-        full_width_ = ReadConfiguredBool(kFullWidthValue, true);
+        full_width_ = ReadConfiguredBool(kFullWidthValue, false);
+        punctuation_.chinese = !ReadConfiguredBool(kAsciiPunctuationValue, false);
+        for (const auto &toggle : kPunctuationToggles) {
+            punctuation_.*toggle.field =
+                ReadConfiguredBool(toggle.value, FyPunctuationOptions{}.*toggle.field);
+        }
         traditional_ = ReadConfiguredBool(kTraditionalValue, false);
         light_candidate_theme_ =
             ReadConfiguredBool(kCandidateLightThemeValue, false);
-        state_->SetPreferences(full_width_, traditional_);
+        state_->SetPreferences(full_width_, punctuation_, traditional_);
         state_->SetCandidateTheme(light_candidate_theme_);
         DebugLog("schema-loaded");
     }
@@ -1422,7 +1500,7 @@ bool FengYuTextService::MapKey(
     if (!FyMapVirtualKey(
             virtual_key, KeyStateDown(VK_SHIFT),
             (GetKeyState(VK_CAPITAL) & 1) != 0, control, alt, composing,
-            full_width_, &mapped, system_shortcut)) {
+            full_width_, punctuation_, &mapped, system_shortcut)) {
         return false;
     }
     *key = mapped.key;
@@ -1443,8 +1521,20 @@ HRESULT FengYuTextService::OnTestKeyDown(
     uint32_t key = 0;
     uint32_t modifiers = 0;
     *eaten = MapKey(context, virtual_key, &key, &modifiers) ? TRUE : FALSE;
+    if (!*eaten && !ascii_mode_) NoteHostKey(context, virtual_key);
     DebugLog("test-key-down", S_OK, virtual_key, *eaten);
     return S_OK;
+}
+
+void FengYuTextService::NoteHostKey(ITfContext *context, WPARAM virtual_key) {
+    // Keys passed to the host never reach the engine; tell it what the host
+    // typed so "3." keeps a half-width period. Repeated test callbacks for one
+    // key are harmless because the note is idempotent.
+    const auto session = context ? state_->Find(context) : nullptr;
+    if (!session || KeyStateDown(VK_CONTROL) || KeyStateDown(VK_MENU)) return;
+    const char character = static_cast<char>(
+        FyPrintableCharacter(virtual_key, KeyStateDown(VK_SHIFT)));
+    fy_session_note_host_text(session->session, &character, character ? 1 : 0);
 }
 
 HRESULT FengYuTextService::OnTestKeyUp(
@@ -1548,11 +1638,6 @@ HRESULT FengYuTextService::ToggleInputMode(ITfContext *context) {
         }
     }
     ascii_mode_ = !ascii_mode_;
-    // Chinese mode defaults to full-width characters; English mode must pass
-    // normal half-width ASCII through to the host application.
-    full_width_ = !ascii_mode_;
-    state_->SetPreferences(full_width_, traditional_);
-    WriteConfiguredBool(kFullWidthValue, full_width_);
     if (language_bar_button_) language_bar_button_->NotifyModeChanged();
     DebugLog(ascii_mode_ ? "input-mode-english" : "input-mode-chinese");
     return S_OK;
@@ -1575,7 +1660,7 @@ HRESULT FengYuTextService::ToggleInputModeFromLanguageBar() {
 
 HRESULT FengYuTextService::SetFullWidthFromLanguageBar(bool enabled) {
     full_width_ = enabled;
-    state_->SetPreferences(full_width_, traditional_);
+    state_->SetPreferences(full_width_, punctuation_, traditional_);
     const bool saved = WriteConfiguredBool(kFullWidthValue, enabled);
     if (language_bar_button_) language_bar_button_->NotifyModeChanged();
     DebugLog(enabled ? "character-width-full" : "character-width-half",
@@ -1583,9 +1668,31 @@ HRESULT FengYuTextService::SetFullWidthFromLanguageBar(bool enabled) {
     return saved ? S_OK : E_FAIL;
 }
 
+HRESULT FengYuTextService::TogglePunctuationFromLanguageBar(UINT command) {
+    const PunctuationToggle *toggle = FindPunctuationToggle(command);
+    if (!toggle) return E_INVALIDARG;
+    bool &enabled = punctuation_.*toggle->field;
+    enabled = !enabled;
+    state_->SetPreferences(full_width_, punctuation_, traditional_);
+    const bool saved = WriteConfiguredBool(toggle->value, enabled);
+    DebugLog("punctuation-key-toggle", saved ? S_OK : E_FAIL,
+             static_cast<WPARAM>(command), enabled);
+    return saved ? S_OK : E_FAIL;
+}
+
+HRESULT FengYuTextService::SetAsciiPunctuationFromLanguageBar(bool enabled) {
+    punctuation_.chinese = !enabled;
+    state_->SetPreferences(full_width_, punctuation_, traditional_);
+    const bool saved = WriteConfiguredBool(kAsciiPunctuationValue, enabled);
+    if (language_bar_button_) language_bar_button_->NotifyModeChanged();
+    DebugLog(enabled ? "punctuation-ascii" : "punctuation-chinese",
+             saved ? S_OK : E_FAIL);
+    return saved ? S_OK : E_FAIL;
+}
+
 HRESULT FengYuTextService::SetTraditionalFromLanguageBar(bool enabled) {
     traditional_ = enabled;
-    state_->SetPreferences(full_width_, traditional_);
+    state_->SetPreferences(full_width_, punctuation_, traditional_);
     const bool saved = WriteConfiguredBool(kTraditionalValue, enabled);
     if (language_bar_button_) language_bar_button_->NotifyModeChanged();
     DebugLog(enabled ? "script-traditional" : "script-simplified",

@@ -44,6 +44,9 @@ private:
     HRESULT ToggleInputMode(ITfContext*);
     HRESULT ToggleInputModeFromLanguageBar();
     HRESULT SetFullWidthFromLanguageBar(bool);
+    HRESULT SetAsciiPunctuationFromLanguageBar(bool);
+    HRESULT TogglePunctuationFromLanguageBar(UINT command);
+    void NoteHostKey(ITfContext*, WPARAM);
     HRESULT SetTraditionalFromLanguageBar(bool);
     HRESULT SetCandidateThemeFromLanguageBar(bool light);
     HRESULT ManageCustomPhrasesFromLanguageBar();
@@ -65,7 +68,8 @@ private:
     DWORD thread_event_sink_cookie_ = TF_INVALID_COOKIE;
     bool key_sink_advised_ = false;
     bool ascii_mode_ = false;
-    bool full_width_ = true;
+    bool full_width_ = false;
+    FyPunctuationOptions punctuation_;
     bool traditional_ = false;
     bool light_candidate_theme_ = false;
     FyShiftTapState shift_tap_;

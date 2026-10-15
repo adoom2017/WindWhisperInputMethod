@@ -32,6 +32,9 @@ int main() {
     CHECK(!shift.TestKeyUp(VK_SHIFT));
 
     FyMappedKey key{};
+    const FyPunctuationOptions chinese{};
+    FyPunctuationOptions ascii{};
+    ascii.chinese = false;
     // Direct delivery without a preceding test callback must cancel the tap.
     for (WPARAM combined : {WPARAM('A'), WPARAM(VK_LEFT), WPARAM(VK_TAB),
                             WPARAM(VK_CONTROL), WPARAM(VK_MENU), WPARAM(VK_LWIN)}) {
@@ -48,44 +51,64 @@ int main() {
     CHECK(!shift.KeyUp(VK_SHIFT));
     shift.KeyDown(VK_SHIFT, false, false);
     CHECK(shift.KeyUp(VK_SHIFT));
-    CHECK(FyMapVirtualKey('N', false, false, false, false, false, false, &key));
+    CHECK(FyMapVirtualKey('N', false, false, false, false, false, false, ascii, &key));
     CHECK(key.key == 'n');
-    CHECK(!FyMapVirtualKey('N', true, false, false, false, false, false, &key));
-    CHECK(!FyMapVirtualKey('N', false, false, true, false, false, false, &key));
-    CHECK(!FyMapVirtualKey(VK_SPACE, false, false, false, false, false, false, &key));
-    CHECK(FyMapVirtualKey(VK_SPACE, false, false, false, false, true, false, &key));
+    CHECK(!FyMapVirtualKey('N', true, false, false, false, false, false, ascii, &key));
+    CHECK(!FyMapVirtualKey('N', false, false, true, false, false, false, ascii, &key));
+    CHECK(!FyMapVirtualKey(VK_SPACE, false, false, false, false, false, false, ascii, &key));
+    CHECK(FyMapVirtualKey(VK_SPACE, false, false, false, false, true, false, ascii, &key));
     CHECK(key.key == 0x20);
-    CHECK(FyMapVirtualKey(VK_BACK, false, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey(VK_BACK, false, false, false, false, true, false, ascii, &key));
     CHECK(key.key == 0x08);
-    CHECK(FyMapVirtualKey(VK_NEXT, false, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey(VK_NEXT, false, false, false, false, true, false, ascii, &key));
     CHECK(key.key == 0xFF56);
-    CHECK(FyMapVirtualKey(VK_DOWN, false, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey(VK_DOWN, false, false, false, false, true, false, ascii, &key));
     CHECK(key.key == 0xFF54);
-    CHECK(FyMapVirtualKey('3', false, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey('3', false, false, false, false, true, false, ascii, &key));
     CHECK(key.key == '3');
-    CHECK(FyMapVirtualKey(VK_OEM_3, true, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_3, true, false, false, false, true, false, ascii, &key));
     CHECK(key.key == '~');
-    CHECK(FyMapVirtualKey(VK_OEM_3, false, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_3, false, false, false, false, true, false, ascii, &key));
     CHECK(key.key == '`');
-    CHECK(FyMapVirtualKey('1', true, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey('1', true, false, false, false, true, false, ascii, &key));
     CHECK(key.key == '!');
-    CHECK(FyMapVirtualKey(VK_OEM_COMMA, false, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_COMMA, false, false, false, false, true, false, ascii, &key));
     CHECK(key.key == ',');
-    CHECK(FyMapVirtualKey(VK_OEM_2, true, false, false, false, true, false, &key));
+    CHECK(FyMapVirtualKey(VK_OEM_2, true, false, false, false, true, false, ascii, &key));
     CHECK(key.key == '?');
 
     // Full-width Chinese mode may capture printable punctuation while idle,
     // but Backspace and other editing keys must pass through to the app.
-    CHECK(FyMapVirtualKey(VK_SPACE, false, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey(VK_SPACE, false, false, false, false, false, true, ascii, &key));
     CHECK(key.key == 0x20);
-    CHECK(FyMapVirtualKey('3', false, false, false, false, false, true, &key));
+    CHECK(FyMapVirtualKey('3', false, false, false, false, false, true, ascii, &key));
     CHECK(key.key == '3');
-    CHECK(!FyMapVirtualKey(VK_BACK, false, false, false, false, false, true, &key));
-    CHECK(!FyMapVirtualKey(VK_RETURN, false, false, false, false, false, true, &key));
-    CHECK(!FyMapVirtualKey(VK_LEFT, false, false, false, false, false, true, &key));
-    CHECK(!FyMapVirtualKey('R', false, false, false, false, false, true,
-                           &key, true));
-    CHECK(!FyMapVirtualKey('R', false, false, false, false, true, true,
-                           &key, true));
+    CHECK(!FyMapVirtualKey(VK_BACK, false, false, false, false, false, true, ascii, &key));
+    CHECK(!FyMapVirtualKey(VK_RETURN, false, false, false, false, false, true, ascii, &key));
+    CHECK(!FyMapVirtualKey(VK_LEFT, false, false, false, false, false, true, ascii, &key));
+    CHECK(!FyMapVirtualKey('R', false, false, false, false, false, true, ascii, &key, true));
+    CHECK(!FyMapVirtualKey('R', false, false, false, false, true, true, ascii, &key, true));
+
+    // Half-width Chinese punctuation mode captures writing punctuation only;
+    // digits and functional symbols such as @ / stay with the host.
+    CHECK(FyMapVirtualKey(VK_OEM_COMMA, false, false, false, false, false, false, chinese, &key));
+    CHECK(key.key == ',');
+    CHECK(FyMapVirtualKey(VK_OEM_7, true, false, false, false, false, false, chinese, &key));
+    CHECK(key.key == '"');
+    CHECK(FyMapVirtualKey(VK_OEM_5, false, false, false, false, false, false, chinese, &key));
+    CHECK(key.key == '\\');
+    CHECK(!FyMapVirtualKey('2', true, false, false, false, false, false, chinese, &key));
+    CHECK(!FyMapVirtualKey('3', false, false, false, false, false, false, chinese, &key));
+    CHECK(!FyMapVirtualKey(VK_OEM_2, false, false, false, false, false, false, chinese, &key));
+    CHECK(!FyMapVirtualKey(VK_SPACE, false, false, false, false, false, false, chinese, &key));
+    CHECK(!FyMapVirtualKey(VK_OEM_COMMA, false, false, false, false, false, false, ascii, &key));
+    FyPunctuationOptions custom{};
+    custom.underscore = false;
+    custom.yuan = true;
+    CHECK(!FyMapVirtualKey(VK_OEM_MINUS, true, false, false, false, false, false, custom, &key));
+    CHECK(FyMapVirtualKey('4', true, false, false, false, false, false, custom, &key));
+    CHECK(key.key == '$');
+    CHECK(FyPrintableCharacter('2', true) == '@');
+    CHECK(FyPrintableCharacter(VK_BACK, false) == 0);
     return 0;
 }

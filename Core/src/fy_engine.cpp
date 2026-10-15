@@ -65,6 +65,19 @@ struct fy_session {
     std::string schema = "fullPinyin";
     bool traditional = false;
     bool full_shape = false;
+    bool ascii_punct = false;
+    // Per-key Chinese forms; each can be turned off to keep the ASCII key.
+    bool punct_bracket = true;
+    bool punct_angle = true;
+    bool punct_backslash = true;
+    bool punct_caret = true;
+    bool punct_underscore = true;
+    bool punct_yuan = false;
+    bool double_quote_open = false;
+    bool single_quote_open = false;
+    // Last ASCII key that reached the host literally; keeps "3." and "12:30"
+    // half-width after a digit.
+    uint32_t previous_literal = 0;
     size_t page = 0;
     size_t highlighted = 0;
     std::vector<Entry> matches;
@@ -73,31 +86,54 @@ struct fy_session {
 };
 
 namespace {
-std::string width_character(uint32_t key, bool full_shape) {
-    if (key < 0x20 || key > 0x7E) return {};
-    if (!full_shape) return std::string(1, static_cast<char>(key));
-    switch (key) {
-    case ',': return "，";
-    case '.': return "。";
-    case '/': return "、";
-    case '?': return "？";
-    case ';': return "；";
-    case ':': return "：";
-    case '!': return "！";
-    case '(': return "（";
-    case ')': return "）";
-    case '[': return "【";
-    case ']': return "】";
-    case ' ': return "　";
-    default:
-        break;
-    }
+std::string full_width_character(uint32_t key) {
+    if (key == ' ') return "\xE3\x80\x80";
     const uint32_t scalar = key + 0xFEE0;
     std::string result;
     result.push_back(static_cast<char>(0xE0 | (scalar >> 12)));
     result.push_back(static_cast<char>(0x80 | ((scalar >> 6) & 0x3F)));
     result.push_back(static_cast<char>(0x80 | (scalar & 0x3F)));
     return result;
+}
+
+// Chinese punctuation for writing; functional symbols such as `@ # % / $`
+// stay ASCII unless full-width characters are enabled. Empty means the key
+// should reach the host unchanged.
+std::string punctuation_text(fy_session *session, uint32_t key, uint32_t previous) {
+    if (key < 0x20 || key > 0x7E) return {};
+    if (!session->ascii_punct) {
+        if (previous >= '0' && previous <= '9' && (key == '.' || key == ':')) {
+            return std::string(1, static_cast<char>(key));
+        }
+        switch (key) {
+        case ',': return "，";
+        case '.': return "。";
+        case '?': return "？";
+        case '!': return "！";
+        case ':': return "：";
+        case ';': return "；";
+        case '(': return "（";
+        case ')': return "）";
+        case '[': if (session->punct_bracket) return "【"; break;
+        case ']': if (session->punct_bracket) return "】"; break;
+        case '<': if (session->punct_angle) return "《"; break;
+        case '>': if (session->punct_angle) return "》"; break;
+        case '\\': if (session->punct_backslash) return "、"; break;
+        case '^': if (session->punct_caret) return "……"; break;
+        case '_': if (session->punct_underscore) return "——"; break;
+        case '$': if (session->punct_yuan) return "￥"; break;
+        case '"':
+            session->double_quote_open = !session->double_quote_open;
+            return session->double_quote_open ? "“" : "”";
+        case '\'':
+            session->single_quote_open = !session->single_quote_open;
+            return session->single_quote_open ? "‘" : "’";
+        default:
+            break;
+        }
+    }
+    if (!session->full_shape) return {};
+    return full_width_character(key);
 }
 
 size_t kind_index(Entry::Kind kind) {
@@ -612,6 +648,14 @@ void fy_session_reset(fy_session *session) {
     session->exported_comments.clear();
     session->page = 0;
     session->highlighted = 0;
+    session->previous_literal = 0;
+}
+
+void fy_session_note_host_text(fy_session *session, const char *text, size_t length) {
+    if (!session) return;
+    const unsigned char last =
+        text && length ? static_cast<unsigned char>(text[length - 1]) : 0;
+    session->previous_literal = last >= 0x20 && last <= 0x7E ? last : 0;
 }
 
 int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers) {
@@ -619,6 +663,8 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
         return 0;
     }
     session->commit.clear();
+    const uint32_t previous_literal = session->previous_literal;
+    session->previous_literal = 0;
 
     if ((modifiers & (kModifierControl | kModifierOption)) != 0) {
         return 0;
@@ -673,8 +719,8 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
         return 1;
     }
     if (key == 0x20) {
-        if (key == 0x20 && session->code.empty() && session->full_shape) {
-            session->commit = width_character(key, true);
+        if (session->code.empty() && session->full_shape) {
+            session->commit = full_width_character(key);
             return 1;
         }
         return session->matches.empty()
@@ -691,19 +737,20 @@ int fy_session_process_key(fy_session *session, uint32_t key, uint32_t modifiers
         const bool letter = (key >= 'a' && key <= 'z') ||
                             (key >= 'A' && key <= 'Z');
         const bool pinyin_separator = key == '\'' &&
-                                      session->schema == "fullPinyin";
+                                      session->schema == "fullPinyin" &&
+                                      !session->code.empty();
         if (!letter && !pinyin_separator && key != '~') {
-            if (!session->code.empty()) {
-                if (session->matches.empty() ||
-                    !fy_session_select_candidate(
-                        session, session->highlighted % kPageSize)) {
-                    return 0;
-                }
-                session->commit += width_character(key, session->full_shape);
-                return 1;
+            if (!session->code.empty() &&
+                (session->matches.empty() ||
+                 !fy_session_select_candidate(
+                     session, session->highlighted % kPageSize))) {
+                return 0;
             }
-            if (!session->full_shape) return 0;
-            session->commit = width_character(key, true);
+            const std::string literal(1, static_cast<char>(key));
+            const std::string text = punctuation_text(session, key, previous_literal);
+            if (text.empty() || text == literal) session->previous_literal = key;
+            if (text.empty() && session->commit.empty()) return 0;
+            session->commit += text.empty() ? literal : text;
             return 1;
         }
         const bool shape = session->schema == "flypy" || session->schema == "flypyShape";
@@ -789,6 +836,20 @@ int fy_session_set_option(
         }
     } else if (option == "full_shape") {
         session->full_shape = value != 0;
+    } else if (option == "ascii_punct") {
+        session->ascii_punct = value != 0;
+    } else if (option == "punct_bracket") {
+        session->punct_bracket = value != 0;
+    } else if (option == "punct_angle") {
+        session->punct_angle = value != 0;
+    } else if (option == "punct_backslash") {
+        session->punct_backslash = value != 0;
+    } else if (option == "punct_caret") {
+        session->punct_caret = value != 0;
+    } else if (option == "punct_underscore") {
+        session->punct_underscore = value != 0;
+    } else if (option == "punct_yuan") {
+        session->punct_yuan = value != 0;
     } else {
         return 0;
     }

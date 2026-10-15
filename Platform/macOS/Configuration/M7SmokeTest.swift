@@ -77,6 +77,8 @@ enum M7SmokeTest {
         store.update {
             $0.schema = .fullPinyin
             $0.usesFullWidth = true
+            $0.usesASCIIPunctuation = true
+            $0.punctuationConversions = [.angle, .yuan]
             $0.usesSimplifiedChinese = false
             $0.candidateOrientation = .vertical
             $0.colorScheme = .dark
@@ -84,6 +86,8 @@ enum M7SmokeTest {
         let expected = FengYuSettingsSnapshot(
             schema: .fullPinyin,
             usesFullWidth: true,
+            usesASCIIPunctuation: true,
+            punctuationConversions: [.angle, .yuan],
             usesSimplifiedChinese: false,
             candidateOrientation: .vertical,
             colorScheme: .dark
@@ -145,6 +149,9 @@ enum M7SmokeTest {
             guard
                 snapshot.status.schemaIdentifier == expected.schema.rawValue,
                 session.option("full_shape") == true,
+                session.option("ascii_punct") == true,
+                session.option("punct_yuan") == true,
+                session.option("punct_bracket") == false,
                 session.option("simplification") == false,
                 session.option("zh_simp") == false,
                 session.option("zh_trad") == true
@@ -303,7 +310,11 @@ enum M7SmokeTest {
         let colorSchemeSelectors = Set(colorSchemeCommands.compactMap(\.action).map(NSStringFromSelector))
         let groupHeadings = menuItems(
             in: controller.menu,
-            titles: ["输入方案", "候选排列", "候选主题"]
+            titles: ["输入方案", "中文标点", "候选排列", "候选主题"]
+        )
+        let punctuationCommands = menuItems(
+            in: controller.menu,
+            titles: PunctuationConversion.allCases.map(\.displayName)
         )
         let settings = store.snapshot
         let unroutableCommands = commandItems.filter { item in
@@ -315,6 +326,7 @@ enum M7SmokeTest {
         guard
             titles.contains("输入方案"),
             titles.contains("全角字符"),
+            titles.contains("英文标点"),
             titles.contains("简体中文"),
             titles.contains("候选排列"),
             titles.contains("候选主题"),
@@ -332,7 +344,13 @@ enum M7SmokeTest {
             orientationSelectors.count == CandidateOrientation.allCases.count,
             colorSchemeCommands.count == CandidateColorScheme.allCases.count,
             colorSchemeSelectors.count == CandidateColorScheme.allCases.count,
-            groupHeadings.count == 3,
+            groupHeadings.count == 4,
+            punctuationCommands.count == PunctuationConversion.allCases.count,
+            Set(punctuationCommands.compactMap(\.action).map(NSStringFromSelector)).count
+                == PunctuationConversion.allCases.count,
+            punctuationCommands.filter({ $0.state == .on }).count
+                == settings.punctuationConversions.count,
+            punctuationCommands.allSatisfy({ $0.indentationLevel == 1 }),
             groupHeadings.allSatisfy({ !$0.isEnabled && $0.action == nil }),
             schemaCommands.filter({ $0.state == .on }).map(\.title) == [settings.schema.displayName],
             orientationCommands.filter({ $0.state == .on }).map(\.title)

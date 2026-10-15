@@ -13,6 +13,8 @@ enum M3SmokeTest {
             print("keyMapping=passed")
             try verifyShiftedPunctuation(root: temporaryRoot)
             print("shiftedPunctuation=passed")
+            try verifyPunctuationRules(root: temporaryRoot)
+            print("punctuationRules=passed")
             try verifyShortcutMapping()
             print("shortcutMapping=passed")
             try verifyModifierMapping()
@@ -98,6 +100,40 @@ enum M3SmokeTest {
             throw InputEngineError.smokeAssertion(
                 "Shift+1 did not commit the Chinese exclamation mark."
             )
+        }
+    }
+
+    private static func verifyPunctuationRules(root: URL) throws {
+        let session = try makeSession(
+            root: root.appendingPathComponent("punctuation-rules", isDirectory: true)
+        )
+        func commit(_ character: Character) throws -> String? {
+            let keyCode = Int32(character.unicodeScalars.first!.value)
+            guard session.process(keyCode: keyCode) else { return nil }
+            return try session.readSnapshot().commitText
+        }
+        let expectations: [(Character, String?)] = [
+            (",", "，"), ("\\", "、"), ("^", "……"), ("_", "——"), ("<", "《"),
+            ("\"", "\u{201C}"), ("\"", "\u{201D}"),
+            ("@", nil), ("#", nil), ("/", nil), ("$", nil), ("%", nil),
+            ("3", nil), (".", "."), (".", "。"),
+            ("1", nil), (":", ":"), (":", "："),
+        ]
+        for (character, expected) in expectations {
+            guard try commit(character) == expected else {
+                throw InputEngineError.smokeAssertion(
+                    "Chinese-mode punctuation for \(character) is incorrect."
+                )
+            }
+        }
+        guard session.simulate(sequence: "ni"), try commit("@")?.hasSuffix("@") == true else {
+            throw InputEngineError.smokeAssertion("@ after a composition was not kept half-width.")
+        }
+        guard session.setOption("punct_underscore", enabled: false),
+            session.setOption("punct_yuan", enabled: true),
+            try commit("_") == nil, try commit("$") == "￥", try commit("[") == "【"
+        else {
+            throw InputEngineError.smokeAssertion("Per-key punctuation options were not applied.")
         }
     }
 
