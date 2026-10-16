@@ -1,5 +1,12 @@
 # Windows x64 开发交接
 
+## 2026-10-16 安装方式更新
+
+对外分发改为 `WindWhisperInputMethod-x64-Setup.exe`，由 `Installer/Windows/build-installer.ps1` 构建。
+NSIS 中文向导隐藏文件路径和命令输出，内部仍用 MSI 完成注册、升级和失败回滚。旧 MSI 用户可直接升级；卸载保留用户数据。
+GitHub 工作流构建 EXE、运行回归和安装/修复/卸载检查，并发布 EXE 与校验文件。
+完整使用和构建步骤以 [Windows README](../Platform/Windows/README.md) 为准，下面保留历史开发记录。
+
 ## 交接基线
 
 - 分支：`feature/windows-tsf-port`

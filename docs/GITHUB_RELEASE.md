@@ -47,6 +47,8 @@ base64 < DeveloperIDInstaller.p12 | tr -d '\n'
 
 ## Windows 状态
 
-Windows TSF、候选窗与 MSI 目前仍是开发骨架，未通过 Windows 构建和安装门禁，
-因此 workflow 不会发布 Windows 产物。Windows 端完成构建、TSF 集成、安装、升级、
-回滚和卸载门禁后再增加独立 job，禁止把当前工程骨架作为可安装版本发布。
+Windows 使用独立的 **Build Windows Installer** 工作流（`release-windows.yml`）。
+推送或 PR 到 `main` 时构建 NSIS 中文 EXE 向导，运行核心与 Windows 回归测试，以及安装、修复和卸载检查。
+发布 Release 时从标签构建并附上 `WindWhisperInputMethod-x64-Setup.exe` 与 SHA-256 校验文件。
+版本号取自 `Installer/Windows/Product.wxs`，必须与 Release 标签一致；MSI 仅用作 EXE 内部安装事务，不单独发布。
+参见 [Windows 编译、打包与使用](../Platform/Windows/README.md)。

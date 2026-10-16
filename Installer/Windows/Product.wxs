@@ -3,7 +3,7 @@
   <Package
       Name="风语输入法"
       Manufacturer="WindWhisper"
-      Version="1.0.47"
+      Version="1.0.48"
       Language="2052"
       UpgradeCode="9A4D32D6-6D4A-4C8D-9F2F-8A0B7D0E6D11"
       Scope="perMachine">
@@ -11,6 +11,7 @@
     <SummaryInformation Description="风语中文输入法" />
     <MajorUpgrade
         DowngradeErrorMessage="已安装更高版本的风语输入法。"
+        AllowSameVersionUpgrades="yes"
         Schedule="afterInstallInitialize" />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="ProductIcon" SourceFile="$(var.RepositoryRoot)\Resources\WindWhisperProfile.ico" />
