@@ -139,18 +139,25 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     var onHostEcho: (() -> Void)?
     private var isEchoPending = false
 
-    init(text: String = "", cursor: Int = 0, host: Host = .uikit, mergesCallsPerTurn: Bool = false) {
+    /// Flutter hosts report the marked code as part of the document context.
+    private let contextIncludesMarkedText: Bool
+
+    init(text: String = "", cursor: Int = 0, host: Host = .uikit, mergesCallsPerTurn: Bool = false,
+         contextIncludesMarkedText: Bool = false) {
         self.text = text
         self.cursor = cursor
         self.host = host
         self.mergesCallsPerTurn = mergesCallsPerTurn
+        self.contextIncludesMarkedText = contextIncludesMarkedText
         super.init()
     }
     var markedText: String? {
         markedRange.map { String(Array(text)[$0]) }
     }
-    /// Like iOS, the document context excludes marked text.
-    var documentContextBeforeInput: String? { String(text.prefix(markedRange?.lowerBound ?? cursor)) }
+    /// Like UIKit, the document context excludes marked text by default.
+    var documentContextBeforeInput: String? {
+        String(text.prefix(contextIncludesMarkedText ? cursor : markedRange?.lowerBound ?? cursor))
+    }
     /// Everything before the caret, marked text included (test assertions).
     var textBeforeCaret: String { String(text.prefix(cursor)) }
     var documentContextAfterInput: String? { String(text.dropFirst(cursor)) }

@@ -375,7 +375,13 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var pendingCommit = ""
     /// A raw-code commit inserted over its own marked code; verified once the
     /// host settled, because legacy Flutter hosts insert a second copy.
-    private var rawCodeCommitCheck: (contextBefore: String, code: String)?
+    /// Flutter hosts include the marked code in the document context, UIKit
+    /// hosts do not; the context read before marking tells the two apart.
+    private var rawCodeCommitCheck: (contextBefore: String, includesCode: Bool, code: String)?
+    /// Set when the host had not applied the raw-code commit yet at settling;
+    /// checked again on the host's next change, until this uptime.
+    private var rawCodeCommitCheckDeadline: TimeInterval = 0
+    private var contextBeforeMarking: String?
     private var pendingMarkedComposition: String?
     /// Native text fields echo our own commit ~50-70 ms later; that echo must
     /// not end the code typed after the commit. Hosts without the echo (Flutter)
@@ -538,6 +544,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         // themselves; clearing it never leaves an orphaned marked range behind.
         // The document context excludes marked text, so it cannot tell us more.
         guard !isEditingHost else { return }
+        if rawCodeCommitCheck != nil, !isHostSettling {
+            removeDuplicatedRawCode()
+        }
         if isHostSettling {
             // The host applied our commit; queued writes can follow now.
             ignoresHostEchoUntil = 0
@@ -836,13 +845,17 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             testDocumentProxy = nil
             usesInlineComposition = false
         }
-        let hosts: [(TouchTestDocumentProxy.Host, Bool)] = [
-            (.uikit, false), (.uikit, true), (.legacyFlutter, true),
+        let hosts: [(TouchTestDocumentProxy.Host, Bool, Bool)] = [
+            (.uikit, false, false), (.uikit, true, false), (.legacyFlutter, true, false),
+            (.legacyFlutter, true, true),
         ]
-        for (host, merges) in hosts {
+        for (host, merges, includesMarked) in hosts {
             try verifyInlineComposition(
-                TouchTestDocumentProxy(text: "前后", cursor: 1, host: host, mergesCallsPerTurn: merges),
-                label: "\(host) merges=\(merges)"
+                TouchTestDocumentProxy(
+                    text: "前后", cursor: 1, host: host, mergesCallsPerTurn: merges,
+                    contextIncludesMarkedText: includesMarked
+                ),
+                label: "\(host) merges=\(merges) contextIncludesMarked=\(includesMarked)"
             )
         }
 
@@ -1894,6 +1907,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
         pendingMarkedComposition = nil
         guard text != markedComposition else { return }
+        if markedComposition.isEmpty {
+            contextBeforeMarking = textDocumentProxy.documentContextBeforeInput ?? ""
+        }
         writeHost {
             textDocumentProxy.setMarkedText(
                 text,
@@ -1919,7 +1935,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             // flickers. UIKit hosts replace the marked code in place; legacy
             // Flutter keeps it and inserts a copy, which finishHostSettling()
             // removes.
-            rawCodeCommitCheck = (textDocumentProxy.documentContextBeforeInput ?? "", text)
+            let contextBefore = textDocumentProxy.documentContextBeforeInput ?? ""
+            let includesCode = contextBefore.hasSuffix(text)
+                && contextBeforeMarking.map { contextBefore == $0 + text } ?? false
+            rawCodeCommitCheck = (contextBefore, includesCode, text)
+            rawCodeCommitCheckDeadline = 0
             writeHost { textDocumentProxy.insertText(text) }
             markedComposition = ""
             beginHostSettling()
@@ -1957,15 +1977,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         hostSettleTimer = nil
         guard isHostSettling else { return }
         isHostSettling = false
-        if let check = rawCodeCommitCheck {
-            rawCodeCommitCheck = nil
-            let context = textDocumentProxy.documentContextBeforeInput ?? ""
-            let tail = String(check.contextBefore.suffix(16))
-            if context.hasSuffix(tail + check.code + check.code) {
-                writeHost {
-                    for _ in check.code { textDocumentProxy.deleteBackward() }
-                }
-            }
+        if rawCodeCommitCheck != nil {
+            rawCodeCommitCheckDeadline = ProcessInfo.processInfo.systemUptime + 0.5
+            removeDuplicatedRawCode()
         }
         if !pendingCommit.isEmpty {
             let commit = pendingCommit
@@ -1976,6 +1990,33 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
         if let pending = pendingMarkedComposition {
             setMarkedComposition(pending)
+        }
+    }
+
+    /// Legacy Flutter keeps the marked code and inserts the commit as a copy.
+    /// Until the host reports the commit, the check waits for its next change.
+    private func removeDuplicatedRawCode() {
+        guard let check = rawCodeCommitCheck else { return }
+        let context = textDocumentProxy.documentContextBeforeInput ?? ""
+        let waits = context == check.contextBefore && !check.includesCode
+            && ProcessInfo.processInfo.systemUptime < rawCodeCommitCheckDeadline
+            && markedComposition.isEmpty && !hasActiveEngineComposition
+        if waits { return }
+        rawCodeCommitCheck = nil
+        guard markedComposition.isEmpty else { return }
+        let before = check.includesCode
+            ? String(check.contextBefore.dropLast(check.code.count))
+            : check.contextBefore
+        let duplicated = context.hasSuffix(String(before.suffix(16)) + check.code + check.code)
+        logger.debug("""
+            raw code commit: includesCode=\(check.includesCode, privacy: .public) \
+            duplicated=\(duplicated, privacy: .public) \
+            before=\(check.contextBefore.suffix(24), privacy: .private) \
+            after=\(context.suffix(24), privacy: .private)
+            """)
+        guard duplicated else { return }
+        writeHost {
+            for _ in check.code { textDocumentProxy.deleteBackward() }
         }
     }
 
