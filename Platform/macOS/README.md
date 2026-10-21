@@ -64,7 +64,13 @@ Scripts/package-release.sh local 0.1.0 2026091001
 xcrun notarytool store-credentials "windwhisper-notary"
 ```
 
-然后打包：
+然后打包。最简单的方式只需公证凭据名和版本号，构建号按当前时间生成，签名证书自动从钥匙串查找：
+
+```bash
+Scripts/publish.sh windwhisper-notary 0.1.0
+```
+
+需要指定证书或构建号时直接调用：
 
 ```bash
 WINDWHISPER_APP_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
