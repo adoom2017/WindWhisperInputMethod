@@ -15,7 +15,7 @@
 | 平台 | 系统要求 | 安装 | 详细说明 |
 | --- | --- | --- | --- |
 | macOS | macOS 13+，Apple Silicon / Intel | 运行 DMG 中的 `安装风语.pkg`，在“系统设置 → 键盘 → 文本输入”中添加“风语” | [Platform/macOS](Platform/macOS/README.md) |
-| Windows | Windows 10/11 x64 | 安装 MSI，按 `Win + Space` 切换到“风语输入法” | [Platform/Windows](Platform/Windows/README.md) |
+| Windows | Windows 10/11 x64 | 运行 EXE 安装向导，按 `Win + Space` 切换到“风语输入法” | [Platform/Windows](Platform/Windows/README.md) |
 | iOS | iOS 17+ | 安装 App，在“设置 → 通用 → 键盘 → 键盘 → 添加新键盘”中添加“风语” | [iOS](iOS/README.md) |
 
 ## 基本操作
@@ -46,7 +46,7 @@
 Core/          C++ 引擎、C ABI 与 Swift 适配层（三端共享）
 Platform/      macOS（InputMethodKit）与 Windows（TSF）平台实现
 iOS/           iOS 宿主 App 与键盘扩展
-Installer/     macOS PKG 脚本与 Windows WiX 安装包
+Installer/     macOS PKG 脚本与 Windows NSIS 安装向导
 Resources/     词库、图标与本地化资源
 Scripts/       构建、打包、测试与资源生成脚本
 docs/          设计规范、架构、测试计划与发布说明

@@ -31,9 +31,11 @@ try {
 
                 $path = [Drawing.Drawing2D.GraphicsPath]::new()
                 try {
-                    $emSize = [single]($size * 0.84)
+                    # Match the mode indicator: regular YaHei UI, 14px em in
+                    # a 16px tray slot, with proportional spacing at each DPI.
+                    $emSize = [single]($size * 14 / 16)
                     $path.AddString('风', $fontFamily,
-                        [int][Drawing.FontStyle]::Bold, $emSize,
+                        [int][Drawing.FontStyle]::Regular, $emSize,
                         [Drawing.PointF]::new(0, 0),
                         [Drawing.StringFormat]::GenericDefault)
                     $bounds = $path.GetBounds()
@@ -47,18 +49,15 @@ try {
                         $matrix.Dispose()
                     }
 
-                    # The profile icon is a static Windows resource. A dark
-                    # glyph with a white contour stays visible on both trays.
-                    $outline = [Drawing.Pen]::new([Drawing.Color]::White,
-                        [single][Math]::Max(1.5, $size * 0.075))
-                    $outline.LineJoin = [Drawing.Drawing2D.LineJoin]::Round
-                    $fill = [Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(28, 28, 28))
+                    # Windows loads this brand mark as a static resource,
+                    # independently of GetIcon's themed mode indicator. A
+                    # neutral #767676 glyph stays readable on both light and
+                    # dark taskbars without a white halo or a background plate.
+                    $fill = [Drawing.SolidBrush]::new([Drawing.Color]::FromArgb(118, 118, 118))
                     try {
-                        $graphics.DrawPath($outline, $path)
                         $graphics.FillPath($fill, $path)
                     } finally {
                         $fill.Dispose()
-                        $outline.Dispose()
                     }
                 } finally {
                     $path.Dispose()

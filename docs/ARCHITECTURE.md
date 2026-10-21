@@ -16,7 +16,7 @@
 | `Platform/macOS/` | InputMethodKit、AppKit 候选窗、设置与安装集成 | macOS |
 | `Platform/Windows/` | TSF COM 服务、Win32/GDI 候选窗、注册表设置、自定义词组编辑器 | Windows |
 | `iOS/` | SwiftUI 宿主 App、键盘扩展、App Group 共享存储 | iOS |
-| `Installer/` | macOS PKG 脚本、Windows WiX MSI | macOS / Windows |
+| `Installer/` | macOS PKG 脚本、Windows NSIS EXE（内含 MSI 安装事务） | macOS / Windows |
 | `Resources/` | 词库、图标与本地化资源 | 共享 |
 | `Scripts/` | 构建、打包、测试与资源生成 | 以 macOS / iOS 为主 |
 

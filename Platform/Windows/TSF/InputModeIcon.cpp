@@ -47,8 +47,11 @@ HICON CreateInputModeIcon(bool ascii_mode, COLORREF foreground,
     HGDIOBJ old_bitmap = SelectObject(memory, color);
     RECT bounds{0, 0, width, height};
     FillRect(memory, &bounds, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+    // Keep a consistent 1/8-em margin at every DPI. Regular-weight glyphs
+    // match the visual weight of the neighbouring Windows tray symbols.
+    const int em_size = MulDiv((width < height ? width : height), 14, 16);
     HFONT font = CreateFontW(
-        -(height - 2), 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+        -em_size, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
         ANTIALIASED_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Microsoft YaHei UI");
     HGDIOBJ old_font = font ? SelectObject(memory, font) : nullptr;

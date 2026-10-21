@@ -63,3 +63,15 @@
 - 图形：三道错落的横向弧线，表示“风”，左上角留出空白。不用 3D、玻璃、高光。
 - 颜色：accent 底、白色线条；小尺寸（16/32px）时线条加粗、减少到两道。
 - 由 `Scripts/generate-brand-icon.swift` 一次生成母版、macOS 各尺寸和 iOS 1024 图标：`swift Scripts/generate-brand-icon.swift Resources/Assets/WindWhisperIconMaster.png Resources/Assets.xcassets/AppIcon.appiconset iOS/App/Assets.xcassets/AppIcon.appiconset/AppIcon.png`。Windows 语言栏图标是单色“风”字，由 `Scripts/generate-windows-profile-icon.ps1` 生成。
+
+### Windows 托盘文字图标
+
+- “风”与“中/英”统一采用 Microsoft YaHei UI 普通字重；16px 图标使用 14px 字号，随 DPI 等比缩放，保持视觉居中和透明留白。
+- 模式图标“中/英”随系统任务栏主题使用深色或白色；高对比度主题使用系统文字色。
+- “风”是 Windows 加载的静态品牌资源，采用中性灰 `#767676`，兼顾浅色与深色任务栏的可辨识度。不加白色描边、阴影或底板。
+
+### Windows 安装向导
+
+- 使用 NSIS Modern UI 2 的中文欢迎、进度和完成页，字体为 Microsoft YaHei UI，保留原生按钮和系统缩放行为。
+- 品牌侧栏使用 surface 浅色背景、accent 色“风”字和普通字重的产品名，不加渐变或高光。
+- 安装与卸载的进度区只显示面向用户的操作状态，文件路径、命令和详细日志保留在后台。完成页说明切换输入法和刷新方法。

@@ -1,16 +1,16 @@
 [CmdletBinding()]
 param(
-    [string]$MsiPath = '',
+    [Alias('MsiPath')][string]$InstallerPath = '',
     [switch]$Uninstall
 )
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
-if ([string]::IsNullOrWhiteSpace($MsiPath)) {
-    $MsiPath = Join-Path $repositoryRoot `
-        'build\windows\Installer\Release\WindWhisperInputMethod-x64.msi'
+if ([string]::IsNullOrWhiteSpace($InstallerPath)) {
+    $InstallerPath = Join-Path $repositoryRoot `
+        'build\windows\Installer\Release\WindWhisperInputMethod-x64-Setup.exe'
 }
-$MsiPath = [IO.Path]::GetFullPath($MsiPath)
+$InstallerPath = [IO.Path]::GetFullPath($InstallerPath)
 
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = [Security.Principal.WindowsPrincipal]::new($identity)
@@ -23,7 +23,7 @@ if (-not $isAdministrator) {
         '-NoProfile',
         '-ExecutionPolicy', 'Bypass',
         '-File', ('"{0}"' -f $PSCommandPath),
-        '-MsiPath', ('"{0}"' -f $MsiPath)
+        '-InstallerPath', ('"{0}"' -f $InstallerPath)
     )
     if ($Uninstall) {
         $arguments += '-Uninstall'
@@ -33,26 +33,26 @@ if (-not $isAdministrator) {
     exit $elevated.ExitCode
 }
 
-if (-not (Test-Path -LiteralPath $MsiPath -PathType Leaf)) {
-    throw "MSI not found: $MsiPath"
-}
-
-$logDirectory = Join-Path $repositoryRoot 'build\windows\Installer'
-New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+$installFolder = Join-Path $env:ProgramFiles 'WindWhisper Input Method'
 $operation = if ($Uninstall) { 'uninstall' } else { 'install' }
-$logPath = Join-Path $logDirectory "$operation.log"
-$msiexecArguments = if ($Uninstall) {
-    @('/x', ('"{0}"' -f $MsiPath), '/passive', '/norestart',
-      '/L*V', ('"{0}"' -f $logPath))
+$logPath = Join-Path $env:ProgramData "WindWhisper\Installer\$operation.log"
+if ([IO.Path]::GetExtension($InstallerPath) -eq '.msi') {
+    # Retain explicit -MsiPath compatibility for legacy installer diagnosis.
+    $msiexecArguments = @($(if ($Uninstall) { '/x' } else { '/i' }),
+        ('"{0}"' -f $InstallerPath), '/passive', '/norestart',
+        '/L*V', ('"{0}"' -f $logPath))
+    New-Item -ItemType Directory -Path (Split-Path -Parent $logPath) -Force | Out-Null
+    $installer = Start-Process -FilePath "$env:SystemRoot\System32\msiexec.exe" `
+        -ArgumentList $msiexecArguments -Wait -PassThru
 } else {
-    @('/i', ('"{0}"' -f $MsiPath), '/passive', '/norestart',
-      '/L*V', ('"{0}"' -f $logPath))
+    $executable = if ($Uninstall) { Join-Path $installFolder 'Uninstall.exe' } else { $InstallerPath }
+    if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
+        throw "Installer not found: $executable"
+    }
+    $installer = Start-Process -FilePath $executable -Wait -PassThru
 }
-
-$installer = Start-Process -FilePath "$env:SystemRoot\System32\msiexec.exe" `
-    -ArgumentList $msiexecArguments -Wait -PassThru
 if ($installer.ExitCode -notin @(0, 3010)) {
-    throw "Windows Installer failed with exit code $($installer.ExitCode). Log: $logPath"
+    throw "Installer failed with exit code $($installer.ExitCode). Log: $logPath"
 }
 
 if ($Uninstall) {
@@ -60,7 +60,6 @@ if ($Uninstall) {
     exit 0
 }
 
-$installFolder = Join-Path $env:ProgramFiles 'WindWhisper Input Method'
 $registrar = Join-Path $installFolder 'fy_tsf_registration.exe'
 $tsfDll = Join-Path $installFolder 'fy_tsf.dll'
 foreach ($path in @($registrar, $tsfDll, (Join-Path $installFolder 'fy_engine.dll'))) {
@@ -75,7 +74,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host 'Install and TSF registration verification completed successfully.'
-Write-Host 'No sign-out is required. Refresh the language bar with:'
+Write-Host 'Refresh the language bar with (or sign out and back in):'
 Write-Host "  pwsh -NoProfile -ExecutionPolicy Bypass -File `"$PSScriptRoot\Refresh-Tsf.ps1`""
 Write-Host 'Close and reopen the target editor/browser so it reloads the new DLL.'
 Write-Host "Log: $logPath"

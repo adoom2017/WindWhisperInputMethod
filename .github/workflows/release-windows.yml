@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   build:
-    name: Build and test x64 MSI
+    name: Build and test x64 setup EXE
     runs-on: windows-2022
     timeout-minutes: 30
     defaults:
@@ -37,38 +37,36 @@ jobs:
       - name: Configure x64 build
         run: cmake -S . -B build/windows -G 'Visual Studio 17 2022' -A x64
 
-      - name: Build MSI
-        run: ./Installer/Windows/build-msi.ps1 -Configuration Release
+      - name: Build NSIS installer
+        run: ./Installer/Windows/build-installer.ps1 -Configuration Release
 
       - name: Run regression tests
         run: ctest --test-dir build/windows -C Release --output-on-failure
+
+      - name: Test install, repair, and uninstall
+        run: ./Installer/Windows/Test-Installer.ps1 -AllowMachineChanges
 
       - name: Verify installer and generate checksum
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          $path = (Resolve-Path 'build/windows/Installer/Release/WindWhisperInputMethod-x64.msi').Path
-          $installer = New-Object -ComObject WindowsInstaller.Installer
-          $database = $installer.OpenDatabase($path, 0)
-          $view = $database.OpenView('SELECT `Value` FROM `Property` WHERE `Property` = ''ProductVersion''')
-          $view.Execute()
-          $version = $view.Fetch().StringData(1)
-          $view.Close()
-          if (-not $version) { throw 'MSI ProductVersion is missing' }
+          $path = (Resolve-Path 'build/windows/Installer/Release/WindWhisperInputMethod-x64-Setup.exe').Path
+          $version = [Diagnostics.FileVersionInfo]::GetVersionInfo($path).ProductVersion
+          if (-not $version) { throw 'Installer ProductVersion is missing' }
           if ($env:RELEASE_TAG -and $env:RELEASE_TAG -ne "v$version") {
-            throw "Release tag must match MSI version v$version. Update Product.wxs before tagging."
+            throw "Release tag must match installer version v$version. Update Product.wxs before tagging."
           }
           $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  WindWhisperInputMethod-x64.msi" | Set-Content -LiteralPath "$path.sha256" -Encoding utf8NoBOM
-          "Windows x64 MSI version: $version" >> $env:GITHUB_STEP_SUMMARY
+          "$hash  WindWhisperInputMethod-x64-Setup.exe" | Set-Content -LiteralPath "$path.sha256" -Encoding utf8NoBOM
+          "Windows x64 NSIS installer version: $version" >> $env:GITHUB_STEP_SUMMARY
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
         with:
           name: windwhisper-windows-x64-${{ github.run_number }}
           path: |
-            build/windows/Installer/Release/*.msi
-            build/windows/Installer/Release/*.sha256
+            build/windows/Installer/Release/WindWhisperInputMethod-x64-Setup.exe
+            build/windows/Installer/Release/WindWhisperInputMethod-x64-Setup.exe.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -77,11 +75,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-test-logs-${{ github.run_number }}
-          path: build/windows/Testing/Temporary/
+          path: |
+            build/windows/Testing/Temporary/
+            C:/ProgramData/WindWhisper/Installer/*.log
           if-no-files-found: ignore
 
   publish:
-    name: Attach MSI to release
+    name: Attach setup EXE to release
     if: github.event_name == 'release'
     needs: build
     runs-on: windows-2022
@@ -99,5 +99,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          gh release upload "$env:RELEASE_TAG" installer/WindWhisperInputMethod-x64.msi installer/WindWhisperInputMethod-x64.msi.sha256 --repo "$env:GITHUB_REPOSITORY" --clobber
+          gh release upload "$env:RELEASE_TAG" installer/WindWhisperInputMethod-x64-Setup.exe installer/WindWhisperInputMethod-x64-Setup.exe.sha256 --repo "$env:GITHUB_REPOSITORY" --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Release upload failed' }
