@@ -112,6 +112,9 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
         /// Flutter before flutter#191062 (闲鱼): inserting goes in at the caret
         /// and the marked code stays behind as plain text.
         case legacyFlutter
+        /// 闲鱼: inserting the marked code itself shows it twice, although the
+        /// document context reports one copy.
+        case xianyu
     }
 
     private enum Call {
@@ -127,7 +130,7 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     private(set) var markedRange: Range<Int>?
     private(set) var markedTextCalls = 0
     private(set) var cursorAdjustmentCalls = 0
-    private let host: Host
+    let host: Host
     /// iOS merges a keyboard's calls until the host applies them (modelled as
     /// a 60 ms delivery delay): inserts first, then the last setMarkedText,
     /// then unmarkText.
@@ -139,25 +142,18 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     var onHostEcho: (() -> Void)?
     private var isEchoPending = false
 
-    /// Flutter hosts report the marked code as part of the document context.
-    private let contextIncludesMarkedText: Bool
-
-    init(text: String = "", cursor: Int = 0, host: Host = .uikit, mergesCallsPerTurn: Bool = false,
-         contextIncludesMarkedText: Bool = false) {
+    init(text: String = "", cursor: Int = 0, host: Host = .uikit, mergesCallsPerTurn: Bool = false) {
         self.text = text
         self.cursor = cursor
         self.host = host
         self.mergesCallsPerTurn = mergesCallsPerTurn
-        self.contextIncludesMarkedText = contextIncludesMarkedText
         super.init()
     }
     var markedText: String? {
         markedRange.map { String(Array(text)[$0]) }
     }
-    /// Like UIKit, the document context excludes marked text by default.
-    var documentContextBeforeInput: String? {
-        String(text.prefix(contextIncludesMarkedText ? cursor : markedRange?.lowerBound ?? cursor))
-    }
+    /// Like iOS, the document context excludes marked text.
+    var documentContextBeforeInput: String? { String(text.prefix(markedRange?.lowerBound ?? cursor)) }
     /// Everything before the caret, marked text included (test assertions).
     var textBeforeCaret: String { String(text.prefix(cursor)) }
     var documentContextAfterInput: String? { String(text.dropFirst(cursor)) }
@@ -213,10 +209,11 @@ final class TouchTestDocumentProxy: NSObject, UITextDocumentProxy {
     private func apply(_ call: Call) {
         switch call {
         case .insert(let value):
-            let range = host == .uikit ? (markedRange ?? cursor..<cursor) : cursor..<cursor
-            replace(range, with: value)
+            let range = host == .legacyFlutter ? cursor..<cursor : (markedRange ?? cursor..<cursor)
+            let shownTwice = host == .xianyu && markedRange.map { String(Array(text)[$0]) == value } == true
+            replace(range, with: shownTwice ? value + value : value)
             markedRange = nil
-            cursor = range.lowerBound + value.count
+            cursor = range.lowerBound + value.count * (shownTwice ? 2 : 1)
         case .mark(let value, let selection):
             let range = markedRange ?? cursor..<cursor
             replace(range, with: value)

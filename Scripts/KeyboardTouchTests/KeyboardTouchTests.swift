@@ -107,6 +107,16 @@ final class KeyboardTouchTests: XCTestCase {
         app.buttons["删除"].tap()
         XCTAssertEqual(value(), "", "Deleting the last code character leaves nothing behind")
 
+        // Return before any commit (host not yet learned) still commits once.
+        app.buttons["n"].tap()
+        app.buttons["i"].tap()
+        app.buttons["换行"].firstMatch.tap()
+        XCTAssertEqual(value(), "ni")
+        app.buttons["a"].tap()
+        XCTAssertEqual(value(), "nia", "The first Return commits the code")
+        for _ in 0..<3 { app.buttons["删除"].tap() }
+        XCTAssertEqual(value(), "")
+
         app.buttons["n"].tap()
         app.buttons["i"].tap()
         let candidate = app.collectionViews.cells

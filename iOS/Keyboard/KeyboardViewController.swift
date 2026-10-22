@@ -373,15 +373,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private var isHostSettling = false
     private var hostSettleTimer: Timer?
     private var pendingCommit = ""
-    /// A raw-code commit inserted over its own marked code; verified once the
-    /// host settled, because legacy Flutter hosts insert a second copy.
-    /// Flutter hosts include the marked code in the document context, UIKit
-    /// hosts do not; the context read before marking tells the two apart.
-    private var rawCodeCommitCheck: (contextBefore: String, includesCode: Bool, code: String)?
-    /// Set when the host had not applied the raw-code commit yet at settling;
-    /// checked again on the host's next change, until this uptime.
-    private var rawCodeCommitCheckDeadline: TimeInterval = 0
-    private var contextBeforeMarking: String?
+    /// Whether the host reports a commit back through textDidChange (UIKit) or
+    /// not (Flutter, 闲鱼). Learned from a commit: an echo before the deadline
+    /// (merged calls can delay it past settling) means it does.
+    private var hostEchoesCommits: Bool?
+    private var hostEchoDeadline: TimeInterval?
     private var pendingMarkedComposition: String?
     /// Native text fields echo our own commit ~50-70 ms later; that echo must
     /// not end the code typed after the commit. Hosts without the echo (Flutter)
@@ -544,8 +540,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         // themselves; clearing it never leaves an orphaned marked range behind.
         // The document context excludes marked text, so it cannot tell us more.
         guard !isEditingHost else { return }
-        if rawCodeCommitCheck != nil, !isHostSettling {
-            removeDuplicatedRawCode()
+        if let deadline = hostEchoDeadline {
+            hostEchoDeadline = nil
+            if ProcessInfo.processInfo.systemUptime < deadline { hostEchoesCommits = true }
         }
         if isHostSettling {
             // The host applied our commit; queued writes can follow now.
@@ -845,17 +842,13 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             testDocumentProxy = nil
             usesInlineComposition = false
         }
-        let hosts: [(TouchTestDocumentProxy.Host, Bool, Bool)] = [
-            (.uikit, false, false), (.uikit, true, false), (.legacyFlutter, true, false),
-            (.legacyFlutter, true, true),
+        let hosts: [(TouchTestDocumentProxy.Host, Bool)] = [
+            (.uikit, false), (.uikit, true), (.legacyFlutter, true), (.xianyu, true),
         ]
-        for (host, merges, includesMarked) in hosts {
+        for (host, merges) in hosts {
             try verifyInlineComposition(
-                TouchTestDocumentProxy(
-                    text: "前后", cursor: 1, host: host, mergesCallsPerTurn: merges,
-                    contextIncludesMarkedText: includesMarked
-                ),
-                label: "\(host) merges=\(merges) contextIncludesMarked=\(includesMarked)"
+                TouchTestDocumentProxy(text: "前后", cursor: 1, host: host, mergesCallsPerTurn: merges),
+                label: "\(host) merges=\(merges)"
             )
         }
 
@@ -891,6 +884,15 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         testDocumentProxy = proxy
         proxy.onHostEcho = { [weak self] in self?.textDidChange(nil) }
         session?.clearComposition()
+        hostEchoesCommits = nil
+
+        // Return before any commit told the host apart: remove, then insert.
+        typeTestCode("qzxvqq")
+        insertNewline()
+        settleHost()
+        try check(proxy.text == "前qzxvqq后" && proxy.markedText == nil && hostEchoesCommits == nil,
+                  "first return")
+        for _ in 0..<6 { deleteBackwardOnce() }
 
         typeTestCode("ni")
         try check(proxy.text == "前ni后" && proxy.markedText == "ni" && compositionLabel.isHidden, "type")
@@ -909,12 +911,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         settleHost()
         try check(proxy.text == "前" + expected.text + "后" && proxy.markedText == nil, "space")
 
+        // The space commit taught the keyboard whether the host echoes.
         typeTestCode("qzxvqq")
-        let callsBeforeReturn = proxy.markedTextCalls
+        RunLoop.main.run(until: Date().addingTimeInterval(0.5))
         insertNewline()
+        try check(hostEchoesCommits == (proxy.host == .uikit), "learned host")
         settleHost()
-        // Return never removes and re-inserts the code (that flickers).
-        try check(proxy.markedTextCalls == callsBeforeReturn, "return in place")
         try check(proxy.textBeforeCaret == "前" + expected.text + "qzxvqq"
             && proxy.markedText == nil, "return")
 
@@ -1907,9 +1909,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
         pendingMarkedComposition = nil
         guard text != markedComposition else { return }
-        if markedComposition.isEmpty {
-            contextBeforeMarking = textDocumentProxy.documentContextBeforeInput ?? ""
-        }
         writeHost {
             textDocumentProxy.setMarkedText(
                 text,
@@ -1922,30 +1921,19 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     /// Commits over marked code the way Apple documents for custom keyboards:
     /// mark the final text, then unmark it in place. `insertText` is not used
     /// over marked text: Flutter hosts before flutter#191062 (闲鱼) insert at the
-    /// caret and leave the code behind as plain text.
+    /// caret and leave the code behind as plain text, or show a second copy
+    /// that the document context never reports.
     private func commitToHost(_ text: String) {
         if isHostSettling {
             // Nothing is marked while settling; this follows the previous commit.
             pendingCommit += text
             return
         }
-        if !markedComposition.isEmpty, text == markedComposition {
-            // Return commits the raw code. A bare unmarkText is unreliable (the
-            // underline can stay until a second press) and remove-then-insert
-            // flickers. UIKit hosts replace the marked code in place; legacy
-            // Flutter keeps it and inserts a copy, which finishHostSettling()
-            // removes.
-            let contextBefore = textDocumentProxy.documentContextBeforeInput ?? ""
-            let includesCode = contextBefore.hasSuffix(text)
-                && contextBeforeMarking.map { contextBefore == $0 + text } ?? false
-            rawCodeCommitCheck = (contextBefore, includesCode, text)
-            rawCodeCommitCheckDeadline = 0
-            writeHost { textDocumentProxy.insertText(text) }
-            markedComposition = ""
-            beginHostSettling()
+        let replacesMarkedCode = !markedComposition.isEmpty
+        if replacesMarkedCode, text == markedComposition {
+            commitMarkedCode(text)
             return
         }
-        let replacesMarkedCode = !markedComposition.isEmpty
         writeHost {
             if replacesMarkedCode {
                 textDocumentProxy.setMarkedText(
@@ -1960,8 +1948,47 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         markedComposition = ""
         if replacesMarkedCode {
             ignoresHostEchoUntil = ProcessInfo.processInfo.systemUptime + 0.5
+            learnHostEcho()
             beginHostSettling()
         }
+    }
+
+    /// Return commits the marked code itself. UIKit hosts keep the underline
+    /// after re-marking identical text, so they get insertText, which replaces
+    /// the marked code; legacy Flutter (闲鱼) shows that insert twice, so it is
+    /// marked and unmarked like other commits. Until a commit has told the two
+    /// apart, the code is removed and inserted again once the host settled.
+    private func commitMarkedCode(_ text: String) {
+        markedComposition = ""
+        if hostEchoesCommits == nil, let deadline = hostEchoDeadline,
+           ProcessInfo.processInfo.systemUptime >= deadline {
+            hostEchoDeadline = nil
+            hostEchoesCommits = false
+        }
+        switch hostEchoesCommits {
+        case true?:
+            writeHost { textDocumentProxy.insertText(text) }
+            beginHostSettling()
+        case false?:
+            writeHost {
+                textDocumentProxy.setMarkedText(
+                    text,
+                    selectedRange: NSRange(location: (text as NSString).length, length: 0)
+                )
+                textDocumentProxy.unmarkText()
+            }
+            ignoresHostEchoUntil = ProcessInfo.processInfo.systemUptime + 0.5
+            beginHostSettling()
+        case nil:
+            writeHost { textDocumentProxy.setMarkedText("", selectedRange: NSRange(location: 0, length: 0)) }
+            pendingCommit = text
+            beginHostSettling()
+        }
+    }
+
+    private func learnHostEcho() {
+        guard hostEchoesCommits == nil else { return }
+        hostEchoDeadline = ProcessInfo.processInfo.systemUptime + 0.5
     }
 
     private func beginHostSettling() {
@@ -1977,10 +2004,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         hostSettleTimer = nil
         guard isHostSettling else { return }
         isHostSettling = false
-        if rawCodeCommitCheck != nil {
-            rawCodeCommitCheckDeadline = ProcessInfo.processInfo.systemUptime + 0.5
-            removeDuplicatedRawCode()
-        }
         if !pendingCommit.isEmpty {
             let commit = pendingCommit
             pendingCommit = ""
@@ -1990,33 +2013,6 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
         if let pending = pendingMarkedComposition {
             setMarkedComposition(pending)
-        }
-    }
-
-    /// Legacy Flutter keeps the marked code and inserts the commit as a copy.
-    /// Until the host reports the commit, the check waits for its next change.
-    private func removeDuplicatedRawCode() {
-        guard let check = rawCodeCommitCheck else { return }
-        let context = textDocumentProxy.documentContextBeforeInput ?? ""
-        let waits = context == check.contextBefore && !check.includesCode
-            && ProcessInfo.processInfo.systemUptime < rawCodeCommitCheckDeadline
-            && markedComposition.isEmpty && !hasActiveEngineComposition
-        if waits { return }
-        rawCodeCommitCheck = nil
-        guard markedComposition.isEmpty else { return }
-        let before = check.includesCode
-            ? String(check.contextBefore.dropLast(check.code.count))
-            : check.contextBefore
-        let duplicated = context.hasSuffix(String(before.suffix(16)) + check.code + check.code)
-        logger.debug("""
-            raw code commit: includesCode=\(check.includesCode, privacy: .public) \
-            duplicated=\(duplicated, privacy: .public) \
-            before=\(check.contextBefore.suffix(24), privacy: .private) \
-            after=\(context.suffix(24), privacy: .private)
-            """)
-        guard duplicated else { return }
-        writeHost {
-            for _ in check.code { textDocumentProxy.deleteBackward() }
         }
     }
 
