@@ -9,6 +9,9 @@ enum KeyboardSharedPreferences {
     /// keyboards) instead of above the keys.
     static let inlineCompositionKey = "inlineComposition"
     static let defaultInlineComposition = true
+    /// Suggest likely next words after a commit instead of punctuation.
+    static let inputPredictionKey = "inputPrediction"
+    static let defaultInputPrediction = true
 
     static func normalizedHapticIntensity(_ value: Double) -> Double {
         guard value.isFinite else { return defaultHapticIntensity }

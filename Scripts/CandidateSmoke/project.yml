@@ -13,11 +13,14 @@ targets:
     platform: iOS
     sources:
       - path: ../../iOS/Keyboard/KeyboardViewController.swift
+      - path: ../../iOS/Keyboard/InputPredictions.swift
       - path: ../../iOS/Keyboard/FengYuSchema.swift
       - path: ../../iOS/Shared/KeyboardSharedStorage.swift
       - path: ../../Core/SwiftAdapter
       - path: ../ios-candidate-ui-smoke.swift
       - path: ../../iOS/Resources/fy.dict.yaml
+        buildPhase: resources
+      - path: ../../iOS/Resources/predict.txt
         buildPhase: resources
       - path: ../../LICENSES/pinyin-data-MIT.txt
         buildPhase: resources

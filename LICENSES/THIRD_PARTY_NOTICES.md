@@ -19,6 +19,16 @@
 `Scripts/import-ios-characters.rb` 校验上游文件 SHA256 后提取 Unicode 码点，保留源文件顺序。
 此 MIT 许可仅适用于字表来源，不改变合并词库中其他数据的来源及适用许可。
 
+## iOS 输入联想
+
+`iOS/Resources/predict.txt` 派生自 [rime/librime-predict](https://github.com/rime/librime-predict)
+发布的 [`data-1.0/predict.txt`](https://github.com/rime/librime-predict/releases/tag/data-1.0)
+（SHA256 `df0f7a9ef96569da402d9ea2376aefad4d15382ebcccb05ec84a0acbc00c7f83`），
+该数据由 [rime-essay](https://github.com/rime/rime-essay) 与
+[rime-octagram-data](https://github.com/lotem/rime-octagram-data) 生成，上游许可为 LGPL-3.0。
+`Scripts/generate-ios-predictions.sh` 校验上游文件后转换为简体，只保留 iOS 词库中的词，
+每个词最多保留 10 个联想词。键盘从用户输入中学到的联想只保存在本机，不含第三方数据。
+
 ## 风语代码
 
 应用代码由项目维护者编写，使用 Apple InputMethodKit、AppKit 和 Swift 系统框架。

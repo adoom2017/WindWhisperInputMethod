@@ -20,6 +20,14 @@ private enum KeyboardPreferences {
         return defaults.bool(forKey: KeyboardSharedPreferences.inlineCompositionKey)
     }
 
+    static var inputPrediction: Bool {
+        guard let defaults = UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier),
+              defaults.object(forKey: KeyboardSharedPreferences.inputPredictionKey) != nil else {
+            return KeyboardSharedPreferences.defaultInputPrediction
+        }
+        return defaults.bool(forKey: KeyboardSharedPreferences.inputPredictionKey)
+    }
+
     static var selectedSchemaIdentifier: String {
         UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier)?
             .string(forKey: KeyboardSharedPreferences.schemaKey)
@@ -35,6 +43,14 @@ private actor KeyboardInputRuntime {
     private var loadedUserData: URL?
     private var loadedCustomWords: URL?
     private var customWordsData: Data?
+    private var predictions: InputPredictions?
+
+    func loadPredictions() -> InputPredictions? {
+        if let predictions { return predictions }
+        guard let url = Bundle.main.url(forResource: "predict", withExtension: "txt") else { return nil }
+        predictions = try? InputPredictions(contentsOf: url)
+        return predictions
+    }
 
     func makeSession(
         paths: InputServicePaths,
@@ -86,6 +102,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
     private enum SuggestionItem {
         case punctuation(String)
         case candidate(CandidateSnapshot)
+        /// A likely next word after the last commit.
+        case prediction(String)
         case status(String)
     }
 
@@ -399,6 +417,12 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         return view
     }()
     private var suggestionItems = [SuggestionItem]()
+    private var predictions: InputPredictions?
+    private var learnedPredictions: LearnedPredictions?
+    /// The committed text the shown predictions follow; selecting one extends it.
+    private var predictionContext = ""
+    /// The last commit, while nothing else has been typed after it.
+    private var lastCommittedWord: String?
     private var candidateQueryGeneration: UInt64 = 0
     private var hasMoreCandidateItems = false
     private var highlightedCandidateIndex = 0
@@ -506,6 +530,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         customWordsRefreshTimer = nil
         stopRepeatingBackspace()
         cancelLocalComposition()
+        lastCommittedWord = nil
+        learnedPredictions?.flush()
         super.viewWillDisappear(animated)
     }
 
@@ -638,6 +664,13 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
                 try Task.checkCancellation()
                 guard let self else { return }
                 _ = result.session.selectSchema(identifier: schema.rawValue)
+                predictions = await KeyboardInputRuntime.shared.loadPredictions()
+                try Task.checkCancellation()
+                if learnedPredictions == nil {
+                    learnedPredictions = LearnedPredictions(
+                        url: paths.userData.appendingPathComponent("user_predictions.tsv")
+                    )
+                }
                 service = result.service
                 session = result.session
                 startupErrorDescription = nil
@@ -751,7 +784,9 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         precondition(testLastCommit == "qzxvqq" && !hasActiveEngineComposition && compositionLabel.isHidden)
         try verifyLocalComposition()
         try verifyInlineComposition()
-        return "PASS collection: \(count) items, \(created) additional cells, \(rounds) scroll batches, selection 6/33/last, stale batch rejected, query reset, local and inline composition"
+        try verifyPredictions()
+        try verifyLearnedPredictions()
+        return "PASS collection: \(count) items, \(created) additional cells, \(rounds) scroll batches, selection 6/33/last, stale batch rejected, query reset, local and inline composition, predictions, learned predictions"
     }
 
     private func typeTestCode(_ text: String) {
@@ -834,6 +869,143 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         viewWillDisappear(false)
         precondition(compositionLabel.isHidden && !hasActiveEngineComposition && proxy.text == committed)
         precondition(proxy.markedTextCalls == 0 && proxy.cursorAdjustmentCalls == 0)
+    }
+
+    private func verifyPredictions() throws {
+        func check(_ condition: Bool, _ step: String) throws {
+            guard condition else { throw InputEngineError.smokeAssertion("predictions \(step)") }
+        }
+        guard let url = Bundle.main.url(forResource: "predict", withExtension: "txt") else {
+            throw InputEngineError.smokeAssertion("predict.txt is not bundled")
+        }
+        let data = try InputPredictions(contentsOf: url)
+        let lines = try String(contentsOf: url, encoding: .utf8).split(separator: "\n").filter { !$0.hasPrefix("#") }
+        // The binary search reaches both ends of the file.
+        for line in [lines.first!, lines.last!] {
+            let fields = line.split(separator: "\t").map(String.init)
+            try check(data.predictions(after: fields[0]) == Array(fields.dropFirst()), "edge \(fields[0])")
+        }
+        let afterWe = data.predictions(after: "我们")
+        try check(afterWe.first == "的" && afterWe.contains("可以"), "我们: \(afterWe)")
+        try check(data.predictions(after: "今天天气很好") == data.predictions(after: "很好")
+            && !data.predictions(after: "很好").isEmpty, "longest tail")
+        try check(data.predictions(after: "qzxvqq").isEmpty && data.predictions(after: "").isEmpty, "miss")
+
+        usesInlineComposition = false
+        let proxy = TouchTestDocumentProxy()
+        testDocumentProxy = proxy
+        predictions = data
+        defer {
+            testDocumentProxy = nil
+            predictions = nil
+        }
+        session?.clearComposition()
+        typeTestCode("ni")
+        guard case .candidate(let word) = suggestionItems[0] else {
+            throw InputEngineError.smokeAssertion("missing candidate")
+        }
+        space()
+        settleHost()
+        let expected = data.predictions(after: word.text)
+        try check(!expected.isEmpty, "no data after \(word.text)")
+        guard case .prediction(let first) = suggestionItems.first else {
+            throw InputEngineError.smokeAssertion("predictions not shown after \(word.text)")
+        }
+        try check(first == expected[0] && suggestionItems.count == expected.count, "shown")
+        collectionView(suggestionCollectionView, didSelectItemAt: IndexPath(item: 0, section: 0))
+        settleHost()
+        try check(proxy.text == word.text + first, "select: \(proxy.text)")
+        // The next predictions follow the selected word.
+        let next = data.predictions(after: word.text + first)
+        if case .prediction(let shown)? = suggestionItems.first {
+            try check(shown == next.first, "chain")
+        } else {
+            try check(next.isEmpty, "chain missing")
+        }
+        deleteBackwardOnce()
+        guard case .punctuation? = suggestionItems.first else {
+            throw InputEngineError.smokeAssertion("predictions stay after Backspace")
+        }
+        // A commit without predictions (a raw code) shows punctuation.
+        typeTestCode("qzxvqq")
+        insertNewline()
+        settleHost()
+        guard case .punctuation? = suggestionItems.first else {
+            throw InputEngineError.smokeAssertion("predictions after a raw code")
+        }
+    }
+
+    private func verifyLearnedPredictions() throws {
+        func check(_ condition: Bool, _ step: String) throws {
+            guard condition else { throw InputEngineError.smokeAssertion("learned predictions \(step)") }
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("user_predictions.tsv")
+        var day = 20_000
+        let learned = LearnedPredictions(url: url, today: { day })
+        try check(!LearnedPredictions.isLearnable("qzxvqq") && !LearnedPredictions.isLearnable("，")
+            && !LearnedPredictions.isLearnable("") && LearnedPredictions.isLearnable("可以"), "learnable")
+
+        // A pair used once joins after the two best bundled words; twice, it leads.
+        let bundledURL = Bundle.main.url(forResource: "predict", withExtension: "txt")!
+        predictions = try InputPredictions(contentsOf: bundledURL)
+        learnedPredictions = learned
+        defer {
+            predictions = nil
+            learnedPredictions = nil
+        }
+        let bundled = predictions!.predictions(after: "我们")
+        learned.record(after: "我们", next: "风语")
+        try check(predictedWords(after: "我们") == Array((bundled.prefix(2) + ["风语"] + bundled.dropFirst(2)).prefix(10)),
+                  "new word once: \(predictedWords(after: "我们"))")
+        learned.record(after: "我们", next: "风语")
+        learned.record(after: "我们", next: "可以")
+        learned.record(after: "我们", next: "可以")
+        learned.record(after: "我们", next: "可以")
+        let ranked = predictedWords(after: "我们")
+        try check(ranked.prefix(2) == ["可以", "风语"] && ranked.filter { $0 == "可以" }.count == 1, "ranked: \(ranked)")
+        // Learned heads use the longest tail too.
+        try check(learned.predictions(after: "所以我们").first?.text == "可以", "tail")
+
+        learned.flush()
+        let reloaded = LearnedPredictions(url: url, today: { day })
+        try check(reloaded.entries == learned.entries && reloaded.pairCount == 2, "reload")
+
+        // Past capacity the weakest pairs go: old single uses before recent or frequent ones.
+        day -= 365
+        learned.record(after: "去年", next: "旧词")
+        day += 365
+        for index in 0..<LearnedPredictions.capacity {
+            let scalar = UnicodeScalar(0x4E00 + index)!
+            learned.record(after: "测试", next: "词" + String(Character(scalar)))
+        }
+        // 3 + 5,000 pairs: pruned to 4,000 when passing capacity, then 2 more.
+        try check(learned.pairCount == LearnedPredictions.retainedAfterPruning + 2
+            && learned.pairCount == learned.entries.values.map(\.count).reduce(0, +), "pruned to \(learned.pairCount)")
+        try check(learned.entries["我们"]?["可以"]?.count == 3 && learned.entries["去年"] == nil, "pruned the weakest")
+
+        // Consecutive commits are learned; a typed space ends the run.
+        let fresh = LearnedPredictions(url: root.appendingPathComponent("chain.tsv"))
+        learnedPredictions = fresh
+        usesInlineComposition = false
+        testDocumentProxy = TouchTestDocumentProxy()
+        defer { testDocumentProxy = nil }
+        session?.clearComposition()
+        typeTestCode("ni")
+        guard case .candidate(let first) = suggestionItems[0] else { throw InputEngineError.smokeAssertion("missing candidate") }
+        space()
+        typeTestCode("ni")
+        space()
+        try check(fresh.entries[String(first.text.suffix(4))]?[first.text]?.count == 1, "chain: \(fresh.entries)")
+        space()
+        typeTestCode("ni")
+        space()
+        try check(fresh.entries[String(first.text.suffix(4))]?[first.text]?.count == 1, "space ends the run")
+        if case .prediction? = suggestionItems.first {
+            collectionView(suggestionCollectionView, didSelectItemAt: IndexPath(item: 0, section: 0))
+            try check(fresh.pairCount == 2, "selected prediction is learned")
+        }
     }
 
     private func verifyInlineComposition() throws {
@@ -1520,6 +1692,46 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         reloadSuggestions(resetPosition: true)
     }
 
+    /// Likely next words after `text`, or the quick punctuation when there are
+    /// none (for example after English or a raw code).
+    private func showPredictions(after text: String) {
+        let next = KeyboardPreferences.inputPrediction ? predictedWords(after: text) : []
+        guard !next.isEmpty else { return showQuickPunctuation() }
+        predictionContext = String(text.suffix(4))
+        suggestionItems = next.map(SuggestionItem.prediction)
+        hasMoreCandidateItems = false
+        reloadSuggestions(resetPosition: true)
+    }
+
+    /// The user's own pairs lead: words used twice or more come first, a word
+    /// used once joins after the two best bundled ones, so one stray pair
+    /// does not take over.
+    private func predictedWords(after text: String) -> [String] {
+        let learned = learnedPredictions?.predictions(after: text) ?? []
+        var words = learned.filter { $0.count >= 2 }.map(\.text)
+        var rest = predictions?.predictions(after: text) ?? []
+        rest.insert(contentsOf: learned.filter { $0.count < 2 }.map(\.text), at: min(2, rest.count))
+        for word in rest where !words.contains(word) { words.append(word) }
+        return Array(words.prefix(10))
+    }
+
+    /// Learns `commit` as following the previous commit, unless something
+    /// else was typed in between.
+    private func learnCommit(_ commit: String) {
+        if KeyboardPreferences.inputPrediction, let previous = lastCommittedWord {
+            learnedPredictions?.record(after: previous, next: commit)
+        }
+        lastCommittedWord = commit
+    }
+
+    /// Text typed past the bar (a space, a symbol, Backspace) ends the run of
+    /// commits and makes the predictions stale.
+    private func endPredictions() {
+        lastCommittedWord = nil
+        guard case .prediction? = suggestionItems.first else { return }
+        showQuickPunctuation()
+    }
+
     private func showCandidates(
         _ candidates: [CandidateSnapshot],
         resetPosition: Bool
@@ -1560,6 +1772,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         case .candidate(let candidate):
             cell.label.attributedText = candidateTitle(candidate, selected: selected)
             cell.accessibilityLabel = "候选词 \(candidate.text)"
+        case .prediction(let text):
+            cell.label.attributedText = nil
+            cell.label.text = text
+            cell.label.font = .systemFont(ofSize: 19)
+            cell.accessibilityLabel = "联想词 \(text)"
         case .status(let text):
             cell.label.attributedText = nil
             cell.label.text = text
@@ -1588,6 +1805,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             ) ?? false
             if selected { playKeyFeedback() }
             refresh()
+        case .prediction(let text):
+            playKeyFeedback()
+            commitToHost(text)
+            learnCommit(text)
+            showPredictions(after: predictionContext + text)
         case .status:
             break
         }
@@ -1609,6 +1831,8 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             ]).width
         case .candidate(let value):
             textWidth = candidateTitle(value, selected: false).size().width
+        case .prediction(let value):
+            textWidth = (value as NSString).size(withAttributes: [.font: UIFont.systemFont(ofSize: 19)]).width
         }
         return CGSize(width: max(44, ceil(textWidth) + 20), height: Metrics.suggestionHeight)
     }
@@ -1649,6 +1873,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     private func insertPunctuation(_ punctuation: String) {
         textDocumentProxy.insertText(punctuation)
+        endPredictions()
     }
 
     @objc private func insertPunctuationKey(_ sender: UIButton) {
@@ -1687,6 +1912,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         guard let title = sender.currentTitle else { return }
         guard layoutMode == .letters else {
             textDocumentProxy.insertText(title)
+            endPredictions()
             return
         }
         guard let value = title.lowercased().first else { return }
@@ -1698,6 +1924,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
                 refresh()
             }
             textDocumentProxy.insertText(output)
+            endPredictions()
             if !isCapsLocked {
                 isShifted = false
                 lastShiftTapUptime = nil
@@ -1707,7 +1934,10 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         }
         let keyCode = Int32(output.utf8.first ?? 0)
         let handled = session?.process(keyCode: keyCode) ?? false
-        if !handled { textDocumentProxy.insertText(output) }
+        if !handled {
+            textDocumentProxy.insertText(output)
+            endPredictions()
+        }
         if isShifted {
             isShifted = false
             lastShiftTapUptime = nil
@@ -1718,7 +1948,10 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
 
     @objc private func space() {
         let handled = session?.process(keyCode: 0x20) ?? false
-        if !handled { textDocumentProxy.insertText(" ") }
+        if !handled {
+            textDocumentProxy.insertText(" ")
+            endPredictions()
+        }
         if handled { refresh() }
     }
 
@@ -1758,13 +1991,17 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             refresh()
         } else {
             textDocumentProxy.deleteBackward()
+            endPredictions()
         }
     }
 
     @objc private func insertNewline() {
         let handled = session?.process(keyCode: 0xFF0D) ?? false
         refresh()
-        if !handled { textDocumentProxy.insertText("\n") }
+        if !handled {
+            textDocumentProxy.insertText("\n")
+            endPredictions()
+        }
     }
 
     @objc private func toggleASCII() {
@@ -1873,6 +2110,7 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
             // Commit before marking any code that continues after it (for
             // example 比如 + n from "birun").
             commitToHost(commit)
+            learnCommit(commit)
         }
         asciiButton.setTitle(snapshot.status.isASCIIMode ? "英" : "中", for: .normal)
         asciiButton.accessibilityValue = snapshot.status.isASCIIMode ? "英文模式" : "中文模式"
@@ -1886,7 +2124,11 @@ final class KeyboardViewController: UIInputViewController, UICollectionViewDataS
         let candidates = snapshot.menu.candidates
         updateCompositionDisplay(composition)
         if composition.isEmpty && candidates.isEmpty {
-            showQuickPunctuation()
+            if let commit = snapshot.commitText, !commit.isEmpty {
+                showPredictions(after: commit)
+            } else {
+                showQuickPunctuation()
+            }
         } else {
             showCandidates(candidates, resetPosition: isNewQuery)
         }

@@ -126,6 +126,9 @@ final class KeyboardTouchTests: XCTestCase {
         // The 中/英 toggle sits inside the space bar; tap away from it.
         app.buttons["空格"].coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.5)).tap()
         XCTAssertEqual(value(), expected, "Space replaces the code with the candidate")
+        let prediction = app.collectionViews.cells
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "联想词 ")).firstMatch
+        XCTAssertTrue(prediction.waitForExistence(timeout: 5), "A commit shows next-word predictions")
 
         app.buttons["n"].tap()
         XCTAssertEqual(value(), expected + "n", "A new code follows the committed text")

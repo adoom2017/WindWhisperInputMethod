@@ -37,6 +37,12 @@ struct SettingsView: View {
     )
     private var inlineComposition = KeyboardSharedPreferences.defaultInlineComposition
 
+    @AppStorage(
+        KeyboardSharedPreferences.inputPredictionKey,
+        store: UserDefaults(suiteName: KeyboardSharedPreferences.appGroupIdentifier)
+    )
+    private var inputPrediction = KeyboardSharedPreferences.defaultInputPrediction
+
     @Environment(\.openURL) private var openURL
     @State private var trialText = ""
 
@@ -91,6 +97,12 @@ struct SettingsView: View {
                     Text("编码显示")
                 } footer: {
                     Text("开启时，输入的编码像系统键盘一样显示在输入框里；关闭后显示在候选栏左侧。个别 App 中编码显示异常时，可以关闭此项。")
+                }
+
+                Section {
+                    Toggle("输入联想", isOn: $inputPrediction)
+                } footer: {
+                    Text("上屏后在候选栏推荐接下来可能输入的词，例如输入“我们”后推荐“的”“都”“可以”。键盘会记住你常连着输入的词，把它们排到前面，记录只保存在本机；关闭后显示常用标点，也不再记录。")
                 }
 
                 Section("按键反馈") {
