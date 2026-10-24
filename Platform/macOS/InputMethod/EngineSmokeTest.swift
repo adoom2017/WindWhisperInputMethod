@@ -238,11 +238,16 @@ enum EngineSmokeTest {
             throw InputEngineError.smokeAssertion("Flypy reverse lookup committed its annotation")
         }
 
+        // Outside Flypy, ~ is a functional symbol: it commits the candidate
+        // and itself (docs/DECISIONS.md, 中文模式标点) instead of starting a reverse lookup.
         let pinyin = try service.makeSession()
         guard pinyin.selectSchema(identifier: FengYuSchema.fullPinyin.rawValue),
             pinyin.simulate(sequence: "ni"),
-            !pinyin.process(keyCode: 0x7E, modifierMask: KeyMapper.ModifierMask.shift),
-            try pinyin.readSnapshot().composition?.text == "ni"
+            let firstPinyin = try pinyin.readSnapshot().menu.candidates.first,
+            firstPinyin.comment == nil,
+            pinyin.process(keyCode: 0x7E, modifierMask: KeyMapper.ModifierMask.shift),
+            try pinyin.readSnapshot().commitText == firstPinyin.text + "~",
+            try pinyin.readSnapshot().composition == nil
         else {
             throw InputEngineError.smokeAssertion("reverse lookup leaked into another schema")
         }
@@ -425,20 +430,18 @@ enum EngineSmokeTest {
             throw InputEngineError.smokeAssertion("custom words were not normalized and persisted")
         }
 
-        let merged = try CustomWordsStore.merging(
-            CustomWordsDocument(comments: ["# 不导入这条注释"], entries: [
-                CustomWordEntry(text: "风语", code: "fy"),
-                CustomWordEntry(text: "词库导入", code: "ckdr", weight: 8_888),
-            ]),
-            into: loaded
-        )
+        // Importing replaces the whole list with the file's entries and comments.
+        let importURL = root.appendingPathComponent("import.tsv")
+        try Data("\u{FEFF}# 导入文件注释\r\n词库导入\tCKDR\t8888\r\n".utf8).write(to: importURL)
+        let imported = try CustomWordsStore(fileURL: importURL).load()
+        let replaced = try store.save(imported)
         guard
-            merged.addedEntries.map(\.text) == ["词库导入"],
-            merged.skippedCount == 1,
-            merged.document.entries.map(\.text) == ["风语", "输入法", "词库导入"],
-            merged.document.comments == loaded.comments
+            replaced.entries.map(\.text) == ["词库导入"],
+            replaced.entries.map(\.code) == ["ckdr"],
+            replaced.entries.map(\.weight) == [8_888],
+            try store.load().comments == ["# 导入文件注释"]
         else {
-            throw InputEngineError.smokeAssertion("custom words import did not merge and deduplicate")
+            throw InputEngineError.smokeAssertion("custom words import did not replace the list")
         }
 
         let duplicateResult = Swift.Result {
@@ -460,10 +463,10 @@ enum EngineSmokeTest {
         let reloaded = try store.load()
         guard
             case .failure = invalidCodeResult,
-            reloaded.entries.map(\.text) == loaded.entries.map(\.text),
-            reloaded.entries.map(\.code) == loaded.entries.map(\.code),
-            reloaded.entries.map(\.weight) == loaded.entries.map(\.weight),
-            reloaded.comments == loaded.comments
+            reloaded.entries.map(\.text) == replaced.entries.map(\.text),
+            reloaded.entries.map(\.code) == replaced.entries.map(\.code),
+            reloaded.entries.map(\.weight) == replaced.entries.map(\.weight),
+            reloaded.comments == replaced.comments
         else {
             throw InputEngineError.smokeAssertion("invalid custom word changed the persisted file")
         }

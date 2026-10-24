@@ -32,6 +32,21 @@ struct IOSCustomPhrasesSmoke {
         precondition(document.entries[0].code == "zz")
         try check(store.load().entries[0].text == "测试专属词组")
 
+        // A file exported on Windows (or saved by Notepad): BOM, CRLF, header, weights.
+        let windowsFile = root.appendingPathComponent("windows_export.tsv")
+        try Data(("\u{FEFF}# 词条<Tab>编码<Tab>可选权重\r\n测试专属词组\tzz\r\n新词组\tabc\t5\r\n").utf8)
+            .write(to: windowsFile)
+        let imported = try CustomWordsStore(fileURL: windowsFile).load()
+        try check(imported.entries.map(\.text) == ["测试专属词组", "新词组"] && imported.entries[1].weight == 5)
+        // Importing replaces the whole list.
+        let previous = try store.load()
+        try store.save(imported)
+        try check(store.load().entries.map(\.text) == ["测试专属词组", "新词组"])
+        // Exported text reads back on every platform: same header, UTF-8, LF.
+        let exported = try CustomWordsStore.contents(for: imported)
+        try check(exported.hasPrefix(CustomWordsStore.header + "\n") && exported.contains("新词组\tabc\t5\n"))
+        try store.save(previous)
+
         func candidates(_ schema: FengYuSchema, code: String = "zz") throws -> [String] {
             let service = try InputService(paths: paths, enabledSchemas: [schema], candidateLimit: nil)
             let session = try service.makeSession()

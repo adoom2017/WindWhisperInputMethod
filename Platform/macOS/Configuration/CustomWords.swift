@@ -21,12 +21,6 @@ struct CustomWordsDocument: Equatable, Sendable {
     static let empty = CustomWordsDocument(comments: [], entries: [])
 }
 
-struct CustomWordsMergeResult: Sendable {
-    let document: CustomWordsDocument
-    let addedEntries: [CustomWordEntry]
-    let skippedCount: Int
-}
-
 enum CustomWordsStoreError: LocalizedError {
     case invalidLine(Int)
     case emptyText(Int)
@@ -70,7 +64,9 @@ struct CustomWordsStore: Sendable {
             return .empty
         }
 
-        let contents = try String(contentsOf: fileURL, encoding: .utf8)
+        var contents = try String(contentsOf: fileURL, encoding: .utf8)
+        // Files saved by Windows Notepad can start with a UTF-8 byte order mark.
+        if contents.hasPrefix("\u{FEFF}") { contents.removeFirst() }
         var comments = [String]()
         var entries = [CustomWordEntry]()
 
@@ -145,26 +141,6 @@ struct CustomWordsStore: Sendable {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    static func merging(
-        _ importedDocument: CustomWordsDocument,
-        into currentDocument: CustomWordsDocument
-    ) throws -> CustomWordsMergeResult {
-        let current = try normalized(currentDocument)
-        let imported = try normalized(importedDocument)
-        var knownKeys = Set(current.entries.map(duplicateKey(for:)))
-        let addedEntries = imported.entries.filter { entry in
-            knownKeys.insert(duplicateKey(for: entry)).inserted
-        }
-        return CustomWordsMergeResult(
-            document: CustomWordsDocument(
-                comments: current.comments,
-                entries: current.entries + addedEntries
-            ),
-            addedEntries: addedEntries,
-            skippedCount: imported.entries.count - addedEntries.count
-        )
-    }
-
     private static func validated(_ entries: [CustomWordEntry]) throws -> [CustomWordEntry] {
         var firstIndexByKey = [String: Int]()
         return try entries.enumerated().map { offset, entry in
@@ -193,9 +169,5 @@ struct CustomWordsStore: Sendable {
             firstIndexByKey[duplicateKey] = index
             return CustomWordEntry(id: entry.id, text: text, code: code, weight: entry.weight)
         }
-    }
-
-    private static func duplicateKey(for entry: CustomWordEntry) -> String {
-        "\(entry.text)\u{0}\(entry.code)"
     }
 }

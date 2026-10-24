@@ -57,7 +57,7 @@ private final class CustomWordsEditorModel: ObservableObject {
     @Published var exportDocument: CustomWordsExportDocument?
 
     private let store: CustomWordsStore
-    private let comments: [String]
+    private var comments: [String]
     private let onSaved: () -> Void
     private var savedWords: [CustomWordDraft]
     var closeWindow: (() -> Void)?
@@ -121,13 +121,14 @@ private final class CustomWordsEditorModel: ObservableObject {
                 if didAccess { url.stopAccessingSecurityScopedResource() }
             }
 
-            let current = try currentDocument()
+            // Importing replaces the whole list, on every platform; nothing is
+            // written until “保存并应用”.
             let imported = try CustomWordsStore(fileURL: url).load()
-            let merged = try CustomWordsStore.merging(imported, into: current)
-            words = merged.document.entries.map(CustomWordDraft.init(entry:))
-            selection = Set(merged.addedEntries.map(\.id))
+            words = imported.entries.map(CustomWordDraft.init(entry:))
+            comments = imported.comments
+            selection.removeAll()
             errorMessage = nil
-            statusMessage = "已导入 \(merged.addedEntries.count) 个词条，跳过 \(merged.skippedCount) 个重复词条。"
+            statusMessage = "已用导入文件替换列表，共 \(imported.entries.count) 个词条。点击“保存并应用”完成保存。"
         } catch {
             guard !Self.isUserCancelled(error) else { return }
             errorMessage = "导入失败：\(error.localizedDescription)"

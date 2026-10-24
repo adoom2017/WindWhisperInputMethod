@@ -270,48 +270,5 @@ bool SaveCustomPhrases(const std::filesystem::path &path,
     return true;
 }
 
-bool MergeCustomPhrases(CustomPhraseDocument *target,
-                        CustomPhraseDocument imported,
-                        CustomPhraseMergeResult *result,
-                        std::wstring *error_message) {
-    if (!target) {
-        SetError(error_message, L"当前自定义词库不可用。");
-        return false;
-    }
-    if (!NormalizeCustomPhrases(target, error_message) ||
-        !NormalizeCustomPhrases(&imported, error_message)) {
-        return false;
-    }
-    CustomPhraseMergeResult summary;
-    std::unordered_map<std::string, size_t> existing;
-    for (size_t index = 0; index < target->entries.size(); ++index) {
-        const CustomPhrase &entry = target->entries[index];
-        existing.emplace(WideToUtf8(entry.text) + '\0' + entry.code, index);
-    }
-    for (CustomPhrase &entry : imported.entries) {
-        const std::string key = WideToUtf8(entry.text) + '\0' + entry.code;
-        const auto found = existing.find(key);
-        if (found == existing.end()) {
-            existing.emplace(key, target->entries.size());
-            target->entries.push_back(std::move(entry));
-            ++summary.added;
-        } else if (target->entries[found->second].weight != entry.weight) {
-            target->entries[found->second].weight = entry.weight;
-            ++summary.updated;
-        } else {
-            ++summary.unchanged;
-        }
-    }
-    for (std::string &comment : imported.comments) {
-        if (std::find(target->comments.begin(), target->comments.end(), comment) ==
-            target->comments.end()) {
-            target->comments.push_back(std::move(comment));
-        }
-    }
-    if (result) *result = summary;
-    if (error_message) error_message->clear();
-    return true;
-}
-
 }  // namespace fengyu
 #endif

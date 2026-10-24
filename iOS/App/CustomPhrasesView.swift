@@ -1,5 +1,30 @@
 import SwiftUI
 import Observation
+import UniformTypeIdentifiers
+
+/// The phrase file as written by every platform: UTF-8 `词条<Tab>编码<Tab>可选权重`.
+private struct CustomPhrasesFile: FileDocument {
+    static var readableContentTypes: [UTType] { [.tabSeparatedText, .plainText] }
+
+    let contents: String
+
+    init(contents: String) {
+        self.contents = contents
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        guard let data = configuration.file.regularFileContents,
+              let contents = String(data: data, encoding: .utf8)
+        else {
+            throw CocoaError(.fileReadInapplicableStringEncoding)
+        }
+        self.contents = contents
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: Data(contents.utf8))
+    }
+}
 
 @MainActor
 @Observable
@@ -32,6 +57,21 @@ private final class CustomPhrasesModel {
         document = try store().save(updated)
     }
 
+    /// Reads a phrase file; importing it replaces the whole list, on every platform.
+    func readImport(from url: URL) throws -> CustomWordsDocument {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+        return try CustomWordsStore(fileURL: url).load()
+    }
+
+    func replace(with imported: CustomWordsDocument) throws {
+        document = try store().save(imported)
+    }
+
+    func exportFile() throws -> CustomPhrasesFile {
+        CustomPhrasesFile(contents: try CustomWordsStore.contents(for: document))
+    }
+
     func delete(at offsets: IndexSet) {
         var updated = document
         updated.entries.remove(atOffsets: offsets)
@@ -46,6 +86,10 @@ private final class CustomPhrasesModel {
 struct CustomPhrasesView: View {
     @State private var model = CustomPhrasesModel()
     @State private var editingEntry: CustomWordEntry?
+    @State private var isImporting = false
+    @State private var exportFile: CustomPhrasesFile?
+    @State private var pendingImport: CustomWordsDocument?
+    @State private var statusMessage: String?
 
     var body: some View {
         List {
@@ -75,7 +119,7 @@ struct CustomPhrasesView: View {
                 ContentUnavailableView {
                     Label("暂无自定义词组", systemImage: "text.badge.plus")
                 } description: {
-                    Text("为常用的句子设置 1～4 个字母的编码，用小鹤音形打出编码即可上屏。")
+                    Text("为常用的句子设置 1～4 个字母的编码，用小鹤音形打出编码即可上屏。也可以从右上角导入 Mac 或 Windows 版导出的词组文件。")
                 } actions: {
                     Button("添加词组") {
                         editingEntry = CustomWordEntry(text: "", code: "")
@@ -92,6 +136,73 @@ struct CustomPhrasesView: View {
                 }
                 .disabled(!model.loaded)
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu("导入或导出", systemImage: "ellipsis.circle") {
+                    Button("导入词组…", systemImage: "square.and.arrow.down") {
+                        isImporting = true
+                    }
+                    Button("导出词组…", systemImage: "square.and.arrow.up") {
+                        do {
+                            exportFile = try model.exportFile()
+                        } catch {
+                            model.errorMessage = "导出失败：\(error.localizedDescription)"
+                        }
+                    }
+                    .disabled(model.document.entries.isEmpty)
+                }
+                .disabled(!model.loaded)
+            }
+        }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.tabSeparatedText, .plainText],
+            allowsMultipleSelection: false
+        ) { result in
+            do {
+                guard let url = try result.get().first else { return }
+                pendingImport = try model.readImport(from: url)
+            } catch {
+                model.errorMessage = "导入失败：\(error.localizedDescription)"
+            }
+        }
+        .confirmationDialog(
+            "替换全部词组",
+            isPresented: Binding(get: { pendingImport != nil }, set: { if !$0 { pendingImport = nil } }),
+            titleVisibility: .visible,
+            presenting: pendingImport
+        ) { imported in
+            Button("替换为 \(imported.entries.count) 个词组", role: .destructive) {
+                do {
+                    try model.replace(with: imported)
+                    statusMessage = "已用导入文件替换全部词组，共 \(imported.entries.count) 个。"
+                } catch {
+                    model.errorMessage = "导入失败：\(error.localizedDescription)"
+                }
+            }
+            Button("取消", role: .cancel) { }
+        } message: { imported in
+            Text("当前的 \(model.document.entries.count) 个词组将被文件中的 \(imported.entries.count) 个词组替换，此操作无法撤销。")
+        }
+        .fileExporter(
+            isPresented: Binding(get: { exportFile != nil }, set: { if !$0 { exportFile = nil } }),
+            document: exportFile,
+            contentType: .tabSeparatedText,
+            defaultFilename: "custom_words.tsv"
+        ) { result in
+            switch result {
+            case .success:
+                statusMessage = "已导出 \(model.document.entries.count) 个词组。"
+            case .failure(let error):
+                model.errorMessage = "导出失败：\(error.localizedDescription)"
+            }
+        }
+        .alert("完成", isPresented: Binding(
+            get: { statusMessage != nil },
+            set: { if !$0 { statusMessage = nil } }
+        )) {
+            Button("好", role: .cancel) { }
+        } message: {
+            Text(statusMessage ?? "")
         }
         .task { model.load() }
         .sheet(item: $editingEntry) { entry in

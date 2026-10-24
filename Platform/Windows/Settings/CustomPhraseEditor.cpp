@@ -289,39 +289,17 @@ void ImportPhrases(EditorState *state) {
                     L"导入失败", MB_OK | MB_ICONERROR);
         return;
     }
-    const std::wstring prompt =
-        L"文件中共有 " + std::to_wstring(imported.entries.size()) +
-        L" 个词组。\n\n选择“是”：合并到当前词库\n"
-        L"选择“否”：用导入文件替换当前全部词组\n"
-        L"选择“取消”：不做任何修改";
-    const int choice = MessageBoxW(
-        state->window, prompt.c_str(), L"选择导入方式",
-        MB_ICONQUESTION | MB_YESNOCANCEL | MB_DEFBUTTON1);
-    if (choice == IDCANCEL) return;
-
-    std::wstring status;
-    if (choice == IDYES) {
-        CustomPhraseMergeResult summary;
-        if (!MergeCustomPhrases(&state->document, std::move(imported),
-                                &summary, &error)) {
-            MessageBoxW(state->window, error.c_str(), L"导入失败",
-                        MB_OK | MB_ICONERROR);
-            return;
-        }
-        status = L"已合并：新增 " + std::to_wstring(summary.added) +
-                 L" 个，更新 " + std::to_wstring(summary.updated) +
-                 L" 个，跳过 " + std::to_wstring(summary.unchanged) +
-                 L" 个。";
-    } else {
-        const size_t count = imported.entries.size();
-        state->document = std::move(imported);
-        status = L"已用导入文件替换列表，共 " +
-                 std::to_wstring(count) + L" 个词组。";
-    }
+    // Importing replaces the whole list, on every platform; nothing is
+    // written until “保存并应用”.
+    const size_t count = imported.entries.size();
+    state->document = std::move(imported);
     state->dirty = true;
     PopulateForm(state, -1);
     RefreshList(state);
-    SetStatus(state, status + L" 点击“保存并应用”完成保存。", false);
+    SetStatus(state,
+              L"已用导入文件替换列表，共 " + std::to_wstring(count) +
+                  L" 个词组。点击“保存并应用”完成保存。",
+              false);
 }
 
 void ExportPhrases(EditorState *state) {
