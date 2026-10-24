@@ -50,7 +50,8 @@ int wmain() {
     CHECK(loaded.entries[0].text == L"导入词组");
     CHECK(loaded.entries[0].weight == 4000000);
 
-    loaded.entries.push_back({L"风语输入法", "FY", std::nullopt});
+    // The same phrase and code (codes compare lowercased) is a duplicate.
+    loaded.entries.push_back({L"导入词组", "DRCZ", std::nullopt});
     CHECK(!fengyu::NormalizeCustomPhrases(&loaded, &error));
     CHECK(!error.empty());
 
