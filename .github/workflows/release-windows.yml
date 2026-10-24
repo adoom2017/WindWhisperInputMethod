@@ -70,6 +70,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # upload-artifact only takes files under the workspace.
+      - name: Collect installer logs
+        if: failure()
+        run: |
+          New-Item -ItemType Directory -Force -Path build/windows/installer-logs | Out-Null
+          Copy-Item -Path 'C:/ProgramData/WindWhisper/Installer/*.log' `
+            -Destination build/windows/installer-logs -ErrorAction SilentlyContinue
+
       - name: Preserve test diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -77,7 +85,7 @@ jobs:
           name: windows-test-logs-${{ github.run_number }}
           path: |
             build/windows/Testing/Temporary/
-            C:/ProgramData/WindWhisper/Installer/*.log
+            build/windows/installer-logs/
           if-no-files-found: ignore
 
   publish:

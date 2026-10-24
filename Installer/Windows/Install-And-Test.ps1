@@ -60,6 +60,15 @@ if ($Uninstall) {
     exit 0
 }
 
+# fy_tsf_registration.exe is a windowless (GUI-subsystem) program: `&` neither
+# waits for it nor sets $LASTEXITCODE, so start it and wait for its exit code.
+function Invoke-Registrar([string]$Registrar, [string[]]$Arguments) {
+    # Start-Process does not quote arguments; install paths contain spaces.
+    $quoted = $Arguments | ForEach-Object { '"' + $_ + '"' }
+    $process = Start-Process -FilePath $Registrar -ArgumentList $quoted -Wait -PassThru -NoNewWindow
+    return $process.ExitCode
+}
+
 $registrar = Join-Path $installFolder 'fy_tsf_registration.exe'
 $tsfDll = Join-Path $installFolder 'fy_tsf.dll'
 foreach ($path in @($registrar, $tsfDll, (Join-Path $installFolder 'fy_engine.dll'))) {
@@ -68,9 +77,9 @@ foreach ($path in @($registrar, $tsfDll, (Join-Path $installFolder 'fy_engine.dl
     }
 }
 
-& $registrar status $tsfDll
-if ($LASTEXITCODE -ne 0) {
-    throw "TSF post-install verification failed with exit code $LASTEXITCODE. Log: $logPath"
+$status = Invoke-Registrar $registrar @('status', $tsfDll)
+if ($status -ne 0) {
+    throw "TSF post-install verification failed with exit code $status. Log: $logPath"
 }
 
 Write-Host 'Install and TSF registration verification completed successfully.'

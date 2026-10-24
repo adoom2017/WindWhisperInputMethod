@@ -25,6 +25,15 @@ if (Test-Path $legacyUpgradeKey) { throw 'An MSI WindWhisper installation alread
 $installedFolder = Join-Path $env:ProgramFiles 'WindWhisper Input Method'
 if (Test-Path -LiteralPath $installedFolder) { throw 'WindWhisper files already exist; use a clean VM.' }
 
+# fy_tsf_registration.exe is a windowless (GUI-subsystem) program: `&` neither
+# waits for it nor sets $LASTEXITCODE, so start it and wait for its exit code.
+function Invoke-Registrar([string]$Registrar, [string[]]$Arguments) {
+    # Start-Process does not quote arguments; install paths contain spaces.
+    $quoted = $Arguments | ForEach-Object { '"' + $_ + '"' }
+    $process = Start-Process -FilePath $Registrar -ArgumentList $quoted -Wait -PassThru -NoNewWindow
+    return $process.ExitCode
+}
+
 function Invoke-Setup([string]$FilePath, [string[]]$Arguments) {
     $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments -Wait -PassThru -WindowStyle Hidden
     if ($process.ExitCode -notin @(0, 3010)) {
@@ -44,8 +53,9 @@ try {
             throw "Installed file missing: $name"
         }
     }
-    & (Join-Path $installedFolder 'fy_tsf_registration.exe') status (Join-Path $installedFolder 'fy_tsf.dll')
-    if ($LASTEXITCODE -ne 0) { throw 'TSF registration verification failed.' }
+    $status = Invoke-Registrar (Join-Path $installedFolder 'fy_tsf_registration.exe') @(
+        'status', (Join-Path $installedFolder 'fy_tsf.dll'))
+    if ($status -ne 0) { throw "TSF registration verification failed with exit code $status." }
     # Re-running the same EXE must repair rather than show MSI error 1638.
     Invoke-Setup $InstallerPath @('/S')
     Write-Host 'Silent installation, hidden MSI entry, and same-version repair passed.'

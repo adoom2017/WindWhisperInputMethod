@@ -16,6 +16,15 @@ if ([string]::IsNullOrWhiteSpace($InstallRoot)) {
         $machineInstall
     }
 }
+# fy_tsf_registration.exe is a windowless (GUI-subsystem) program: `&` neither
+# waits for it nor sets $LASTEXITCODE, so start it and wait for its exit code.
+function Invoke-Registrar([string]$Registrar, [string[]]$Arguments) {
+    # Start-Process does not quote arguments; install paths contain spaces.
+    $quoted = $Arguments | ForEach-Object { '"' + $_ + '"' }
+    $process = Start-Process -FilePath $Registrar -ArgumentList $quoted -Wait -PassThru -NoNewWindow
+    return $process.ExitCode
+}
+
 $InstallRoot = [IO.Path]::GetFullPath($InstallRoot)
 $registrar = Join-Path $InstallRoot 'fy_tsf_registration.exe'
 $dll = Join-Path $InstallRoot 'fy_tsf.dll'
@@ -37,15 +46,14 @@ Start-Process -FilePath $ctfmonPath -WindowStyle Hidden
 Get-Process -Name TextInputHost -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
 
-& $registrar activate
-if ($LASTEXITCODE -ne 0) {
+if ((Invoke-Registrar $registrar @('activate')) -ne 0) {
     # ActivateProfile can return E_FAIL when the profile is already enabled or
     # when TextInputHost owns the current session.  A healthy registration is
     # sufficient here because the user can select WindWhisper from the input
     # indicator immediately after the host restarts.
-    & $registrar status $dll
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unable to activate WindWhisper profile (exit code $LASTEXITCODE)."
+    $status = Invoke-Registrar $registrar @('status', $dll)
+    if ($status -ne 0) {
+        throw "Unable to activate WindWhisper profile (exit code $status)."
     }
 }
 
