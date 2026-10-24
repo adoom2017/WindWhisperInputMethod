@@ -3,25 +3,23 @@
 set -euo pipefail
 
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
-mode="${1:-}"
-version="${2:-}"
-build_number="${3:-$(date +%Y%m%d%H%M)}"
-app_identity="${WINDWHISPER_APP_SIGN_IDENTITY:-${WINDWHISPER_CODE_SIGN_IDENTITY:-}}"
-installer_identity="${WINDWHISPER_INSTALLER_SIGN_IDENTITY:-}"
-notary_profile="${WINDWHISPER_NOTARY_PROFILE:-}"
-notary_keychain="${WINDWHISPER_NOTARY_KEYCHAIN:-}"
 dist_directory="$project_root/dist"
 
 usage() {
     cat <<'USAGE'
-Usage: Scripts/package-release.sh <local|signed|notarized> <version> [build-number]
+Usage: Scripts/package-release.sh <notary-profile> <version>
+       Scripts/package-release.sh --local <version>
 
-  local       Ad-hoc signed local release candidate; not for redistribution.
-  signed      Developer ID signed app and PKG installer.
-  notarized   Signed, notarized, and stapled PKG and DMG.
+  notary-profile  notarytool keychain profile saved with
+                  `xcrun notarytool store-credentials <name>`; builds a
+                  Developer ID signed, notarized and stapled PKG and DMG.
+  --local         Ad-hoc signed local release candidate; not for redistribution.
 
-Signed modes require WINDWHISPER_APP_SIGN_IDENTITY (or the legacy
-WINDWHISPER_CODE_SIGN_IDENTITY) and WINDWHISPER_INSTALLER_SIGN_IDENTITY.
+The build number is the current time (YYYYMMDDHHMM) unless
+WINDWHISPER_BUILD_NUMBER is set. Signing uses the first "Developer ID
+Application" and "Developer ID Installer" identities in the keychain unless
+WINDWHISPER_APP_SIGN_IDENTITY / WINDWHISPER_INSTALLER_SIGN_IDENTITY are set;
+WINDWHISPER_NOTARY_KEYCHAIN names a keychain holding the notary profile.
 USAGE
 }
 
@@ -30,24 +28,45 @@ fail() {
     exit 1
 }
 
-case "$mode" in
-    local|signed|notarized) ;;
-    *) usage >&2; exit 64 ;;
-esac
+if [[ $# -ne 2 || -z "$1" ]]; then
+    usage >&2
+    exit 64
+fi
+if [[ "$1" == "--local" ]]; then
+    mode=local
+    notary_profile=""
+else
+    mode=notarized
+    notary_profile="$1"
+fi
+version="$2"
+build_number="${WINDWHISPER_BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
+notary_keychain="${WINDWHISPER_NOTARY_KEYCHAIN:-}"
+
 if [[ ! "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
     fail "version must use numeric dotted notation (for example 1.0.0)"
 fi
 if [[ ! "$build_number" =~ ^[0-9]+$ ]]; then
     fail "build number must contain only digits"
 fi
-if [[ "$mode" != "local" && -z "$app_identity" ]]; then
-    fail "WINDWHISPER_APP_SIGN_IDENTITY is required for $mode mode"
-fi
-if [[ "$mode" != "local" && -z "$installer_identity" ]]; then
-    fail "WINDWHISPER_INSTALLER_SIGN_IDENTITY is required for $mode mode"
-fi
-if [[ "$mode" == "notarized" && -z "$notary_profile" ]]; then
-    fail "WINDWHISPER_NOTARY_PROFILE is required for notarized mode"
+
+# The first matching Developer ID identity in the keychain search list.
+find_identity() {
+    /usr/bin/security find-identity -v \
+        | /usr/bin/sed -nE "s/^.*\"($1: .*)\"$/\\1/p" \
+        | /usr/bin/head -n 1
+}
+app_identity=""
+installer_identity=""
+if [[ "$mode" != "local" ]]; then
+    app_identity="${WINDWHISPER_APP_SIGN_IDENTITY:-${WINDWHISPER_CODE_SIGN_IDENTITY:-$(find_identity "Developer ID Application")}}"
+    installer_identity="${WINDWHISPER_INSTALLER_SIGN_IDENTITY:-$(find_identity "Developer ID Installer")}"
+    [[ -n "$app_identity" ]] || fail "no Developer ID Application identity in the keychain"
+    [[ -n "$installer_identity" ]] || fail "no Developer ID Installer identity in the keychain"
+    echo "Version:   $version ($build_number)"
+    echo "App:       $app_identity"
+    echo "Installer: $installer_identity"
+    echo "Notary:    $notary_profile"
 fi
 release_name="windwhisper-$version-$build_number-macos-universal"
 staging_root="$dist_directory/$release_name"

@@ -47,16 +47,6 @@ Scripts/test-m9.sh          # 安装事务与回滚
 
 ## 打包
 
-本地安装包（ad-hoc 签名，仅供本机测试）：
-
-```bash
-Scripts/package-release.sh local 0.1.0 2026091001
-```
-
-参数依次为模式、版本号和纯数字构建号。产物输出到 `dist/`，包含 PKG、DMG 和 SHA-256 文件。
-
-### 签名与公证
-
 需要 `Developer ID Application` 和 `Developer ID Installer` 证书（含私钥）已导入钥匙串。
 首次使用时保存公证凭据：
 
@@ -64,23 +54,22 @@ Scripts/package-release.sh local 0.1.0 2026091001
 xcrun notarytool store-credentials "windwhisper-notary"
 ```
 
-然后打包。最简单的方式只需公证凭据名和版本号，构建号按当前时间生成，签名证书自动从钥匙串查找：
+然后只需公证凭据名和版本号即可签名、公证并打包：
 
 ```bash
-Scripts/publish.sh windwhisper-notary 0.1.0
+Scripts/package-release.sh windwhisper-notary 0.1.0
 ```
 
-需要指定证书或构建号时直接调用：
+构建号按当前时间（`YYYYMMDDHHMM`）生成，签名证书自动从钥匙串查找第一个
+Developer ID Application / Installer。需要时可用环境变量覆盖：`WINDWHISPER_BUILD_NUMBER`、
+`WINDWHISPER_APP_SIGN_IDENTITY`、`WINDWHISPER_INSTALLER_SIGN_IDENTITY`；公证凭据不在默认钥匙串时设置
+`WINDWHISPER_NOTARY_KEYCHAIN`。产物输出到 `dist/`，包含 PKG、DMG 和 SHA-256 文件。
+
+本地安装包（ad-hoc 签名，仅供本机测试）：
 
 ```bash
-WINDWHISPER_APP_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-WINDWHISPER_INSTALLER_SIGN_IDENTITY="Developer ID Installer: Your Name (TEAMID)" \
-WINDWHISPER_NOTARY_PROFILE="windwhisper-notary" \
-  Scripts/package-release.sh notarized 0.1.0 2026091001
+Scripts/package-release.sh --local 0.1.0
 ```
-
-仅签名不公证时把 `notarized` 改为 `signed`。公证凭据不在默认钥匙串时，设置
-`WINDWHISPER_NOTARY_KEYCHAIN`。用 `security find-identity -v -p codesigning` 查看可用证书。
 
 发布 `vMAJOR.MINOR.PATCH` 格式的 GitHub Release 也会自动签名打包，配置见
 [自动发布说明](../../docs/GITHUB_RELEASE.md)。

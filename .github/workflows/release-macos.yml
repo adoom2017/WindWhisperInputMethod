@@ -116,7 +116,8 @@ jobs:
       - name: Build and package notarized release
         run: |
           set -euo pipefail
-          Scripts/package-release.sh notarized "$RELEASE_VERSION" "$RELEASE_BUILD"
+          WINDWHISPER_BUILD_NUMBER="$RELEASE_BUILD" \
+            Scripts/package-release.sh "$WINDWHISPER_NOTARY_PROFILE" "$RELEASE_VERSION"
 
       - name: Upload assets to GitHub Release
         run: |
